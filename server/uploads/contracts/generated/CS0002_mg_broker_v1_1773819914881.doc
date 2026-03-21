@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office"
+      xmlns:w="urn:schemas-microsoft-com:office:word"
+      xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+  <meta charset="utf-8">
+  <xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml>
+  <style>
+    @page { size: A4; margin: 2cm 2.5cm; }
+    body { font-family: 'TH Sarabun New', 'Sarabun', serif; font-size: 16pt; line-height: 1.5; color: #000; }
+    .header { text-align: center; margin-bottom: 20pt; }
+    .logo-text { font-size: 24pt; font-weight: bold; color: #1a5e1f; margin-bottom: 10pt; }
+    .title { font-size: 18pt; font-weight: bold; text-decoration: underline; text-align: center; margin: 20pt 0; }
+    .section { margin: 12pt 0; text-indent: 60pt; text-align: justify; }
+    .field { border-bottom: 1pt dotted #000; display: inline-block; min-width: 100pt; padding: 0 4pt; }
+    .signature-area { margin-top: 40pt; display: table; width: 100%; }
+    .signature-col { display: table-cell; width: 33%; text-align: center; padding: 10pt; vertical-align: top; }
+    .signature-line { margin-top: 50pt; border-top: 1pt solid #000; }
+    table { border-collapse: collapse; width: 100%; }
+    td { padding: 4pt 8pt; border: 1pt solid #000; }
+    th { padding: 4pt 8pt; border: 1pt solid #000; background-color: #f5f5f5; font-weight: bold; }
+    .bold { font-weight: bold; }
+    .footer { margin-top: 40pt; text-align: center; font-size: 12pt; color: #666; }
+    ul { list-style-type: disc; margin-left: 30pt; }
+    li { margin-bottom: 8pt; }
+    .contract-number { text-align: center; margin-bottom: 20pt; }
+    .date-line { text-align: center; margin: 20pt 0; }
+  </style>
+</head>
+<body>
+
+    <div class="header">
+      <div class="logo-text">LOAN DD</div>
+      <div class="logo-text">บริษัท โลนด์ ดีดี จำกัด</div>
+    </div>
+
+    <div class="title">สัญญาแต่งตั้งนายหน้า จำนอง</div>
+
+    <p style="text-align: center;">ทำที่ บริษัท โลนด์ ดีดี จำกัด</p>
+    <p style="text-align: center;">87 ถนนสุวินทวงศ์ แขวงมีนบุรี เขตมีนบุรี กรุงเทพฯ 10510</p>
+
+    <div class="date-line">
+      วันที่ <span class="field">2026-03-18</span>
+      เดือน <span class="field">___________</span>
+      พ.ศ. <span class="field">___________</span>
+    </div>
+
+    <div class="section">
+      สัญญาฉบับนี้ทำขึ้นระหว่าง <span class="field">ภัทร</span>
+      เลขบัตรประชาชน <span class="field">_______________</span>
+      <span class="bold">ผู้มอบอำนาจ</span>
+    </div>
+
+    <div class="section">
+      ฝ่ายหนึ่งกับ <span class="field">_______________</span>
+      <span class="bold">ตัวแทน/นายหน้า</span> ฝ่ายอื่น
+    </div>
+
+    <div class="section">
+      <span class="bold">ข้อ 1</span> ผู้มอบอำนาจได้มอบอำนาจให้ตัวแทน/นายหน้าเพื่อดำเนินการค้นหาผู้ให้กู้
+      และเจรจาต่อรองเงื่อนไขการกู้ยืมเงินจำนองกับผู้ให้กู้
+    </div>
+
+    <div class="section">
+      <span class="bold">ข้อ 2</span> ตัวแทน/นายหน้าจะได้รับค่าบริการจากผู้มอบอำนาจ จำนวน
+      <span class="field">_______________</span> บาท
+      (_________________________________ บาท)
+    </div>
+
+    <div class="section">
+      <span class="bold">ข้อ 3</span> ตัวแทน/นายหน้าจะต้องปฏิบัติตามกฎหมายและข้อบังคับที่เกี่ยวข้อง
+      และรักษาความเป็นส่วนตัวของข้อมูลผู้มอบอำนาจ
+    </div>
+
+    <div style="margin-top: 40pt;">
+      <div class="signature-area">
+        <div class="signature-col">
+          <div>ผู้มอบอำนาจ</div>
+          <div class="signature-line"></div>
+          <div>(<span class="field">ภัทร</span>)</div>
+        </div>
+        <div class="signature-col">
+          <div>ตัวแทน/นายหน้า</div>
+          <div class="signature-line"></div>
+          <div>(<span class="field">_______________</span>)</div>
+        </div>
+        <div class="signature-col">
+          <div>พยาน</div>
+          <div class="signature-line"></div>
+          <div>(<span class="field">นางสาว อารยา เพิ่มลุดสำห์</span>)</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      บริษัท โลนด์ ดีดี จำกัด<br/>
+      87 ถนนสุวินทวงศ์ แขวงมีนบุรี เขตมีนบุรี กรุงเทพฯ 10510<br/>
+      โทรศัพท์ 081-638-6966
+    </div>
+  
+</body>
+</html>

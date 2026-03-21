@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office"
+      xmlns:w="urn:schemas-microsoft-com:office:word"
+      xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+  <meta charset="utf-8">
+  <xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml>
+  <style>
+    @page { size: A4; margin: 2cm 2.5cm; }
+    body { font-family: 'TH Sarabun New', 'Sarabun', serif; font-size: 16pt; line-height: 1.5; color: #000; }
+    .header { text-align: center; margin-bottom: 20pt; }
+    .logo-text { font-size: 24pt; font-weight: bold; color: #1a5e1f; margin-bottom: 10pt; }
+    .title { font-size: 18pt; font-weight: bold; text-decoration: underline; text-align: center; margin: 20pt 0; }
+    .section { margin: 12pt 0; text-indent: 60pt; text-align: justify; }
+    .field { border-bottom: 1pt dotted #000; display: inline-block; min-width: 100pt; padding: 0 4pt; }
+    .signature-area { margin-top: 40pt; display: table; width: 100%; }
+    .signature-col { display: table-cell; width: 33%; text-align: center; padding: 10pt; vertical-align: top; }
+    .signature-line { margin-top: 50pt; border-top: 1pt solid #000; }
+    table { border-collapse: collapse; width: 100%; }
+    td { padding: 4pt 8pt; border: 1pt solid #000; }
+    th { padding: 4pt 8pt; border: 1pt solid #000; background-color: #f5f5f5; font-weight: bold; }
+    .bold { font-weight: bold; }
+    .footer { margin-top: 40pt; text-align: center; font-size: 12pt; color: #666; }
+    ul { list-style-type: disc; margin-left: 30pt; }
+    li { margin-bottom: 8pt; }
+    .contract-number { text-align: center; margin-bottom: 20pt; }
+    .date-line { text-align: center; margin: 20pt 0; }
+  </style>
+</head>
+<body>
+
+    <div class="header">
+      <div class="logo-text">LOAN DD</div>
+      <div class="logo-text">บริษัท โลนด์ ดีดี จำกัด</div>
+    </div>
+
+    <div class="title">สัญญาขายฝาก</div>
+
+    <div class="contract-number">
+      เลขที่เอกสาร: <span class="field">CS0001</span>
+    </div>
+
+    <p style="text-align: center;">ทำที่ บริษัท โลนด์ ดีดี จำกัด</p>
+    <p style="text-align: center;">87 ถนนสุวินทวงศ์ แขวงมีนบุรี เขตมีนบุรี กรุงเทพฯ 10510</p>
+
+    <div class="date-line">
+      วันที่ <span class="field">19 มีนาคม 2569</span>
+      เดือน <span class="field">___________</span>
+      พ.ศ. <span class="field">___________</span>
+    </div>
+
+    <div class="section">
+      สัญญาฉบับนี้ทำขึ้นระหว่าง <span class="field">บริษัท โลนด์ ดีดี จำกัด</span>
+      เลขบัตรประชาชน <span class="field">0105566225836</span>
+      ที่อยู่ <span class="field">87 ถนนสุวินทวงศ์ แขวงมีนบุรี เขตมีนบุรี กรุงเทพฯ 10510</span>
+      โทรศัพท์ <span class="field">081-638-6966</span>
+      <span class="bold">ผู้ซื้อฝาก</span>
+    </div>
+
+    <div class="section">
+      ฝ่ายหนึ่งกับ <span class="field">ต่วย</span>
+      เลขบัตรประชาชน <span class="field">_______________</span>
+      ที่อยู่ <span class="field">23 หมู่บ้านโคกน้อย นาคู เขาวง กาฬสินธุ์</span>
+      โทรศัพท์ <span class="field">0987654390</span>
+      รหัสทรัพย์ <span class="field">CS0001</span>
+      <span class="bold">ผู้ขายฝาก</span> ฝ่ายอื่น
+    </div>
+
+    <div class="section">
+      <span class="bold">ข้อ 1</span> ผู้ขายฝากตกลงขายฝากให้แก่ผู้ซื้อฝาก ซึ่งเป็นทรัพย์สินดังต่อไปนี้
+      
+    ประเภท: <span class="field">house</span>
+    โฉนด: <span class="field">7654</span>
+    เลขที่ดิน: <span class="field">_______________</span>
+    
+    ที่ตั้ง: <span class="field">_______________</span>
+    ตำบล: <span class="field">นาคู</span>
+    อำเภอ: <span class="field">เขาวง</span>
+    จังหวัด: <span class="field">กาฬสินธุ์</span>
+    
+  
+    </div>
+
+    <div class="section">
+      <span class="bold">ข้อ 2</span> ผู้ซื้อฝากตกลงจ่ายเงินค่าขายฝากจำนวน
+      <span class="field">30,000.00</span> บาท
+      (_________________________________ บาท)
+    </div>
+
+    <div class="section">
+      <span class="bold">ข้อ 3</span> สัญญานี้มีระยะเวลา <span class="field">___</span> ปี
+      นับตั้งแต่วันทำสัญญา และกำหนดวันไถ่ถอน
+      <span class="field">_______________</span>
+    </div>
+
+    <div class="section" style="text-indent: 90pt;">
+      <span class="bold">ข้อ 3.1</span> ยอดไถ่ถอน <span class="field">_______________</span> บาท
+      (_________________________________ บาท)
+    </div>
+
+    <div class="section" style="text-indent: 90pt;">
+      <span class="bold">ข้อ 3.2</span> อัตราดอกเบี้ย <span class="field">4.50</span> % ต่อปี
+    </div>
+
+    <div class="section">
+      <span class="bold">ข้อ 4</span> สัญญาฉบับนี้สิ้นสุดลงเมื่อผู้ขายฝากชำระเงินเต็มจำนวนตามข้อ 3.1 ให้แก่ผู้ซื้อฝาก
+    </div>
+
+    <div class="section">
+      <span class="bold">ข้อ 5</span> ผู้ขายฝากจะดำเนินการจดทะเบียนโอนกรรมสิทธิ์ ณ สำนักงานที่ดิน
+      <span class="field">_______________</span> ภายใน 15 วันนับแต่วันทำสัญญา
+    </div>
+
+    <div class="section">
+      <span class="bold">ข้อ 6</span> บุคคลใดฝ่ายใดฝ่ายหนึ่งผิดสัญญาหรือไม่ปฏิบัติตามเงื่อนไขของสัญญา
+      บุคคลนั้นจะต้องชดใช้ค่าเสียหายให้แก่อีกฝ่ายหนึ่ง
+    </div>
+
+    <div style="margin-top: 40pt;">
+      <div style="text-align: center; margin-bottom: 30pt;">
+        <span class="bold">ลงชื่อเป็นสักษรพยาน</span>
+      </div>
+
+      <div class="signature-area">
+        <div class="signature-col">
+          <div>ผู้ขายฝาก</div>
+          <div class="signature-line"></div>
+          <div>(<span class="field">ต่วย</span>)</div>
+          <div style="font-size: 12pt; margin-top: 10pt;">วันที่_______/______/______</div>
+        </div>
+        <div class="signature-col">
+          <div>ผู้ซื้อฝาก</div>
+          <div class="signature-line"></div>
+          <div>(<span class="field">บริษัท โลนด์ ดีดี จำกัด</span>)</div>
+          <div style="font-size: 12pt; margin-top: 10pt;">วันที่_______/______/______</div>
+        </div>
+        <div class="signature-col">
+          <div>พยาน</div>
+          <div class="signature-line"></div>
+          <div>(<span class="field">นางสาว อารยา เพิ่มลุดสำห์</span>)</div>
+          <div style="font-size: 12pt; margin-top: 10pt;">วันที่_______/______/______</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      บริษัท โลนด์ ดีดี จำกัด<br/>
+      87 ถนนสุวินทวงศ์ แขวงมีนบุรี เขตมีนบุรี กรุงเทพฯ 10510<br/>
+      โทรศัพท์ 081-638-6966
+    </div>
+  
+</body>
+</html>

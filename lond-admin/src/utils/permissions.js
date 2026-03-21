@@ -1,0 +1,94 @@
+// ============ permissions.js ============
+// กำหนดสิทธิ์การเข้าถึงหน้าต่างๆ ตาม department
+
+const PERMISSIONS = {
+  // Super Admin / Manager — เห็นทุกอย่าง
+  super_admin: '*',
+  manager: '*',
+
+  // ฝ่ายขาย — เห็น: แชท + รายการเคส + นายหน้า เท่านั้น
+  sales: [
+    '/dashboard',
+    '/calendar',
+    '/chat',
+    '/sales',
+    '/agents',
+  ],
+
+  // ฝ่ายประเมิน — เห็น: หน้าประเมิน + ฟอร์มลูกหนี้ (edit only)
+  appraisal: [
+    '/dashboard',
+    '/calendar',
+    '/appraisal',
+    '/sales',   // ★ เข้าฟอร์มลูกหนี้ได้ (อัพโหลดรูป + ดูนัด)
+  ],
+
+  // ฝ่ายอนุมัติสินเชื่อ — เห็น: ผลประเมิน + อนุมัติ + นายทุน + ประมูล + ฟอร์มลูกหนี้
+  approval: [
+    '/dashboard',
+    '/calendar',
+    '/approval',
+    '/appraisal',
+    '/sales',   // ★ เข้าฟอร์มลูกหนี้ได้ (ดูตารางวงเงิน + ผลประเมิน)
+    '/investors', '/investor-auction-history',
+    '/auction',
+  ],
+
+  // ฝ่ายนิติกรรม — เห็น: นิติกรรม + นายทุน + ยกเลิกเคส
+  legal: [
+    '/dashboard',
+    '/calendar',
+    '/legal',
+    '/investors',
+    '/cancellation',
+  ],
+
+  // ฝ่ายออกสัญญา — เห็น: ออกสัญญา + ยกเลิกเคส
+  issuing: [
+    '/dashboard',
+    '/calendar',
+    '/issuing',
+    '/cancellation',
+  ],
+
+  // ฝ่ายบัญชี — เห็น: บัญชีเท่านั้น
+  accounting: [
+    '/dashboard',
+    '/calendar',
+    '/accounting',
+  ],
+
+  // ฝ่ายประมูลทรัพย์
+  auction: [
+    '/dashboard',
+    '/calendar',
+    '/auction',
+    '/investors', '/investor-auction-history',
+  ],
+}
+
+// ถ้า department ไม่อยู่ใน list → ให้เข้า dashboard + calendar ได้อย่างน้อย (fallback)
+const FALLBACK_PATHS = ['/dashboard', '/calendar']
+
+export function hasAccess(department, path) {
+  if (!department) return false
+  const allowed = PERMISSIONS[department]
+  // department ไม่รู้จัก → fallback ให้เข้า dashboard + calendar ได้
+  if (!allowed) return FALLBACK_PATHS.includes(path)
+  if (allowed === '*') return true
+  return allowed.includes(path)
+}
+
+export function getAllowedPaths(department) {
+  if (!department) return []
+  const allowed = PERMISSIONS[department]
+  if (!allowed) return []
+  if (allowed === '*') return null
+  return allowed
+}
+
+export function getDefaultPage(department) {
+  return '/dashboard'
+}
+
+export default PERMISSIONS
