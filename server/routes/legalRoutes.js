@@ -32,4 +32,10 @@ const checklistUpload = upload.single('checklist_file')
 router.post('/cases/:caseId/checklist-upload', checklistUpload, legalController.uploadChecklistFile)
 router.post('/cases/:caseId/checklist-delete-file', legalController.deleteChecklistFile)
 
+// ★ PDF รวมเอกสารทั้งหมด (legal_documents table)
+const legalDocUpload = upload.single('legal_doc_pdf')
+router.get('/cases/:caseId/documents', legalController.getLegalDocuments)
+router.post('/cases/:caseId/documents', legalDocUpload, legalController.uploadLegalDocument)
+router.delete('/documents/:docId', legalController.deleteLegalDocument)
+
 module.exports = router

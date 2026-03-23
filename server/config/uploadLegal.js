@@ -20,6 +20,7 @@ const folderMap = {
   tax_receipt:       'tax-receipt',     // ★ ใบเสร็จค่าธรรมเนียม/ภาษี
   borrower_id_card_legal: 'borrower-id-card',  // ★ บัตรประชาชนเจ้าของทรัพย์
   checklist_file:    'checklist',       // ★ อัพโหลดต่อ item ใน SOP checklist
+  legal_doc_pdf:     'legal-docs',      // ★ PDF รวมเอกสารทั้งหมด (ใหม่)
 }
 
 const storage = multer.diskStorage({

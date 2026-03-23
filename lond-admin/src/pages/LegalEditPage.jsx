@@ -553,6 +553,13 @@ export default function LegalEditPage() {
   })
   const setFileName = (field, name) => setFileNames(prev => ({ ...prev, [field]: name }))
 
+  // ★ legal_documents — PDF รวมเอกสาร
+  const [legalDocs, setLegalDocs] = useState([])
+  const [legalDocUploading, setLegalDocUploading] = useState(false)
+  const [legalDocNote, setLegalDocNote] = useState('')
+  const legalDocRef = useRef(null)
+  const [legalDocFileName, setLegalDocFileName] = useState('')
+
   const setL = (k, v) => setLegalForm(prev => ({ ...prev, [k]: v }))
 
   useEffect(() => {
@@ -593,6 +600,10 @@ export default function LegalEditPage() {
           })
         }
         setLoading(false)
+        // ★ โหลด legal_documents
+        fetch(`${LEGAL_API}/cases/${id}/documents`, { headers })
+          .then(r => r.json()).then(d => { if (d.success) setLegalDocs(d.documents || []) })
+          .catch(() => {})
       }).catch(() => setLoading(false))
   }, [id])
 
@@ -607,6 +618,41 @@ export default function LegalEditPage() {
       })
       const data = await res.json()
       if (data.success) setCaseData(prev => ({ ...prev, [column]: null }))
+      else alert(data.message || 'ลบไม่สำเร็จ')
+    } catch { alert('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้') }
+  }
+
+  // ★ อัพโหลด PDF รวมเอกสาร
+  const handleLegalDocUpload = async () => {
+    if (!legalDocRef.current?.files[0]) return
+    setLegalDocUploading(true)
+    try {
+      const fd = new FormData()
+      fd.append('legal_doc_pdf', legalDocRef.current.files[0])
+      if (legalDocNote.trim()) fd.append('note', legalDocNote.trim())
+      const res = await fetch(`${LEGAL_API}/cases/${id}/documents`, {
+        method: 'POST', headers: { Authorization: `Bearer ${token()}` }, body: fd
+      })
+      const data = await res.json()
+      if (data.success) {
+        setLegalDocs(prev => [data.document, ...prev])
+        setLegalDocFileName('')
+        setLegalDocNote('')
+        if (legalDocRef.current) legalDocRef.current.value = ''
+      } else alert(data.message || 'อัพโหลดไม่สำเร็จ')
+    } catch { alert('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้') }
+    setLegalDocUploading(false)
+  }
+
+  // ★ ลบ PDF รวมเอกสาร
+  const handleLegalDocDelete = async (docId) => {
+    if (!confirm('ต้องการลบไฟล์นี้?')) return
+    try {
+      const res = await fetch(`${LEGAL_API}/documents/${docId}`, {
+        method: 'DELETE', headers: { Authorization: `Bearer ${token()}` }
+      })
+      const data = await res.json()
+      if (data.success) setLegalDocs(prev => prev.filter(d => d.id !== docId))
       else alert(data.message || 'ลบไม่สำเร็จ')
     } catch { alert('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้') }
   }
@@ -1352,6 +1398,134 @@ export default function LegalEditPage() {
             })()}
 
             {/* ---- ★ สลิปค่าปากถุง + สลิปค่าหักล่วงหน้า ---- */}
+            {/* ★ PDF รวมเอกสารทั้งหมด */}
+            <div className="card" style={{ padding: 24, marginBottom: 20, borderTop: '3px solid #7c3aed', background: 'linear-gradient(135deg, #faf5ff 0%, #fff 60%)' }}>
+              <h3 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 700, color: '#7c3aed', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <i className="fas fa-file-pdf"></i>
+                PDF รวมเอกสารทั้งหมด
+              </h3>
+              <p style={{ margin: '0 0 18px', fontSize: 12, color: '#9ca3af' }}>
+                อัพโหลดไฟล์ PDF ที่รวมสัญญา บัตรประชาชน และเอกสารทุกชิ้นของเคสนี้ไว้ในฉบับเดียว
+              </p>
+
+              {/* Zone อัพโหลด */}
+              <div style={{ background: '#f5f3ff', border: '2px dashed #c4b5fd', borderRadius: 14, padding: '18px 20px', marginBottom: 16 }}>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                  {/* ปุ่มเลือกไฟล์ */}
+                  <label style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 8, padding: '9px 18px',
+                    background: legalDocFileName ? 'linear-gradient(135deg, #7c3aed, #6d28d9)' : '#fff',
+                    border: `2px solid ${legalDocFileName ? '#7c3aed' : '#c4b5fd'}`,
+                    borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: 700,
+                    color: legalDocFileName ? '#fff' : '#7c3aed', boxShadow: legalDocFileName ? '0 3px 10px rgba(124,58,237,0.3)' : 'none',
+                    transition: 'all 0.2s', flexShrink: 0,
+                  }}>
+                    <i className={`fas ${legalDocFileName ? 'fa-file-pdf' : 'fa-folder-open'}`}></i>
+                    {legalDocFileName ? legalDocFileName.slice(0, 28) + (legalDocFileName.length > 28 ? '…' : '') : 'เลือกไฟล์ PDF'}
+                    <input type="file" accept=".pdf,application/pdf" ref={legalDocRef} style={{ display: 'none' }}
+                      onChange={e => setLegalDocFileName(e.target.files[0]?.name || '')} />
+                  </label>
+
+                  {/* ช่องหมายเหตุ */}
+                  <input
+                    type="text" placeholder="หมายเหตุ (ไม่บังคับ)"
+                    value={legalDocNote} onChange={e => setLegalDocNote(e.target.value)}
+                    style={{ flex: 1, minWidth: 140, padding: '9px 14px', borderRadius: 10, border: '1.5px solid #c4b5fd', fontSize: 13, outline: 'none', background: '#fff', color: '#374151' }}
+                  />
+
+                  {/* ปุ่มอัพโหลด */}
+                  <button type="button" onClick={handleLegalDocUpload}
+                    disabled={!legalDocFileName || legalDocUploading}
+                    style={{
+                      padding: '9px 20px', borderRadius: 10, border: 'none', cursor: legalDocFileName ? 'pointer' : 'not-allowed',
+                      background: legalDocFileName ? 'linear-gradient(135deg, #16a34a, #15803d)' : '#e5e7eb',
+                      color: legalDocFileName ? '#fff' : '#9ca3af', fontWeight: 700, fontSize: 13,
+                      display: 'inline-flex', alignItems: 'center', gap: 7, flexShrink: 0,
+                      boxShadow: legalDocFileName ? '0 3px 10px rgba(22,163,74,0.3)' : 'none', transition: 'all 0.2s',
+                    }}>
+                    {legalDocUploading
+                      ? <><i className="fas fa-spinner fa-spin"></i> กำลังอัพโหลด...</>
+                      : <><i className="fas fa-cloud-upload-alt"></i> อัพโหลด</>}
+                  </button>
+
+                  {/* ล้างไฟล์ */}
+                  {legalDocFileName && (
+                    <button type="button"
+                      onClick={() => { setLegalDocFileName(''); setLegalDocNote(''); if (legalDocRef.current) legalDocRef.current.value = '' }}
+                      style={{ padding: '9px 14px', borderRadius: 10, border: '1.5px solid #fca5a5', background: '#fef2f2', color: '#dc2626', fontWeight: 600, fontSize: 12, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <i className="fas fa-times"></i> ยกเลิก
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* รายการไฟล์ที่อัพโหลดแล้ว */}
+              {legalDocs.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '20px 0', color: '#c4b5fd', fontSize: 13 }}>
+                  <i className="fas fa-inbox" style={{ fontSize: 28, display: 'block', marginBottom: 6 }}></i>
+                  ยังไม่มีไฟล์ที่อัพโหลด
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {legalDocs.map((doc, idx) => (
+                    <div key={doc.id} style={{
+                      display: 'flex', alignItems: 'center', gap: 12,
+                      background: '#fff', border: '1.5px solid #e9d5ff', borderRadius: 12,
+                      padding: '12px 16px', boxShadow: '0 1px 4px rgba(124,58,237,0.06)',
+                    }}>
+                      {/* ไอคอน PDF */}
+                      <div style={{ width: 42, height: 42, background: 'linear-gradient(135deg, #7c3aed, #a78bfa)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <i className="fas fa-file-pdf" style={{ color: '#fff', fontSize: 18 }}></i>
+                      </div>
+
+                      {/* ข้อมูลไฟล์ */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#4c1d95', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {doc.file_name || doc.file_path?.split('/').pop()}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 2, flexWrap: 'wrap' }}>
+                          {doc.note && (
+                            <span style={{ fontSize: 11, color: '#7c3aed', background: '#f3e8ff', padding: '1px 8px', borderRadius: 20, fontWeight: 600 }}>
+                              {doc.note}
+                            </span>
+                          )}
+                          {doc.file_size && (
+                            <span style={{ fontSize: 10, color: '#9ca3af' }}>
+                              {(doc.file_size / 1024 / 1024).toFixed(2)} MB
+                            </span>
+                          )}
+                          <span style={{ fontSize: 10, color: '#9ca3af' }}>
+                            <i className="fas fa-clock" style={{ marginRight: 3 }}></i>
+                            {new Date(doc.created_at).toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* ปุ่ม */}
+                      <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                        <a href={`/${doc.file_path}`} target="_blank" rel="noreferrer"
+                          style={{ padding: '6px 14px', background: 'linear-gradient(135deg, #7c3aed, #6d28d9)', color: '#fff', borderRadius: 8, fontSize: 12, fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5, boxShadow: '0 2px 6px rgba(124,58,237,0.3)' }}>
+                          <i className="fas fa-eye"></i> เปิด
+                        </a>
+                        <button type="button" onClick={() => handleLegalDocDelete(doc.id)}
+                          style={{ padding: '6px 12px', background: '#fef2f2', color: '#dc2626', border: '1.5px solid #fca5a5', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                          <i className="fas fa-trash-alt"></i>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Badge จำนวนไฟล์ */}
+              {legalDocs.length > 0 && (
+                <div style={{ marginTop: 12, textAlign: 'right', fontSize: 12, color: '#7c3aed', fontWeight: 600 }}>
+                  <i className="fas fa-layer-group" style={{ marginRight: 5 }}></i>
+                  {legalDocs.length} ไฟล์ทั้งหมด
+                </div>
+              )}
+            </div>
+
             <div className="card" style={{ padding: 24, marginBottom: 20, borderTop: '3px solid #e65100' }}>
               <h3 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 700, color: '#e65100', display: 'flex', alignItems: 'center', gap: 8 }}>
                 <i className="fas fa-receipt"></i>

@@ -466,3 +466,55 @@ exports.deleteChecklistFile = (req, res) => {
     res.json({ success: true })
   })
 }
+// ========== legal_documents — ดึงรายการไฟล์ทั้งหมดของเคส ==========
+exports.getLegalDocuments = (req, res) => {
+  const { caseId } = req.params
+  db.query(
+    'SELECT * FROM legal_documents WHERE case_id = ? ORDER BY created_at DESC',
+    [caseId],
+    (err, rows) => {
+      if (err) { console.error('getLegalDocuments error:', err); return res.status(500).json({ success: false, message: 'Server Error' }) }
+      res.json({ success: true, documents: rows })
+    }
+  )
+}
+
+// ========== legal_documents — อัพโหลด PDF ใหม่ ==========
+exports.uploadLegalDocument = (req, res) => {
+  if (!req.file) return res.status(400).json({ success: false, message: 'ไม่มีไฟล์' })
+  const { caseId } = req.params
+  const { note } = req.body
+  const filePath = `uploads/legal/legal-docs/${req.file.filename}`
+  const fileName = req.file.originalname
+  const fileSize = req.file.size
+
+  // ดึง loan_request_id จาก cases เพื่อเก็บไว้ด้วย
+  db.query('SELECT loan_request_id FROM cases WHERE id = ?', [caseId], (errC, rows) => {
+    const loanRequestId = rows && rows[0] ? rows[0].loan_request_id : null
+    db.query(
+      'INSERT INTO legal_documents (case_id, loan_request_id, file_path, file_name, file_size, note, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())',
+      [caseId, loanRequestId, filePath, fileName, fileSize, note || null],
+      (err, result) => {
+        if (err) { console.error('uploadLegalDocument error:', err); return res.status(500).json({ success: false, message: 'Server Error' }) }
+        res.json({ success: true, document: { id: result.insertId, file_path: filePath, file_name: fileName, file_size: fileSize, note: note || null, created_at: new Date() } })
+      }
+    )
+  })
+}
+
+// ========== legal_documents — ลบไฟล์ ==========
+exports.deleteLegalDocument = (req, res) => {
+  const { docId } = req.params
+  db.query('SELECT file_path FROM legal_documents WHERE id = ?', [docId], (errSel, rows) => {
+    if (errSel) return res.status(500).json({ success: false, message: 'Server Error' })
+    if (!rows || rows.length === 0) return res.status(404).json({ success: false, message: 'ไม่พบไฟล์' })
+    const filePath = rows[0].file_path
+    db.query('DELETE FROM legal_documents WHERE id = ?', [docId], (errDel) => {
+      if (errDel) return res.status(500).json({ success: false, message: 'Server Error' })
+      // ลบไฟล์จาก disk
+      const abs = path.join(__dirname, '..', filePath)
+      fs.unlink(abs, (e) => { if (e) console.error('ลบไฟล์ disk ไม่สำเร็จ:', e.message) })
+      res.json({ success: true })
+    })
+  })
+}
