@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import '../styles/sales.css'
+import MapPreview from '../components/MapPreview'
 
 const token = () => localStorage.getItem('loandd_admin')
 const API = '/api/admin/accounting'
@@ -347,8 +348,10 @@ function CaseModal({ caseRow, onClose }) {
                         <InfoRow label="ประเภทเอกสารสิทธิ์" value={{ chanote: 'โฉนดที่ดิน (น.ส.4)', ns4k: 'น.ส.4ก.', ns3: 'นส.3', ns3k: 'นส.3ก.', spk: 'ที่ดิน ส.ป.ก.' }[docs.deed_type] || docs.deed_type} />
                         <InfoRow label="พื้นที่ดิน" value={docs.land_area} />
                         <InfoRow label="พื้นที่อาคาร" value={docs.building_area} />
-                        {docs.location_url && <InfoRow label="โลเคชั่น" value={docs.location_url} link />}
                       </div>
+                      {docs.location_url && (
+                        <MapPreview url={docs.location_url} label="โลเคชั่นทรัพย์" />
+                      )}
                       {(docs.estimated_value || docs.appraisal_result || docs.approved_amount || docs.loan_amount) && (
                         <div style={{ background: '#f3e8ff', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12 }}>
                           <InfoRow label="ราคาประเมิน (เบื้องต้น)" value={fmt(docs.estimated_value)} />

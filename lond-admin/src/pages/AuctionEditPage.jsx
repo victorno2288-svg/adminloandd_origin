@@ -6,6 +6,7 @@ import MapPreview from '../components/MapPreview'
 import AgentCard from '../components/AgentCard'
 import CaseInfoSummary from '../components/CaseInfoSummary'
 import ChecklistDocsPanel from '../components/ChecklistDocsPanel'
+import LandOfficeInput from '../components/LandOfficeInput'
 import AppraisalStatusCard from '../components/AppraisalStatusCard'
 
 const token = () => localStorage.getItem('loandd_admin')
@@ -1111,7 +1112,7 @@ export default function AuctionEditPage() {
               </div>
               <div className="form-group">
                 <label>สำนักงานที่ดิน</label>
-                <input type="text" value={form.land_office} onChange={e => set('land_office', e.target.value)} placeholder="สำนักงานที่ดิน" />
+                <LandOfficeInput id="auction" value={form.land_office} onChange={e => set('land_office', e.target.value)} />
               </div>
               <div className="form-group">
                 <label>ช่วงเวลา</label>

@@ -6,6 +6,7 @@ import MapPreview from '../components/MapPreview'
 import AgentCard from '../components/AgentCard'
 import CaseInfoSummary from '../components/CaseInfoSummary'
 import ChecklistDocsPanel from '../components/ChecklistDocsPanel'
+import LandOfficeInput from '../components/LandOfficeInput'
 
 
 const token = () => localStorage.getItem('loandd_admin')
@@ -514,6 +515,12 @@ export default function LegalEditPage() {
   const [legalForm, setLegalForm] = useState({
     officer_name: '', visit_date: '', land_office: '', time_slot: '',
     legal_status: 'pending', note: '',
+    // ★ Contract dates (บันทึกวันทำสัญญาจริง)
+    contract_years: '',       // ระยะเวลาสัญญา (ปี) — แก้ไขได้โดยฝ่ายนิติกรรม
+    interest_rate: '',        // อัตราดอกเบี้ย % ต่อปี — แก้ไขได้โดยฝ่ายนิติกรรม
+    contract_start_date: '',          // วันทำสัญญาที่กรมที่ดิน
+    contract_end_date: '',            // วันหมดอายุสัญญา (คำนวณอัตโนมัติจาก contract_years)
+    contract_redemption_amount: '',   // ยอดสินไถ่ (ขายฝาก) = วงเงิน × (1 + ดอกเบี้ย × ปี)
     // ★ Financial Protocol (SOP Phase 4)
     net_payout: '',          // ยอดโอนสุทธิให้ลูกหนี้
     payment_method: '',      // วิธีชำระ: cash | transfer | cheque
@@ -587,6 +594,12 @@ export default function LegalEditPage() {
             time_slot: c.transaction_time || c.time_slot || '',
             legal_status: c.legal_status || 'pending',
             note: c.note || '',
+            // ★ Contract dates
+            contract_years: c.contract_years || '',
+            interest_rate: c.interest_rate || '',
+            contract_start_date: toDateInput(c.contract_start_date),
+            contract_end_date: toDateInput(c.contract_end_date),
+            contract_redemption_amount: c.contract_redemption_amount || '',
             // ★ Financial Protocol
             net_payout: c.net_payout || '',
             payment_method: c.payment_method || '',
@@ -1130,7 +1143,7 @@ export default function LegalEditPage() {
                   </div>
                   <div className="form-group">
                     <label>สำนักงานที่ดิน</label>
-                    <input type="text" value={legalForm.land_office} onChange={e => setL('land_office', e.target.value)} placeholder="สำนักงานที่ดิน" />
+                    <LandOfficeInput id="legal" value={legalForm.land_office} onChange={e => setL('land_office', e.target.value)} />
                   </div>
                   <div className="form-group">
                     <label>ช่วงเวลา</label>
@@ -1142,6 +1155,156 @@ export default function LegalEditPage() {
                       {legalStatusOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </select>
                   </div>
+
+                  {/* ★ ข้อมูลสัญญา — กรอกหลังทำนิติกรรมเสร็จ */}
+                  <div style={{
+                    background: 'linear-gradient(135deg,#f0f9ff,#e0f2fe)',
+                    border: '1.5px solid #7dd3fc', borderRadius: 10,
+                    padding: '14px 16px', marginBottom: 12
+                  }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#0369a1', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <i className="fas fa-file-signature"></i> ข้อมูลสัญญา
+                      <span style={{ fontSize: 10, fontWeight: 400, color: '#38bdf8', marginLeft: 4 }}>(กรอกหลังทำนิติกรรม)</span>
+                    </div>
+
+                    {/* ระยะเวลาสัญญา + ดอกเบี้ย — กรอกได้ */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label style={{ fontSize: 11 }}>
+                          <i className="fas fa-clock" style={{ color: '#0369a1', marginRight: 4 }}></i>
+                          ระยะเวลาสัญญา (ปี)
+                        </label>
+                        <select value={legalForm.contract_years}
+                          onChange={e => {
+                            const yr = e.target.value
+                            setL('contract_years', yr)
+                            // recalculate contract_end_date ถ้ามีวันเริ่ม
+                            if (legalForm.contract_start_date && yr) {
+                              const d = new Date(legalForm.contract_start_date)
+                              d.setFullYear(d.getFullYear() + Number(yr))
+                              setL('contract_end_date', d.toISOString().split('T')[0])
+                            }
+                          }}
+                          style={{ fontSize: 13 }}>
+                          <option value="">-- เลือก --</option>
+                          <option value="1">1 ปี</option>
+                          <option value="2">2 ปี</option>
+                          <option value="3">3 ปี</option>
+                        </select>
+                      </div>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label style={{ fontSize: 11 }}>
+                          <i className="fas fa-percentage" style={{ color: '#0369a1', marginRight: 4 }}></i>
+                          ดอกเบี้ย (% / ปี)
+                        </label>
+                        <input type="number" min="0" max="100" step="0.1"
+                          value={legalForm.interest_rate}
+                          onChange={e => setL('interest_rate', e.target.value)}
+                          placeholder="เช่น 15"
+                          style={{ fontSize: 13 }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* วันทำสัญญา */}
+                    <div className="form-group" style={{ marginBottom: 8 }}>
+                      <label style={{ fontSize: 12 }}>
+                        <i className="fas fa-calendar-check" style={{ color: '#0369a1', marginRight: 5 }}></i>
+                        วันทำสัญญา (วันโอนที่กรมที่ดิน)
+                      </label>
+                      <input type="date" value={legalForm.contract_start_date}
+                        onChange={e => {
+                          const start = e.target.value
+                          setL('contract_start_date', start)
+                          // คำนวณวันหมดอายุอัตโนมัติจาก contract_years (ใช้ค่าที่แก้ไขแล้ว)
+                          const yr = legalForm.contract_years || caseData.contract_years
+                          if (start && yr) {
+                            const d = new Date(start)
+                            d.setFullYear(d.getFullYear() + Number(yr))
+                            setL('contract_end_date', d.toISOString().split('T')[0])
+                          }
+                        }}
+                        style={{ fontSize: 13 }}
+                      />
+                    </div>
+
+                    {/* วันหมดอายุสัญญา */}
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label style={{ fontSize: 12 }}>
+                        <i className="fas fa-calendar-times" style={{ color: '#dc2626', marginRight: 5 }}></i>
+                        วันหมดอายุสัญญา
+                        <span style={{ fontSize: 10, color: '#94a3b8', marginLeft: 6 }}>
+                          (คำนวณอัตโนมัติ หรือแก้ไขได้)
+                        </span>
+                      </label>
+                      <input type="date" value={legalForm.contract_end_date}
+                        onChange={e => setL('contract_end_date', e.target.value)}
+                        style={{ fontSize: 13 }}
+                      />
+                      {/* แสดง countdown ถ้ามีวันหมดอายุ */}
+                      {legalForm.contract_end_date && (() => {
+                        const days = Math.ceil((new Date(legalForm.contract_end_date) - new Date()) / (1000 * 60 * 60 * 24))
+                        const color = days < 0 ? '#dc2626' : days <= 30 ? '#ea580c' : days <= 90 ? '#ca8a04' : '#16a34a'
+                        const bg = days < 0 ? '#fef2f2' : days <= 30 ? '#fff7ed' : days <= 90 ? '#fefce8' : '#f0fdf4'
+                        const border = days < 0 ? '#fca5a5' : days <= 30 ? '#fed7aa' : days <= 90 ? '#fde047' : '#86efac'
+                        return (
+                          <div style={{
+                            marginTop: 6, padding: '5px 10px', borderRadius: 7,
+                            background: bg, border: `1px solid ${border}`,
+                            fontSize: 12, fontWeight: 700, color
+                          }}>
+                            <i className="fas fa-clock" style={{ marginRight: 5 }}></i>
+                            {days < 0
+                              ? `หมดอายุแล้ว ${Math.abs(days)} วัน`
+                              : days === 0 ? 'หมดอายุวันนี้!'
+                              : `อีก ${days} วัน`}
+                          </div>
+                        )
+                      })()}
+                    </div>
+
+                    {/* ยอดสินไถ่ — เฉพาะสัญญาขายฝาก */}
+                    {(caseData.loan_type_detail === 'selling_pledge' || !caseData.loan_type_detail) && (
+                      <div className="form-group" style={{ marginTop: 10, marginBottom: 0 }}>
+                        <label style={{ fontSize: 12 }}>
+                          <i className="fas fa-hand-holding-usd" style={{ color: '#b45309', marginRight: 5 }}></i>
+                          ยอดสินไถ่
+                          <span style={{ fontSize: 10, color: '#94a3b8', marginLeft: 6 }}>(ขายฝาก = วงเงิน + ดอกเบี้ยตลอดสัญญา)</span>
+                          {/* ปุ่ม auto-calculate */}
+                          {(caseData.approved_amount || legalForm.contract_years) && (legalForm.interest_rate || caseData.interest_rate) && (
+                            <button type="button"
+                              onClick={() => {
+                                const principal = Number(caseData.approved_amount || 0)
+                                const rate = Number(legalForm.interest_rate || caseData.interest_rate || 0)
+                                const years = Number(legalForm.contract_years || caseData.contract_years || 0)
+                                if (principal && rate && years) {
+                                  const redemption = principal * (1 + (rate / 100) * years)
+                                  setL('contract_redemption_amount', Math.round(redemption).toString())
+                                }
+                              }}
+                              style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, border: 'none',
+                                background: '#92400e', color: '#fff', fontWeight: 700, cursor: 'pointer',
+                                marginLeft: 8, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                              <i className="fas fa-calculator"></i> คำนวณ
+                            </button>
+                          )}
+                        </label>
+                        <input type="number" min="0" step="1"
+                          value={legalForm.contract_redemption_amount}
+                          onChange={e => setL('contract_redemption_amount', e.target.value)}
+                          placeholder="บาท"
+                          style={{ fontSize: 13 }}
+                        />
+                        {legalForm.contract_redemption_amount && (
+                          <div style={{ fontSize: 12, color: '#92400e', fontWeight: 700, marginTop: 4 }}>
+                            <i className="fas fa-coins" style={{ marginRight: 4 }}></i>
+                            {Number(legalForm.contract_redemption_amount).toLocaleString('th-TH')} บาท
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
                   {/* ★ ข้อมูลนายทุน (จาก investors profile) */}
                   {caseData.investor_name && (
                     <div style={{ background: '#faf5ff', border: '1px solid #d8b4fe', borderRadius: 10, padding: '14px 16px', marginBottom: 12 }}>

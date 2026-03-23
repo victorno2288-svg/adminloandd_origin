@@ -120,6 +120,7 @@ function fetchLegalDetail(caseId, res) {
   const sql = `
     SELECT
       c.id, c.case_code, c.status, c.loan_request_id, c.created_at, c.updated_at,
+      c.contract_start_date, c.contract_end_date, c.investor_amount, c.contract_redemption_amount,
       lr.appraisal_type, lr.appraisal_result, lr.appraisal_date, lr.appraisal_fee,
       c.transaction_date, c.transaction_time, c.transaction_land_office,
       c.transaction_note, c.transaction_recorded_by, c.transaction_recorded_at,
@@ -213,7 +214,10 @@ exports.updateLegal = (req, res) => {
     net_payout, payment_method, actual_transfer_fee, actual_stamp_duty,  // ★ Financial Protocol
     agent_bank_name, agent_bank_account_no, agent_bank_account_name,     // ★ บัญชีนายหน้า
     investor_marital_status,                                              // ★ สถานะภาพนายทุน (SOP 2.3.3)
-    doc_checklist_json                                                    // ★ SOP Document Checklist tick state
+    doc_checklist_json,                                                   // ★ SOP Document Checklist tick state
+    contract_start_date, contract_end_date,                               // ★ วันทำสัญญา + วันหมดอายุ
+    contract_years, interest_rate,                                        // ★ ระยะสัญญา + ดอกเบี้ย (แก้ไขได้โดยนิติกรรม)
+    contract_redemption_amount                                            // ★ ยอดสินไถ่ (ขายฝาก)
   } = body
   // notify_types อาจมาเป็น JSON string (จาก FormData) หรือ array (จาก JSON body)
   let notify_types = []
@@ -285,6 +289,40 @@ exports.updateLegal = (req, res) => {
     if (investor_marital_status !== undefined) {
       db.query('UPDATE cases SET investor_marital_status=? WHERE id=?', [investor_marital_status || null, caseId], (errIms) => {
         if (errIms) console.error('update investor_marital_status error:', errIms)
+      })
+    }
+
+    // ★ contract dates + redemption_amount เก็บใน cases table
+    if (contract_start_date !== undefined || contract_end_date !== undefined || contract_redemption_amount !== undefined) {
+      const cFields = []
+      const cVals = []
+      if (contract_start_date !== undefined) { cFields.push('contract_start_date=?'); cVals.push(contract_start_date || null) }
+      if (contract_end_date !== undefined) { cFields.push('contract_end_date=?'); cVals.push(contract_end_date || null) }
+      if (contract_redemption_amount !== undefined) { cFields.push('contract_redemption_amount=?'); cVals.push(contract_redemption_amount || null) }
+      if (cFields.length > 0) {
+        cVals.push(caseId)
+        db.query(`UPDATE cases SET ${cFields.join(', ')} WHERE id=?`, cVals, (errC) => {
+          if (errC) console.error('update contract dates error:', errC)
+        })
+      }
+    }
+
+    // ★ contract_years + interest_rate เก็บใน loan_requests (ฝ่ายนิติกรรมปรับได้)
+    if (contract_years !== undefined || interest_rate !== undefined) {
+      // หา loan_request_id จาก case
+      db.query('SELECT loan_request_id FROM cases WHERE id=?', [caseId], (errLr, lrRows) => {
+        if (errLr || !lrRows.length || !lrRows[0].loan_request_id) return
+        const lrId = lrRows[0].loan_request_id
+        const lrFields = []
+        const lrVals = []
+        if (contract_years !== undefined) { lrFields.push('contract_years=?'); lrVals.push(contract_years || null) }
+        if (interest_rate !== undefined) { lrFields.push('interest_rate=?'); lrVals.push(interest_rate || null) }
+        if (lrFields.length > 0) {
+          lrVals.push(lrId)
+          db.query(`UPDATE loan_requests SET ${lrFields.join(', ')} WHERE id=?`, lrVals, (errLrUpd) => {
+            if (errLrUpd) console.error('update loan_requests contract fields error:', errLrUpd)
+          })
+        }
       })
     }
 

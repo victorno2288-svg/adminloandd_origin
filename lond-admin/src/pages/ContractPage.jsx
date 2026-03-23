@@ -5,6 +5,7 @@
  */
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { LAND_OFFICES } from '../components/LandOfficeInput'
 
 const token = () => localStorage.getItem('loandd_admin')
 const LEGAL_API = '/api/admin/legal'
@@ -474,14 +475,24 @@ function Row({ label, children }) {
 }
 
 function EditField({ k, form, set, bold, ph }) {
+  const isLandOffice = k === 'land_office'
   return (
-    <input
-      className="field-input"
-      value={form[k] || ''}
-      onChange={e => set(k, e.target.value)}
-      placeholder={ph || ''}
-      style={{ fontWeight: bold ? 700 : 500 }}
-    />
+    <>
+      <input
+        className="field-input"
+        list={isLandOffice ? 'contract-land-office-list' : undefined}
+        value={form[k] || ''}
+        onChange={e => set(k, e.target.value)}
+        placeholder={ph || ''}
+        style={{ fontWeight: bold ? 700 : 500 }}
+        autoComplete={isLandOffice ? 'off' : undefined}
+      />
+      {isLandOffice && (
+        <datalist id="contract-land-office-list">
+          {LAND_OFFICES.map(name => <option key={name} value={name} />)}
+        </datalist>
+      )}
+    </>
   )
 }
 

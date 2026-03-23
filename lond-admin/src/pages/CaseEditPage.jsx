@@ -5,6 +5,7 @@ import CancelCaseButton from '../components/CancelCaseButton'
 import MapPreview from '../components/MapPreview'
 import AgentCard from '../components/AgentCard'
 import ChecklistDocsPanel from '../components/ChecklistDocsPanel'
+import LandOfficeInput from '../components/LandOfficeInput'
 // CaseInfoSummary removed
 // AppraisalStatusCard removed — ย้ายไปดูที่ฝ่ายประเมินโดยตรง
 
@@ -736,9 +737,12 @@ export default function CaseEditPage() {
                     โลเคชั่น
                     <span style={{ fontSize: 10, color: '#6b7280', fontWeight: 400 }}>(กรอกโดยฝ่ายขาย)</span>
                     <button type="button"
-                      onClick={() => window.open('https://landsmaps.dol.go.th/#', '_blank')}
+                      onClick={() => {
+                        const m = (d?.location_url || '').match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) || (d?.location_url || '').match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/)
+                        window.open(m ? `https://landsmaps.dol.go.th/#16/${m[1]}/${m[2]}` : 'https://landsmaps.dol.go.th/#', '_blank')
+                      }}
                       style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, border: 'none', background: 'linear-gradient(135deg,#0369a1,#0284c7)', color: '#fff', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                      <i className="fas fa-map"></i> ค้นหา landsmaps
+                      <i className="fas fa-map"></i> LandsMaps
                     </button>
                   </label>
                   <input type="url" value={d?.location_url || ''} readOnly
@@ -987,7 +991,7 @@ export default function CaseEditPage() {
 
                 <div className="form-group" style={{ marginTop: 16 }}>
                   <label>สำนักงานที่ดิน</label>
-                  <input type="text" value={createForm.transaction_land_office} onChange={e => setCreate('transaction_land_office', e.target.value)} placeholder="เช่น สำนักงานที่ดินจังหวัดนนทบุรี" />
+                  <LandOfficeInput id="create" value={createForm.transaction_land_office} onChange={e => setCreate('transaction_land_office', e.target.value)} />
                 </div>
 
               </div>
@@ -1318,9 +1322,12 @@ export default function CaseEditPage() {
                   โลเคชั่น
                   <span style={{ fontSize: 10, color: '#6b7280', fontWeight: 400 }}>(กรอกโดยฝ่ายขาย)</span>
                   <button type="button"
-                    onClick={() => window.open('https://landsmaps.dol.go.th/#', '_blank')}
+                    onClick={() => {
+                      const m = (caseData.location_url || '').match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) || (caseData.location_url || '').match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/)
+                      window.open(m ? `https://landsmaps.dol.go.th/#16/${m[1]}/${m[2]}` : 'https://landsmaps.dol.go.th/#', '_blank')
+                    }}
                     style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, border: 'none', background: 'linear-gradient(135deg,#0369a1,#0284c7)', color: '#fff', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                    <i className="fas fa-map"></i> ค้นหา landsmaps
+                    <i className="fas fa-map"></i> LandsMaps
                   </button>
                 </label>
                 <input type="url" value={caseData.location_url || ''} readOnly
@@ -1559,7 +1566,7 @@ export default function CaseEditPage() {
 
               <div className="form-group" style={{ marginTop: 16 }}>
                 <label>สำนักงานที่ดิน</label>
-                <input type="text" value={form.transaction_land_office} onChange={e => set('transaction_land_office', e.target.value)} placeholder="เช่น สำนักงานที่ดินจังหวัดนนทบุรี" />
+                <LandOfficeInput id="edit" value={form.transaction_land_office} onChange={e => set('transaction_land_office', e.target.value)} />
               </div>
 
               {form.transaction_recorded_by && (

@@ -120,6 +120,7 @@ const chatWebhookController = require('./controllers/chatWebhookController');
 const advanceRoutes = require('./routes/advanceRoutes');
 const ocrRoutes     = require('./routes/ocrRoutes')
 const sharedChecklistRoutes = require('./routes/sharedChecklistRoutes');
+const contractExpiryRoutes  = require('./routes/contractExpiryRoutes');
 
 // Middleware
 const authMiddleware = require('./middleware/auth');
@@ -185,6 +186,7 @@ app.use('/api/admin/cancellation', authMiddleware, requireDept('cancellation', '
 
 // จัดการแอคเคาท์ — super_admin เท่านั้น
 app.use('/api/admin/account-user', authMiddleware, superAdminOnly, accountUserRoutes);
+app.use('/api/admin/contract-expiry', authMiddleware, contractExpiryRoutes);
 
 
 // ========== Auto-migrate: เพิ่ม column ที่อาจยังไม่มีใน DB ==========
@@ -323,5 +325,27 @@ server.listen(port, () => {
     // Follow-up Reminder: แจ้งเตือนเมื่อถึงวันนัด + แจ้งหัวหน้าเมื่อเลย X วัน
     if (typeof chatController.startFollowupReminder === 'function') {
       chatController.startFollowupReminder(io);
+    }
+
+    // ========== Contract Expiry Cron ==========
+    // ตรวจสัญญาใกล้หมดอายุทุกวัน 08:00 น.
+    // แจ้งเตือน 90 / 60 / 30 วันก่อนหมด → ฝ่ายขาย + ฝ่ายนิติกรรม
+    try {
+      const cron = require('node-cron');
+      const { checkContractExpiry } = require('./controllers/contractExpiryController');
+
+      cron.schedule('0 8 * * *', async () => {
+        console.log('[ContractExpiry] 🕗 เริ่มตรวจสัญญาใกล้หมดอายุ...');
+        try {
+          const result = await checkContractExpiry(null, null);
+          console.log(`[ContractExpiry] ✅ ตรวจ ${result.checked} เคส แจ้งเตือนใหม่ ${result.notified} เคส`);
+        } catch (e) {
+          console.error('[ContractExpiry] ❌', e.message);
+        }
+      }, { timezone: 'Asia/Bangkok' });
+
+      console.log('[ContractExpiry] ✅ Cron ตั้งค่าแล้ว (ทุกวัน 08:00 น. Asia/Bangkok)');
+    } catch (e) {
+      console.error('[ContractExpiry] ⚠️ ไม่สามารถตั้ง cron ได้:', e.message);
     }
 });

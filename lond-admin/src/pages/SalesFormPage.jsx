@@ -301,6 +301,34 @@ export default function SalesFormPage() {
   const [idCardLocalPreview, setIdCardLocalPreview] = useState(null)
   const [paymentSchedPreview, setPaymentSchedPreview] = useState(null)
 
+  // ★ GPS อุปกรณ์จริง — ใช้ navigator.geolocation → auto-fill Google Maps URL
+  const useDeviceGPS = () => {
+    if (!navigator.geolocation) {
+      setOcrMsg({ type: 'warn', text: '⚠️ เบราว์เซอร์นี้ไม่รองรับ GPS' })
+      setTimeout(() => setOcrMsg(null), 4000)
+      return
+    }
+    setOcrMsg({ type: 'info', text: '📍 กำลังอ่านพิกัด GPS จากอุปกรณ์...' })
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude
+        const lng = pos.coords.longitude
+        const mapsUrl = `https://www.google.com/maps/@${lat},${lng},16z`
+        set('location_url', mapsUrl)
+        setOcrMsg({ type: 'success', text: `✅ GPS อุปกรณ์: ${lat.toFixed(5)}, ${lng.toFixed(5)}` })
+        setTimeout(() => setOcrMsg(null), 5000)
+      },
+      (err) => {
+        const msg = err.code === 1 ? 'กรุณาอนุญาต Location ในเบราว์เซอร์'
+          : err.code === 2 ? 'ไม่พบสัญญาณ GPS'
+          : 'หมดเวลา ลองใหม่อีกครั้ง'
+        setOcrMsg({ type: 'warn', text: `⚠️ ${msg}` })
+        setTimeout(() => setOcrMsg(null), 5000)
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+    )
+  }
+
   // ★ Geocoding — แปลงที่อยู่ → พิกัด GPS ด้วย Nominatim (OpenStreetMap, ฟรี)
   const geocodeAddress = async (province, district, subdistrict) => {
     if (!province && !district) return null
@@ -2627,20 +2655,20 @@ export default function SalesFormPage() {
               <div className="form-group">
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   โลเคชั่น
-                  {/* ★ ปุ่มค้นหาบน Google Maps — ใช้ Nominatim Geocoding หาพิกัด GPS จริง */}
+                  {/* ★ ปุ่ม GPS อุปกรณ์จริง — กดครั้งเดียว auto-fill URL */}
+                  <button type="button"
+                    onClick={useDeviceGPS}
+                    style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, border: 'none', background: 'linear-gradient(135deg,#16a34a,#15803d)', color: '#fff', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <i className="fas fa-location-arrow"></i> ใช้ GPS อุปกรณ์
+                  </button>
+                  {/* ★ ค้นหาจากที่อยู่ (Nominatim) — เฉพาะเมื่อกรอกที่อยู่แล้ว */}
                   {(form.province || form.district || form.subdistrict) && (
                     <button type="button"
                       onClick={generateMapsUrl}
                       style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, border: 'none', background: 'linear-gradient(135deg,#ea4335,#fbbc04)', color: '#fff', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                      <i className="fas fa-map-marked-alt"></i> ค้นหาพิกัด GPS
+                      <i className="fas fa-map-marked-alt"></i> ค้นหาจากที่อยู่
                     </button>
                   )}
-                  {/* ★ ปุ่มเปิด landsmaps */}
-                  <button type="button"
-                    onClick={() => window.open('https://landsmaps.dol.go.th/#', '_blank')}
-                    style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, border: 'none', background: 'linear-gradient(135deg,#0369a1,#0284c7)', color: '#fff', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                    <i className="fas fa-map"></i> ค้นหา landsmaps
-                  </button>
                 </label>
                 <input type="url" placeholder="https://maps.app.goo.gl/..." value={form.location_url} onChange={e => set('location_url', e.target.value)} />
                 <MapPreview url={form.location_url} label="โลเคชั่นทรัพย์" />
