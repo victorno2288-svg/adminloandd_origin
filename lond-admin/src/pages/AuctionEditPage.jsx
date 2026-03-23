@@ -95,6 +95,8 @@ export default function AuctionEditPage() {
   const [newWinInv, setNewWinInv] = useState({ ...EMPTY_NEW_INV })
   const [creatingWinInv, setCreatingWinInv] = useState(false)
   const [createdWinInvId, setCreatedWinInvId] = useState(null)
+  const [ocrScanningWin, setOcrScanningWin] = useState(false)
+  const [winIdCardPreview, setWinIdCardPreview] = useState(null)
   const [winIdCardFile, setWinIdCardFile] = useState(null)
   const [uploadingWinIdCard, setUploadingWinIdCard] = useState(false)
   const [winIdCardMsg, setWinIdCardMsg] = useState('')
@@ -311,6 +313,38 @@ export default function AuctionEditPage() {
       }
     } catch { alert('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์') }
     setCreatingBidInv(false)
+  }
+
+  // OCR สแกนบัตรประชาชนนายทุน → auto-fill ชื่อ
+  const handleOcrScanWin = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    // แสดง preview ทันทีที่เลือกไฟล์
+    const previewUrl = URL.createObjectURL(file)
+    setWinIdCardPreview(previewUrl)
+    setWinIdCardFile(file)
+    setOcrScanningWin(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('doc_type', 'id_card')
+      const r = await fetch('/api/admin/ocr/extract', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token()}` },
+        body: fd
+      })
+      const d = await r.json()
+      if (d.success && d.extracted) {
+        setNewWinInv(p => ({
+          ...p,
+          ...(d.extracted.full_name  ? { full_name:  d.extracted.full_name  } : {}),
+        }))
+      } else {
+        alert('สแกนไม่สำเร็จ — ' + (d.message || 'ลองถ่ายรูปให้ชัดขึ้น'))
+      }
+    } catch { alert('ไม่สามารถเชื่อมต่อ OCR') }
+    setOcrScanningWin(false)
+    e.target.value = ''
   }
 
   // สร้างนายทุนใหม่ inline สำหรับช่องผู้ชนะประมูล (+ auto-upload ID card ถ้ามี)
@@ -800,6 +834,83 @@ export default function AuctionEditPage() {
                   <div style={{ fontSize: 12, fontWeight: 700, color: '#8e44ad', marginBottom: 10 }}>สร้างนายทุนใหม่</div>
                   {!createdWinInvId ? (
                     <>
+                      {/* ── ID Card + OCR ── */}
+                      <label style={{
+                        display: 'block', cursor: ocrScanningWin ? 'default' : 'pointer',
+                        marginBottom: 10,
+                        background: winIdCardPreview ? '#faf5ff' : '#f9f0ff',
+                        border: `2px dashed ${winIdCardPreview ? '#a855f7' : '#c39bd3'}`,
+                        borderRadius: 10, padding: 12, transition: 'border-color 0.2s',
+                      }}
+                        onMouseEnter={e => { if (!winIdCardPreview) e.currentTarget.style.borderColor = '#8e44ad' }}
+                        onMouseLeave={e => { if (!winIdCardPreview) e.currentTarget.style.borderColor = '#c39bd3' }}
+                      >
+                        <input type="file" accept=".jpg,.jpeg,.png" style={{ display: 'none' }}
+                          disabled={ocrScanningWin} onChange={handleOcrScanWin} />
+                        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                          {/* preview หรือ placeholder */}
+                          <div style={{
+                            width: 72, height: 72, flexShrink: 0, borderRadius: 8, overflow: 'hidden',
+                            background: '#ede9fe', border: '1px solid #d8b4fe',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative'
+                          }}>
+                            {winIdCardPreview ? (
+                              <img src={winIdCardPreview} alt="preview"
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              <i className="fas fa-id-card" style={{ fontSize: 26, color: '#a855f7' }}></i>
+                            )}
+                            {winIdCardPreview && !ocrScanningWin && (
+                              <button
+                                type="button"
+                                onClick={e => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  setWinIdCardFile(null)
+                                  setWinIdCardPreview(null)
+                                }}
+                                style={{
+                                  position: 'absolute', top: 3, right: 3,
+                                  width: 18, height: 18, borderRadius: '50%',
+                                  background: 'rgba(0,0,0,0.55)', border: 'none',
+                                  color: '#fff', fontSize: 10, lineHeight: '18px',
+                                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  padding: 0, zIndex: 2,
+                                }}
+                                title="ลบรูป"
+                              >✕</button>
+                            )}
+                            {ocrScanningWin && (
+                              <div style={{
+                                position: 'absolute', inset: 0, background: 'rgba(139,92,246,0.7)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              }}>
+                                <i className="fas fa-spinner fa-spin" style={{ color: '#fff', fontSize: 20 }}></i>
+                              </div>
+                            )}
+                          </div>
+                          {/* ข้อความ */}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: '#7e22ce', marginBottom: 3 }}>
+                              <i className="fas fa-camera" style={{ marginRight: 5 }}></i>
+                              {ocrScanningWin ? 'กำลังอ่านบัตร...' : winIdCardPreview ? 'เปลี่ยนรูปบัตรประชาชน' : 'สแกน / อัพโหลดบัตรประชาชน'}
+                            </div>
+                            <div style={{ fontSize: 10, color: '#9ca3af', lineHeight: 1.5 }}>
+                              {ocrScanningWin
+                                ? 'AI กำลังอ่านชื่อ-สกุลจากบัตร...'
+                                : winIdCardPreview
+                                  ? <><span style={{ color: '#16a34a', fontWeight: 600 }}>✓ อัพโหลดบัตรแล้ว</span> — คลิกเพื่อเปลี่ยน</>
+                                  : <>JPG / PNG — OCR อ่านชื่ออัตโนมัติ</>
+                              }
+                            </div>
+                            {winIdCardFile && !ocrScanningWin && (
+                              <div style={{ fontSize: 10, color: '#7d3c98', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                <i className="fas fa-paperclip" style={{ marginRight: 3 }}></i>{winIdCardFile.name}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </label>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                         <div className="form-group" style={{ marginBottom: 0 }}>
                           <label>ชื่อ-นามสกุล <span style={{ color: '#e74c3c' }}>*</span></label>
@@ -817,21 +928,6 @@ export default function AuctionEditPage() {
                           <label>Email</label>
                           <input type="email" value={newWinInv.email} onChange={e => setNewWinInv(p => ({ ...p, email: e.target.value }))} placeholder="email@example.com" />
                         </div>
-                      </div>
-                      {/* ID Card upload — แนบได้ตั้งแต่ตอนสร้าง */}
-                      <div style={{ marginTop: 10, background: '#fff', borderRadius: 6, padding: '8px 10px', border: '1px dashed #c39bd3' }}>
-                        <label style={{ fontSize: 11, fontWeight: 600, color: '#7d3c98', display: 'block', marginBottom: 4 }}>
-                          <i className="fas fa-id-card" style={{ marginRight: 4 }}></i>
-                          บัตรประชาชนนายทุน <span style={{ fontWeight: 400, color: '#999' }}>(ไม่บังคับ — อัพโหลดอัตโนมัติหลังสร้าง)</span>
-                        </label>
-                        <input type="file" accept=".jpg,.jpeg,.png,.pdf"
-                          onChange={e => setWinIdCardFile(e.target.files[0])}
-                          style={{ fontSize: 11, width: '100%' }} />
-                        {winIdCardFile && (
-                          <div style={{ fontSize: 11, marginTop: 4, color: '#7d3c98' }}>
-                            <i className="fas fa-paperclip"></i> {winIdCardFile.name}
-                          </div>
-                        )}
                       </div>
                       <button type="button" onClick={handleCreateWinInvestor} disabled={creatingWinInv || !newWinInv.full_name.trim()}
                         style={{ marginTop: 10, padding: '7px 18px', background: '#8e44ad', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>
@@ -871,7 +967,7 @@ export default function AuctionEditPage() {
                         </div>
                       )}
                       <button type="button"
-                        onClick={() => { setWinInvMode('select'); setCreatedWinInvId(null); setWinIdCardFile(null); setWinIdCardMsg('') }}
+                        onClick={() => { setWinInvMode('select'); setCreatedWinInvId(null); setWinIdCardFile(null); setWinIdCardMsg(''); setWinIdCardPreview(null); setNewWinInv({ ...EMPTY_NEW_INV }) }}
                         style={{ padding: '4px 12px', background: '#f0f0f0', border: '1px solid #ccc', borderRadius: 6, fontSize: 11, cursor: 'pointer' }}>
                         เสร็จสิ้น
                       </button>

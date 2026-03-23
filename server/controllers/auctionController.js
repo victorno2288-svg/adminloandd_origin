@@ -71,10 +71,15 @@ exports.getAuctionCases = (req, res) => {
       auc.id AS auction_id, auc.investor_id, auc.investor_name, auc.investor_code,
       auc.investor_phone, auc.auction_status,
       auc.created_at AS auction_created_at, auc.updated_at AS auction_updated_at,
-      auc.house_reg_book, auc.house_reg_book_legal,
-      auc.name_change_doc, auc.divorce_doc,
-      auc.spouse_consent_doc, auc.spouse_id_card, auc.spouse_reg_copy,
-      auc.marriage_cert, auc.spouse_name_change_doc
+      lr.marital_status,
+      lr.borrower_id_card, lr.house_reg_book, lr.name_change_doc, lr.divorce_doc,
+      lr.spouse_id_card, lr.spouse_reg_copy, lr.marriage_cert,
+      lr.single_cert, lr.death_cert, lr.will_court_doc, lr.testator_house_reg,
+      lr.deed_copy, lr.building_permit, lr.house_reg_prop, lr.sale_contract, lr.debt_free_cert,
+      lr.blueprint, lr.property_photos, lr.land_tax_receipt,
+      lr.condo_title_deed, lr.condo_location_map, lr.common_fee_receipt, lr.floor_plan,
+      lr.location_sketch_map, lr.land_use_cert, lr.rental_contract, lr.business_reg,
+      lr.property_type
     FROM cases c
     LEFT JOIN loan_requests lr ON lr.id = c.loan_request_id
     LEFT JOIN agents a ON a.id = c.agent_id

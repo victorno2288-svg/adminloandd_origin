@@ -38,4 +38,7 @@ router.get('/cases/:caseId/documents', legalController.getLegalDocuments)
 router.post('/cases/:caseId/documents', legalDocUpload, legalController.uploadLegalDocument)
 router.delete('/documents/:docId', legalController.deleteLegalDocument)
 
+// ★ รวมเอกสารทั้งหมดของเคสเป็น PDF เดียว
+router.get('/cases/:caseId/merge-pdf', legalController.mergeCaseDocs)
+
 module.exports = router

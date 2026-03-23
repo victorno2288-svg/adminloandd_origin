@@ -184,99 +184,46 @@ export default function AuctionPage() {
   }
 
   const openDocModal = (row) => {
-    const allImages = parseJSON(row.images)
-    const deedImages = parseJSON(row.deed_images)
+    const maritalDocs = [
+      { label: 'สำเนาบัตรประชาชนผู้กู้',                  icon: 'fa-id-card',   items: parseJSON(row.borrower_id_card) },
+      { label: 'สำเนาทะเบียนบ้านผู้กู้',                  icon: 'fa-home',      items: parseJSON(row.house_reg_book) },
+      { label: 'ทะเบียนสมรส',                              icon: 'fa-heart',     items: parseJSON(row.marriage_cert) },
+      { label: 'สำเนาบัตรประชาชนคู่สมรส',                 icon: 'fa-id-card',   items: parseJSON(row.spouse_id_card) },
+      { label: 'สำเนาทะเบียนบ้านคู่สมรส',                 icon: 'fa-home',      items: parseJSON(row.spouse_reg_copy) },
+      { label: 'หนังสือรับรองโสด / ยืนยันไม่จดทะเบียน',  icon: 'fa-file-alt',  items: parseJSON(row.single_cert) },
+      { label: 'ทะเบียนหย่า',                              icon: 'fa-file-alt',  items: parseJSON(row.divorce_doc) },
+      { label: 'ใบมรณบัตร',                                icon: 'fa-file-alt',  items: parseJSON(row.death_cert) },
+      { label: 'พินัยกรรม / คำสั่งศาล',                   icon: 'fa-gavel',     items: parseJSON(row.will_court_doc) },
+      { label: 'สำเนาทะเบียนบ้านเจ้ามรดก',                icon: 'fa-home',      items: parseJSON(row.testator_house_reg) },
+      { label: 'ใบเปลี่ยนชื่อนามสกุล',                    icon: 'fa-file-alt',  items: parseJSON(row.name_change_doc) },
+    ].filter(d => d.items.length > 0)
 
-    const docs = [
-      {
-        label: 'โฉนด / เอกสารสิทธิ์',
-        icon: 'fa-file-contract',
-        color: '#8e44ad',
-        items: deedImages
-      },
-      {
-        label: 'บัตรประชาชนเจ้าของทรัพย์',
-        icon: 'fa-id-card',
-        color: '#2980b9',
-        items: allImages.filter(p => p.includes('id-cards'))
-      },
-      {
-        label: 'รูปภาพทรัพย์',
-        icon: 'fa-home',
-        color: '#27ae60',
-        items: allImages.filter(p => p.includes('properties'))
-      },
-      {
-        label: 'วิดีโอทรัพย์',
-        icon: 'fa-video',
-        color: '#e67e22',
-        items: allImages.filter(p => p.includes('videos'))
-      },
-      {
-        label: 'เล่มประเมิน',
-        icon: 'fa-book',
-        color: '#8e44ad',
-        items: row.appraisal_book_image ? [row.appraisal_book_image] : []
-      },
-      {
-        label: 'เล่มทะเบียนบ้าน',
-        icon: 'fa-book-open',
-        color: '#16a085',
-        items: parseJSON(row.house_reg_book)
-      },
-      {
-        label: 'เล่มทะเบียนบ้าน (นิติกรรม)',
-        icon: 'fa-book-open',
-        color: '#1abc9c',
-        items: parseJSON(row.house_reg_book_legal)
-      },
-      {
-        label: 'ใบเปลี่ยนชื่อนามสกุล',
-        icon: 'fa-file-alt',
-        color: '#7f8c8d',
-        items: parseJSON(row.name_change_doc)
-      },
-      {
-        label: 'ใบหย่า',
-        icon: 'fa-file-alt',
-        color: '#95a5a6',
-        items: parseJSON(row.divorce_doc)
-      },
-      {
-        label: 'หนังสือยินยอมคู่สมรส',
-        icon: 'fa-heart',
-        color: '#e91e63',
-        items: parseJSON(row.spouse_consent_doc)
-      },
-      {
-        label: 'บัตรประชาชนคู่สมรส',
-        icon: 'fa-id-card',
-        color: '#ad1457',
-        items: parseJSON(row.spouse_id_card)
-      },
-      {
-        label: 'สำเนาทะเบียนคู่สมรส',
-        icon: 'fa-copy',
-        color: '#c2185b',
-        items: parseJSON(row.spouse_reg_copy)
-      },
-      {
-        label: 'ทะเบียนสมรส',
-        icon: 'fa-rings-wedding',
-        color: '#d81b60',
-        items: parseJSON(row.marriage_cert)
-      },
-      {
-        label: 'ใบเปลี่ยนชื่อนามสกุลคู่สมรส',
-        icon: 'fa-file-alt',
-        color: '#880e4f',
-        items: parseJSON(row.spouse_name_change_doc)
-      },
-    ]
+    const propDocs = [
+      { label: 'โฉนดที่ดิน',                             icon: 'fa-file-contract', items: parseJSON(row.deed_copy) },
+      { label: 'ใบอนุญาตก่อสร้าง',                       icon: 'fa-file-alt',      items: parseJSON(row.building_permit) },
+      { label: 'ทะเบียนบ้านของทรัพย์',                   icon: 'fa-home',          items: parseJSON(row.house_reg_prop) },
+      { label: 'สัญญาซื้อขาย / สัญญาจอง',                icon: 'fa-file-signature',items: parseJSON(row.sale_contract) },
+      { label: 'ใบปลอดภาระ',                              icon: 'fa-check-circle',  items: parseJSON(row.debt_free_cert) },
+      { label: 'แบบแปลนบ้าน',                             icon: 'fa-drafting-compass', items: parseJSON(row.blueprint) },
+      { label: 'รูปถ่ายทรัพย์',                           icon: 'fa-camera',        items: parseJSON(row.property_photos) },
+      { label: 'หลักฐานชำระภาษีที่ดิน',                  icon: 'fa-receipt',       items: parseJSON(row.land_tax_receipt) },
+      { label: 'หนังสือกรรมสิทธิ์ห้องชุด (อ.ช.2)',       icon: 'fa-file-contract', items: parseJSON(row.condo_title_deed) },
+      { label: 'แผนที่ตั้งโครงการ / แผนผังห้อง',         icon: 'fa-map',           items: parseJSON(row.condo_location_map) },
+      { label: 'ใบเสร็จค่าส่วนกลาง',                     icon: 'fa-receipt',       items: parseJSON(row.common_fee_receipt) },
+      { label: 'แปลนห้อง (floor plan)',                   icon: 'fa-th-large',      items: parseJSON(row.floor_plan) },
+      { label: 'แผนที่สังเขปทำเล',                        icon: 'fa-map-marked-alt',items: parseJSON(row.location_sketch_map) },
+      { label: 'หนังสือรับรองการใช้ประโยชน์',             icon: 'fa-file-alt',      items: parseJSON(row.land_use_cert) },
+      { label: 'สัญญาเช่า',                               icon: 'fa-file-signature',items: parseJSON(row.rental_contract) },
+      { label: 'ทะเบียนพาณิชย์',                          icon: 'fa-store',         items: parseJSON(row.business_reg) },
+    ].filter(d => d.items.length > 0)
+
     setDocModal({
       show: true,
       title: row.debtor_name || row.case_code || 'เอกสาร',
-      documents: docs
+      documents: [
+        ...maritalDocs.map(d => ({ ...d, color: '#1565c0' })),
+        ...propDocs.map(d => ({ ...d, color: '#15803d' })),
+      ]
     })
   }
 

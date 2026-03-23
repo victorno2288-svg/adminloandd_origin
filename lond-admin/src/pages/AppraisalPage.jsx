@@ -299,6 +299,75 @@ function DocsPopup({ caseData, onClose }) {
   )
 }
 
+// ==================== ComparePhotosModal ====================
+function ComparePhotosModal({ caseData, onClose }) {
+  const [preview, setPreview] = useState(null)
+  if (!caseData) return null
+
+  const parseImgs = (raw) => {
+    try { return JSON.parse(raw) || [] } catch { return [] }
+  }
+  const salesImgs = parseImgs(caseData.images)
+  const appraisalImgs = parseImgs(caseData.appraisal_images)
+
+  const Col = ({ title, color, bg, imgs }) => (
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ background: bg, color, fontWeight: 700, fontSize: 13, padding: '6px 12px', borderRadius: 8, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <i className="fas fa-images"></i> {title}
+        <span style={{ marginLeft: 'auto', fontWeight: 400, fontSize: 11 }}>{imgs.length} รูป</span>
+      </div>
+      {imgs.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '24px 0', color: '#bbb', fontSize: 13 }}>
+          <i className="fas fa-image" style={{ fontSize: 28, marginBottom: 6, display: 'block' }}></i>
+          ยังไม่มีรูป
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 8 }}>
+          {imgs.map((src, i) => {
+            const s = src.startsWith('/') ? src : `/${src}`
+            return (
+              <div key={i} onClick={() => setPreview(s)} style={{ cursor: 'zoom-in', borderRadius: 6, overflow: 'hidden', border: '1.5px solid #e0e0e0', transition: 'border-color 0.15s' }}
+                onMouseEnter={e => e.currentTarget.style.borderColor = color}
+                onMouseLeave={e => e.currentTarget.style.borderColor = '#e0e0e0'}>
+                <img src={s} alt={`รูป ${i + 1}`}
+                  style={{ width: '100%', height: 90, objectFit: 'cover', display: 'block' }}
+                  onError={e => { e.target.style.display = 'none' }} />
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9998 }} />
+      <div style={{
+        position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 9999,
+        background: '#fff', borderRadius: 14, padding: 24, width: '90vw', maxWidth: 900,
+        maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 8px 40px rgba(0,0,0,0.25)'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+          <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>
+            <i className="fas fa-columns" style={{ marginRight: 8, color: 'var(--primary)' }}></i>
+            เปรียบเทียบรูปทรัพย์ — {caseData.debtor_code || caseData.case_code}
+          </h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#999' }}>
+            <i className="fas fa-times"></i>
+          </button>
+        </div>
+        <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+          <Col title="รูปจากฝ่ายขาย" color="#27ae60" bg="#f0fff4" imgs={salesImgs} />
+          <div style={{ width: 1, background: '#e0e0e0', alignSelf: 'stretch' }} />
+          <Col title="รูปจากฝ่ายประเมิน" color="#e67e22" bg="#fff8f0" imgs={appraisalImgs} />
+        </div>
+      </div>
+      <ImageModal src={preview} onClose={() => setPreview(null)} />
+    </>
+  )
+}
+
 // ==================== MAIN APPRAISAL PAGE ====================
 export default function AppraisalPage() {
   const navigate = useNavigate()
@@ -311,6 +380,7 @@ export default function AppraisalPage() {
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [viewDocs, setViewDocs] = useState(null)
+  const [comparePhotos, setComparePhotos] = useState(null)
   const [showOcr, setShowOcr] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
 
@@ -528,17 +598,21 @@ export default function AppraisalPage() {
                       >
                         <i className="fas fa-file-alt"></i> ดูเอกสาร
                       </button>
-                      {/* อัพโหลดเอกสาร (ถ้าเป็นประเมินใน หรือยังไม่มีเอกสาร) */}
-                      <DocUpload
-                        caseId={d.case_id}
-                        currentFile={d.appraisal_book_image}
-                        onUploaded={(path) => {
-                          setData(prev => prev.map(x => x.case_id === d.case_id ? { ...x, appraisal_book_image: path } : x))
+                      {/* เปรียบเทียบรูปทรัพย์ */}
+                      <button
+                        onClick={() => setComparePhotos(d)}
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 4,
+                          padding: '5px 10px', borderRadius: 6, border: '1px solid #8e44ad',
+                          background: '#f9f0ff', color: '#8e44ad', fontSize: 12, fontWeight: 600,
+                          cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s'
                         }}
-                        onDeleted={() => {
-                          setData(prev => prev.map(x => x.case_id === d.case_id ? { ...x, appraisal_book_image: null } : x))
-                        }}
-                      />
+                        onMouseEnter={e => { e.currentTarget.style.background = '#8e44ad'; e.currentTarget.style.color = '#fff' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = '#f9f0ff'; e.currentTarget.style.color = '#8e44ad' }}
+                        title="เปรียบเทียบรูปทรัพย์"
+                      >
+                        <i className="fas fa-columns"></i> เปรียบเทียบรูป
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -552,6 +626,8 @@ export default function AppraisalPage() {
 
       {/* Popup ดูเอกสาร */}
       {viewDocs && <DocsPopup caseData={viewDocs} onClose={() => setViewDocs(null)} />}
+      {/* Popup เปรียบเทียบรูปทรัพย์ */}
+      {comparePhotos && <ComparePhotosModal caseData={comparePhotos} onClose={() => setComparePhotos(null)} />}
     </div>
   )
 }

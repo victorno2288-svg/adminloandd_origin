@@ -91,14 +91,19 @@ exports.getDebtorDetail = (req, res) => {
   // ดึงข้อมูล case + loan_request + issuing_transactions (รวมสลิปค่าดำเนินการจากกรมที่ดิน)
   const caseSql = `
     SELECT c.id AS case_id, c.case_code, c.status,
+      c.transaction_slip, c.advance_slip,
       lr.debtor_code, lr.contact_name AS debtor_name, lr.contact_phone AS debtor_phone,
       lr.province, lr.district, lr.subdistrict, lr.property_address, lr.location_url,
       lr.slip_image AS appraisal_slip_image,
       lr.appraisal_fee,
-      it.commission_slip AS issuing_commission_slip
+      lr.borrower_id_card,
+      it.commission_slip AS issuing_commission_slip,
+      a.id_card_image AS agent_id_card,
+      a.full_name AS agent_name
     FROM cases c
     LEFT JOIN loan_requests lr ON lr.id = c.loan_request_id
     LEFT JOIN issuing_transactions it ON it.case_id = c.id
+    LEFT JOIN agents a ON a.id = lr.agent_id
     WHERE c.id = ?
   `
 

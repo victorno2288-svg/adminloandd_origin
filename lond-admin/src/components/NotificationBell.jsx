@@ -133,16 +133,27 @@ export default function NotificationBell() {
     socketRef.current = socket
 
     socket.on('new_notification', function (data) {
-      // ทุกฝ่ายเห็นทุกแจ้งเตือน
-      {
-        setUnreadCount(function (prev) { return prev + 1 })
-        setNotifications(function (prev) { return [data].concat(prev).slice(0, 20) })
+      // ★ เพิ่มในรายการเสมอ (ทุกคนเห็น log)
+      setNotifications(function (prev) { return [data].concat(prev).slice(0, 20) })
 
-        // Bounce animation
+      // ★ ring/count เฉพาะฝ่ายที่เกี่ยวข้อง — ลดความถี่แจ้งเตือน
+      var myDept = user && user.department
+      var target = data.target_department
+      var isForMe = (
+        !myDept ||
+        myDept === 'super_admin' ||
+        myDept === 'manager' ||
+        !target ||
+        target === myDept ||
+        target === 'all'
+      )
+
+      if (isForMe) {
+        setUnreadCount(function (prev) { return prev + 1 })
+
         setBellBounce(true)
         setTimeout(function () { setBellBounce(false) }, 1000)
 
-        // Browser Notification
         if ('Notification' in window && Notification.permission === 'granted') {
           try {
             new Notification('LOAN DD — ' + (data.title || 'แจ้งเตือนใหม่'), {

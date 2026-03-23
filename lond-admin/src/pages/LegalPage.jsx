@@ -131,15 +131,38 @@ function StatusDropdown({ value, options, badgeMap, labelMap, defaultLabel, onCh
 // ========== DocsPopup ==========
 function DocsPopup({ caseData, onClose }) {
   const [preview, setPreview] = useState(null)
+  const [merging, setMerging] = useState(false)
   if (!caseData) return null
+
+  const handleMergePdf = async () => {
+    setMerging(true)
+    try {
+      const res = await fetch(`${API_LEGAL}/cases/${caseData.case_id}/merge-pdf`, {
+        headers: { Authorization: `Bearer ${token()}` }
+      })
+      if (!res.ok) { const e = await res.json(); alert(e.message || 'ไม่สามารถรวม PDF ได้'); return }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `docs_${caseData.case_code || caseData.case_id}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch { alert('เกิดข้อผิดพลาด') } finally { setMerging(false) }
+  }
+
   const files = [
-    { label: 'เอกสารแนบท้าย', src: caseData.attachment },
-    { label: 'เอกสารขายฝาก/จำนอง', src: caseData.doc_selling_pledge },
-    { label: 'โฉนดขายฝาก/จำนอง', src: caseData.deed_selling_pledge },
-    { label: 'เอกสารขยาย', src: caseData.doc_extension },
-    { label: 'โฉนดขยาย', src: caseData.deed_extension },
-    { label: 'เอกสารไถ่ถอน', src: caseData.doc_redemption },
-    { label: 'โฉนดไถ่ถอน', src: caseData.deed_redemption },
+    { label: 'สลิปโอนเงินค่าปากถุง',  src: caseData.transaction_slip },
+    { label: 'สลิปค่าหักล่วงหน้า',     src: caseData.advance_slip },
+    { label: 'ใบเสร็จค่าธรรมเนียม/ภาษี', src: caseData.tax_receipt },
+    { label: 'บัตรประชาชนเจ้าของทรัพย์', src: caseData.borrower_id_card_legal },
+    { label: 'เอกสารแนบท้าย',          src: caseData.attachment },
+    { label: 'เอกสารขายฝาก/จำนอง',     src: caseData.doc_selling_pledge },
+    { label: 'โฉนดขายฝาก/จำนอง',       src: caseData.deed_selling_pledge },
+    { label: 'เอกสารขยาย',             src: caseData.doc_extension },
+    { label: 'โฉนดขยาย',               src: caseData.deed_extension },
+    { label: 'เอกสารไถ่ถอน',           src: caseData.doc_redemption },
+    { label: 'โฉนดไถ่ถอน',             src: caseData.deed_redemption },
   ].filter(f => f.src)
 
   return (
@@ -167,23 +190,24 @@ function DocsPopup({ caseData, onClose }) {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12 }}>
             {files.map((f, i) => {
-              const isPdf = /\.pdf$/i.test(f.src)
+              const fileIsPdf = /\.pdf$/i.test(f.src)
+              const src = f.src.startsWith('/') ? f.src : `/${f.src}`
               return (
                 <div key={i} style={{
                   border: '1px solid #e0e0e0', borderRadius: 8, padding: 8, textAlign: 'center',
                   cursor: 'pointer', transition: 'all 0.15s'
                 }}
-                  onClick={() => isPdf ? window.open(`/${f.src}`, '_blank') : setPreview(f.src)}
-                  onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--primary)'}
+                  onClick={() => fileIsPdf ? window.open(src, '_blank') : setPreview(f.src)}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = fileIsPdf ? '#e53935' : 'var(--primary)'}
                   onMouseLeave={e => e.currentTarget.style.borderColor = '#e0e0e0'}
                 >
-                  {isPdf ? (
-                    <div style={{ width: '100%', height: 80, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#fff5f5', borderRadius: 4, marginBottom: 6, color: '#e74c3c' }}>
-                      <i className="fas fa-file-pdf" style={{ fontSize: 28 }}></i>
-                      <span style={{ fontSize: 10, marginTop: 4 }}>PDF</span>
+                  {fileIsPdf ? (
+                    <div style={{ width: '100%', height: 80, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#fff5f5', borderRadius: 4, marginBottom: 6, gap: 4 }}>
+                      <i className="fas fa-file-pdf" style={{ fontSize: 32, color: '#e53935' }}></i>
+                      <span style={{ fontSize: 10, color: '#e53935', fontWeight: 600 }}>คลิกเพื่อเปิด</span>
                     </div>
                   ) : (
-                    <img src={`/${f.src}`} alt={f.label}
+                    <img src={src} alt={f.label}
                       style={{ width: '100%', height: 80, objectFit: 'cover', borderRadius: 4, marginBottom: 6 }}
                       onError={e => { e.target.style.display = 'none' }} />
                   )}
@@ -243,7 +267,6 @@ export default function LegalPage() {
     if (searchField === 'debtor_name') return d.debtor_name?.includes(search)
     if (searchField === 'debtor_phone') return d.debtor_phone?.includes(search)
     if (searchField === 'case_code') return d.case_code?.includes(search)
-    if (searchField === 'officer_name') return d.officer_name?.includes(search)
     if (searchField === 'land_office') return d.land_office?.includes(search)
     return d.debtor_code?.includes(search) || d.debtor_name?.includes(search) ||
       d.debtor_phone?.includes(search) || d.case_code?.includes(search)
@@ -312,7 +335,6 @@ export default function LegalPage() {
           <option value="debtor_name">ชื่อลูกหนี้</option>
           <option value="debtor_phone">เบอร์โทร</option>
           <option value="case_code">รหัสเคส</option>
-          <option value="officer_name">เจ้าหน้าที่</option>
           <option value="land_office">สำนักงานที่ดิน</option>
         </select>
         <div className="search-wrapper">
@@ -346,7 +368,6 @@ export default function LegalPage() {
               <th>ID เคส</th>
               <th>ชื่อลูกหนี้</th>
               <th>โทร</th>
-              <th>เจ้าหน้าที่</th>
               <th>สำนักงานที่ดิน</th>
               <th>วันที่ไปที่ดิน</th>
               <th>สถานะนิติกรรม</th>
@@ -356,14 +377,14 @@ export default function LegalPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="10">
+              <tr><td colSpan="9">
                 <div style={{ textAlign: 'center', padding: 40, color: '#aaa' }}>
                   <i className="fas fa-spinner fa-spin" style={{ fontSize: 24, marginBottom: 8 }}></i>
                   <p>กำลังโหลด...</p>
                 </div>
               </td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan="10">
+              <tr><td colSpan="9">
                 <div className="empty-state"><i className="fas fa-inbox"></i><p>ยังไม่มีข้อมูล</p></div>
               </td></tr>
             ) : paged.map((d, i) => (
@@ -372,7 +393,6 @@ export default function LegalPage() {
                 <td><strong style={{ color: 'var(--primary)' }}>{d.case_code || '-'}</strong></td>
                 <td>{d.debtor_name || '-'}</td>
                 <td>{d.debtor_phone || '-'}</td>
-                <td>{d.officer_name || '-'}</td>
                 <td>{d.land_office || '-'}</td>
                 <td>{formatDate(d.visit_date)}</td>
                 <td>

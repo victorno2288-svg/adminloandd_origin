@@ -14,4 +14,7 @@ router.get('/chat-sla', dashboardController.getChatSlaReport);
 // GET /api/admin/dashboard/ceo
 router.get('/ceo', dashboardController.getCeoDashboard);
 
+// GET /api/admin/dashboard/my-stats — แดชบอร์ดส่วนตัว เฉพาะเคสที่ account ตัวเองสร้าง
+router.get('/my-stats', dashboardController.getMyDashboard);
+
 module.exports = router;

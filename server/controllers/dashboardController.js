@@ -671,3 +671,117 @@ exports.getCeoDashboard = (req, res) => {
     res.status(500).json({ success: false, message: e.message })
   })
 }
+// ============================================================
+// GET /api/admin/dashboard/my-stats
+// แดชบอร์ดส่วนตัว — เฉพาะเคสที่ account ตัวเองสร้าง
+// ============================================================
+exports.getMyDashboard = (req, res) => {
+  const userId = req.user ? req.user.id : null
+  if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' })
+
+  const dept = req.user ? req.user.department : null
+  // super_admin / manager เห็นทุกเคส (ไม่กรอง user_id)
+  const isAdmin = (dept === 'super_admin' || dept === 'manager')
+
+  // สร้าง WHERE clause ตาม role
+  const userWhere = isAdmin ? '1=1' : '(c.user_id = ? OR lr.user_id = ?)'
+  const userParams = isAdmin ? [] : [userId, userId]
+  const userSingle = isAdmin ? '1=1' : 'lr.user_id = ?'
+  const userParamsSingle = isAdmin ? [] : [userId]
+
+  const promises = []
+
+  // 1. Status breakdown
+  promises.push(new Promise(resolve => {
+    db.query(`
+      SELECT
+        COUNT(*) AS total_cases,
+        COALESCE(SUM(lr.loan_amount), 0) AS total_loan_amount,
+        COALESCE(SUM(lr.approved_amount), 0) AS total_approved_amount,
+        SUM(CASE WHEN c.status IN ('appraisal_scheduled','awaiting_appraisal_fee') THEN 1 ELSE 0 END) AS waiting_appraisal,
+        SUM(CASE WHEN c.status = 'appraisal_passed' THEN 1 ELSE 0 END) AS appraisal_passed,
+        SUM(CASE WHEN c.status = 'appraisal_not_passed' THEN 1 ELSE 0 END) AS appraisal_not_passed,
+        SUM(CASE WHEN c.status IN ('credit_approved','pending_approve') THEN 1 ELSE 0 END) AS waiting_auction,
+        SUM(CASE WHEN c.status IN ('preparing_docs','legal_scheduled') THEN 1 ELSE 0 END) AS waiting_legal,
+        SUM(CASE WHEN c.status = 'legal_completed' THEN 1 ELSE 0 END) AS waiting_issuing,
+        SUM(CASE WHEN c.status IN ('auction_completed','completed') THEN 1 ELSE 0 END) AS completed_cases,
+        SUM(CASE WHEN c.status NOT IN ('cancelled','appraisal_not_passed','completed','auction_completed') THEN 1 ELSE 0 END) AS active_cases
+      FROM cases c
+      LEFT JOIN loan_requests lr ON lr.id = c.loan_request_id
+      WHERE ${userWhere}
+    `, userParams, (err, rows) => resolve({ key: 'summary', data: err ? {} : (rows[0] || {}) }))
+  }))
+
+  // 2. สัญญาครบกำหนดใน 60 วัน (ทุกฝ่ายเห็น — สำคัญ)
+  promises.push(new Promise(resolve => {
+    db.query(`
+      SELECT c.id AS case_id, c.case_code, c.contract_end_date, c.status,
+        lr.contact_name AS debtor_name, lr.contact_phone AS debtor_phone,
+        DATEDIFF(c.contract_end_date, CURDATE()) AS days_remaining,
+        lr.loan_amount, lr.approved_amount
+      FROM cases c
+      LEFT JOIN loan_requests lr ON lr.id = c.loan_request_id
+      WHERE ${userWhere}
+        AND c.contract_end_date IS NOT NULL
+        AND c.contract_end_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 60 DAY)
+        AND c.status NOT IN ('cancelled','completed','auction_completed')
+      ORDER BY c.contract_end_date ASC
+      LIMIT 15
+    `, userParams, (err, rows) => resolve({ key: 'expiring', data: err ? [] : rows }))
+  }))
+
+  // 3. แชทที่ค้าง
+  promises.push(new Promise(resolve => {
+    const chatWhere = isAdmin ? '1=1' : 'lr.user_id = ?'
+    const chatParams = isAdmin ? [] : [userId]
+    db.query(`
+      SELECT COUNT(DISTINCT cm.loan_request_id) AS pending_count
+      FROM chat_messages cm
+      JOIN loan_requests lr ON lr.id = cm.loan_request_id
+      WHERE ${chatWhere}
+        AND cm.is_read = 0
+        AND cm.sender != 'admin'
+    `, chatParams, (err, rows) => resolve({ key: 'pending_chats', data: err ? 0 : (rows[0]?.pending_count || 0) }))
+  }))
+
+  // 4. ราคาประเมิน
+  promises.push(new Promise(resolve => {
+    db.query(`
+      SELECT lr.id AS lr_id, lr.debtor_code, lr.contact_name AS debtor_name,
+        lr.estimated_value, lr.loan_amount, lr.appraisal_result,
+        lr.province, lr.district,
+        c.id AS case_id, c.case_code, c.status,
+        c.updated_at
+      FROM loan_requests lr
+      LEFT JOIN cases c ON c.loan_request_id = lr.id
+      WHERE ${userSingle}
+        AND lr.estimated_value IS NOT NULL AND lr.estimated_value > 0
+      ORDER BY lr.updated_at DESC
+      LIMIT 10
+    `, userParamsSingle, (err, rows) => resolve({ key: 'appraisals', data: err ? [] : rows }))
+  }))
+
+  // 5. เคสล่าสุด
+  promises.push(new Promise(resolve => {
+    db.query(`
+      SELECT c.id AS case_id, c.case_code, c.status, c.updated_at,
+        c.contract_start_date, c.contract_end_date,
+        lr.contact_name AS debtor_name, lr.contact_phone,
+        lr.loan_amount, lr.approved_amount, lr.appraisal_result,
+        lr.province, lr.district
+      FROM cases c
+      LEFT JOIN loan_requests lr ON lr.id = c.loan_request_id
+      WHERE ${userWhere}
+      ORDER BY c.updated_at DESC
+      LIMIT 20
+    `, userParams, (err, rows) => resolve({ key: 'recent_cases', data: err ? [] : rows }))
+  }))
+
+  Promise.all(promises).then(results => {
+    const out = {}
+    results.forEach(r => { out[r.key] = r.data })
+    res.json({ success: true, ...out })
+  }).catch(e => {
+    res.status(500).json({ success: false, message: e.message })
+  })
+}

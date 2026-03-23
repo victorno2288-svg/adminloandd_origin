@@ -593,27 +593,105 @@ export default function DebtorAccountingEditPage() {
               <input style={{ ...inputStyle, background: form.property_location ? '#f0fff4' : '#fff' }} value={form.property_location || ''} onChange={e => set('property_location', e.target.value)} placeholder="อำเภอ / จังหวัด" />
             </div>
 
-            {/* ---------- สลิปค่าประเมิน (จากฝ่ายขาย — read-only) ---------- */}
-            {(caseInfo?.appraisal_slip_image || caseInfo?.appraisal_fee) && (
-              <div style={{ gridColumn: '1 / -1', padding: '12px 14px', background: '#fffde7', borderRadius: 8, border: '1.5px solid #ffe082', marginBottom: 4 }}>
-                <div style={{ fontWeight: 700, fontSize: 13, color: '#f57f17', marginBottom: 8 }}>
-                  <i className="fas fa-receipt" style={{ marginRight: 6 }}></i> สลิปค่าประเมิน
-                  <span style={{ fontSize: 10, background: '#fff9c4', color: '#f57f17', borderRadius: 10, padding: '1px 7px', fontWeight: 600, marginLeft: 6 }}>ฝ่ายขายอัพโหลด</span>
+            {/* ---------- สลิปจากฝ่ายต่างๆ (read-only สำหรับบัญชี) ---------- */}
+            {(caseInfo?.appraisal_slip_image || caseInfo?.appraisal_fee || caseInfo?.transaction_slip || caseInfo?.advance_slip || caseInfo?.agent_id_card || caseInfo?.borrower_id_card) && (
+              <div style={{ gridColumn: '1 / -1', background: '#f8f9ff', borderRadius: 10, border: '1.5px solid #c7d2fe', padding: '14px 16px', marginBottom: 4 }}>
+                <div style={{ fontWeight: 700, fontSize: 13, color: '#3730a3', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <i className="fas fa-folder-open"></i> เอกสารอ้างอิงจากฝ่ายต่างๆ
+                  <span style={{ fontSize: 10, background: '#e0e7ff', color: '#3730a3', borderRadius: 10, padding: '2px 8px', fontWeight: 600 }}>อ่านอย่างเดียว</span>
                 </div>
-                {caseInfo.appraisal_fee && (
-                  <div style={{ fontSize: 13, color: '#555', marginBottom: 6 }}>
-                    ค่าประเมิน: <strong style={{ color: '#f57f17' }}>฿{Number(caseInfo.appraisal_fee).toLocaleString('th-TH')}</strong>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+
+                  {/* สลิปค่าประเมิน (จากฝ่ายขาย/ประเมิน) */}
+                  {(caseInfo.appraisal_slip_image || caseInfo.appraisal_fee) && (
+                    <div style={{ flex: '1 1 200px', padding: '10px 12px', background: '#fffde7', borderRadius: 8, border: '1.5px solid #ffe082' }}>
+                      <div style={{ fontWeight: 700, fontSize: 12, color: '#f57f17', marginBottom: 6 }}>
+                        <i className="fas fa-receipt" style={{ marginRight: 5 }}></i> สลิปค่าประเมิน
+                        <span style={{ fontSize: 9, background: '#fff9c4', color: '#f57f17', borderRadius: 10, padding: '1px 6px', marginLeft: 5 }}>ฝ่ายประเมิน</span>
+                      </div>
+                      {caseInfo.appraisal_fee && (
+                        <div style={{ fontSize: 12, color: '#555', marginBottom: 5 }}>
+                          ฿{Number(caseInfo.appraisal_fee).toLocaleString('th-TH')}
+                        </div>
+                      )}
+                      {caseInfo.appraisal_slip_image ? (
+                        <a href={caseInfo.appraisal_slip_image.startsWith('/') ? caseInfo.appraisal_slip_image : `/${caseInfo.appraisal_slip_image}`}
+                          target="_blank" rel="noreferrer"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', background: '#f57f17', color: '#fff', borderRadius: 6, fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>
+                          <i className="fas fa-eye"></i> ดูสลิป
+                        </a>
+                      ) : <span style={{ fontSize: 11, color: '#bbb' }}>ยังไม่มีสลิป</span>}
+                    </div>
+                  )}
+
+                  {/* สลิปโอนเงินค่าปากถุง (จากฝ่ายนิติ) */}
+                  <div style={{ flex: '1 1 200px', padding: '10px 12px', background: '#e0f2fe', borderRadius: 8, border: '1.5px solid #7dd3fc' }}>
+                    <div style={{ fontWeight: 700, fontSize: 12, color: '#0369a1', marginBottom: 6 }}>
+                      <i className="fas fa-money-bill-transfer" style={{ marginRight: 5 }}></i> สลิปโอนเงินค่าปากถุง
+                      <span style={{ fontSize: 9, background: '#bae6fd', color: '#0369a1', borderRadius: 10, padding: '1px 6px', marginLeft: 5 }}>ฝ่ายนิติ</span>
+                    </div>
+                    {caseInfo.transaction_slip ? (
+                      <a href={caseInfo.transaction_slip.startsWith('/') ? caseInfo.transaction_slip : `/${caseInfo.transaction_slip}`}
+                        target="_blank" rel="noreferrer"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', background: '#0369a1', color: '#fff', borderRadius: 6, fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>
+                        <i className="fas fa-eye"></i> ดูสลิป
+                      </a>
+                    ) : <span style={{ fontSize: 11, color: '#bbb' }}>ยังไม่มีสลิป</span>}
                   </div>
-                )}
-                {caseInfo.appraisal_slip_image ? (
-                  <a href={caseInfo.appraisal_slip_image.startsWith('/') ? caseInfo.appraisal_slip_image : `/${caseInfo.appraisal_slip_image}`}
-                    target="_blank" rel="noreferrer"
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', background: '#f57f17', color: '#fff', borderRadius: 6, fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>
-                    <i className="fas fa-eye"></i> ดูสลิป
-                  </a>
-                ) : (
-                  <span style={{ fontSize: 12, color: '#bbb' }}>ยังไม่มีสลิป</span>
-                )}
+
+                  {/* สลิปค่าหักล่วงหน้า (จากฝ่ายนิติ) */}
+                  <div style={{ flex: '1 1 200px', padding: '10px 12px', background: '#f0fdf4', borderRadius: 8, border: '1.5px solid #86efac' }}>
+                    <div style={{ fontWeight: 700, fontSize: 12, color: '#15803d', marginBottom: 6 }}>
+                      <i className="fas fa-file-invoice-dollar" style={{ marginRight: 5 }}></i> สลิปค่าหักล่วงหน้า
+                      <span style={{ fontSize: 9, background: '#bbf7d0', color: '#15803d', borderRadius: 10, padding: '1px 6px', marginLeft: 5 }}>ฝ่ายนิติ</span>
+                    </div>
+                    {caseInfo.advance_slip ? (
+                      <a href={caseInfo.advance_slip.startsWith('/') ? caseInfo.advance_slip : `/${caseInfo.advance_slip}`}
+                        target="_blank" rel="noreferrer"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', background: '#15803d', color: '#fff', borderRadius: 6, fontSize: 11, fontWeight: 600, textDecoration: 'none' }}>
+                        <i className="fas fa-eye"></i> ดูสลิป
+                      </a>
+                    ) : <span style={{ fontSize: 11, color: '#bbb' }}>ยังไม่มีสลิป</span>}
+                  </div>
+
+                  {/* บัตรประชาชนลูกหนี้ (จากฝ่ายขาย checklist) */}
+                  {caseInfo.borrower_id_card && (
+                    <div style={{ flex: '1 1 200px', padding: '10px 12px', background: '#fdf4ff', borderRadius: 8, border: '1.5px solid #e9d5ff' }}>
+                      <div style={{ fontWeight: 700, fontSize: 12, color: '#7c3aed', marginBottom: 6 }}>
+                        <i className="fas fa-id-card" style={{ marginRight: 5 }}></i> บัตรประชาชนลูกหนี้
+                        <span style={{ fontSize: 9, background: '#ede9fe', color: '#7c3aed', borderRadius: 10, padding: '1px 6px', marginLeft: 5 }}>ฝ่ายขาย</span>
+                      </div>
+                      {(() => {
+                        const cards = Array.isArray(caseInfo.borrower_id_card) ? caseInfo.borrower_id_card : [caseInfo.borrower_id_card]
+                        return cards.filter(Boolean).map((img, i) => {
+                          const src = img.startsWith('/') ? img : `/${img}`
+                          return (
+                            <a key={i} href={src} target="_blank" rel="noreferrer">
+                              <img src={src} alt={`id-${i}`} style={{ width: 56, height: 40, objectFit: 'cover', borderRadius: 4, border: '1.5px solid #e9d5ff', marginRight: 4 }} onError={e => { e.target.style.display = 'none' }} />
+                            </a>
+                          )
+                        })
+                      })()}
+                    </div>
+                  )}
+
+                  {/* บัตรประชาชนนายหน้า */}
+                  {caseInfo.agent_id_card && (
+                    <div style={{ flex: '1 1 200px', padding: '10px 12px', background: '#fff7ed', borderRadius: 8, border: '1.5px solid #fed7aa' }}>
+                      <div style={{ fontWeight: 700, fontSize: 12, color: '#c2410c', marginBottom: 6 }}>
+                        <i className="fas fa-id-badge" style={{ marginRight: 5 }}></i> บัตรประชาชนนายหน้า
+                        {caseInfo.agent_name && <span style={{ fontSize: 10, color: '#c2410c', fontWeight: 400, marginLeft: 5 }}>({caseInfo.agent_name})</span>}
+                      </div>
+                      <a href={caseInfo.agent_id_card.startsWith('/') ? caseInfo.agent_id_card : `/${caseInfo.agent_id_card}`}
+                        target="_blank" rel="noreferrer">
+                        <img src={caseInfo.agent_id_card.startsWith('/') ? caseInfo.agent_id_card : `/${caseInfo.agent_id_card}`}
+                          alt="agent-id" style={{ width: 56, height: 40, objectFit: 'cover', borderRadius: 4, border: '1.5px solid #fed7aa' }}
+                          onError={e => { e.target.style.display = 'none' }} />
+                      </a>
+                    </div>
+                  )}
+
+                </div>
               </div>
             )}
 

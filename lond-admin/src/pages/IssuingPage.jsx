@@ -141,13 +141,17 @@ function DocsPopup({ caseData, onClose }) {
   const [preview, setPreview] = useState(null)
   if (!caseData) return null
   const files = [
-    { label: 'เอกสารแนบท้าย', src: caseData.attachment },
-    { label: 'เอกสารขายฝาก/จำนอง', src: caseData.doc_selling_pledge },
-    { label: 'โฉนดขายฝาก/จำนอง', src: caseData.deed_selling_pledge },
-    { label: 'เอกสารขยาย', src: caseData.doc_extension },
-    { label: 'โฉนดขยาย', src: caseData.deed_extension },
-    { label: 'เอกสารไถ่ถอน', src: caseData.doc_redemption },
-    { label: 'โฉนดไถ่ถอน', src: caseData.deed_redemption },
+    { label: 'สัญญาขายฝาก',                   src: caseData.issuing_doc_selling_pledge },
+    { label: 'สัญญาจำนอง',                     src: caseData.issuing_doc_mortgage },
+    { label: 'สลิปค่าดำเนินการ',               src: caseData.issuing_commission_slip },
+    { label: 'สัญญาแต่งตั้งนายหน้า',           src: caseData.issuing_broker_contract },
+    { label: 'บัตรประชาชนนายหน้า',             src: caseData.issuing_broker_id },
+    { label: 'สัญญานายหน้า (ขายฝาก)',          src: caseData.issuing_doc_sp_broker },
+    { label: 'เอกสารแนบท้าย (ขายฝาก)',         src: caseData.issuing_doc_sp_appendix },
+    { label: 'หนังสือแจ้งเตือน (ขายฝาก)',       src: caseData.issuing_doc_sp_notice },
+    { label: 'สัญญาต่อท้าย (จำนอง)',            src: caseData.issuing_doc_mg_addendum },
+    { label: 'เอกสารแนบท้าย (จำนอง)',           src: caseData.issuing_doc_mg_appendix },
+    { label: 'สัญญานายหน้า (จำนอง)',            src: caseData.issuing_doc_mg_broker },
   ].filter(f => f.src)
 
   return (
@@ -175,13 +179,15 @@ function DocsPopup({ caseData, onClose }) {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12 }}>
             {files.map((f, i) => {
-              const isPdf = /\.pdf$/i.test(f.src)
+              const isPdf  = /\.pdf$/i.test(f.src)
+              const isWord = /\.(doc|docx)$/i.test(f.src)
+              const isFile = isPdf || isWord
               return (
                 <div key={i} style={{
                   border: '1px solid #e0e0e0', borderRadius: 8, padding: 8, textAlign: 'center',
                   cursor: 'pointer', transition: 'all 0.15s'
                 }}
-                  onClick={() => isPdf ? window.open(`/${f.src}`, '_blank') : setPreview(f.src)}
+                  onClick={() => isFile ? window.open(`/${f.src}`, '_blank') : setPreview(f.src)}
                   onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--primary)'}
                   onMouseLeave={e => e.currentTarget.style.borderColor = '#e0e0e0'}
                 >
@@ -189,6 +195,11 @@ function DocsPopup({ caseData, onClose }) {
                     <div style={{ width: '100%', height: 80, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#fff5f5', borderRadius: 4, marginBottom: 6, color: '#e74c3c' }}>
                       <i className="fas fa-file-pdf" style={{ fontSize: 28 }}></i>
                       <span style={{ fontSize: 10, marginTop: 4 }}>PDF</span>
+                    </div>
+                  ) : isWord ? (
+                    <div style={{ width: '100%', height: 80, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#eef3ff', borderRadius: 4, marginBottom: 6, color: '#2b5fad' }}>
+                      <i className="fas fa-file-word" style={{ fontSize: 28 }}></i>
+                      <span style={{ fontSize: 10, marginTop: 4 }}>Word</span>
                     </div>
                   ) : (
                     <img src={`/${f.src}`} alt={f.label}
@@ -253,10 +264,10 @@ export default function IssuingPage() {
     if (searchField === 'debtor_name') return d.debtor_name?.includes(search)
     if (searchField === 'debtor_phone') return d.debtor_phone?.includes(search)
     if (searchField === 'case_code') return d.case_code?.includes(search)
-    if (searchField === 'email') return d.email?.includes(search) || d.tracking_no?.includes(search)
+    if (searchField === 'email') return d.contact_email?.includes(search) || d.tracking_no?.includes(search)
     if (searchField === 'officer_name') return d.officer_name?.includes(search)
     if (searchField === 'land_office') return d.land_office?.includes(search)
-    return d.debtor_code?.includes(search) || d.debtor_name?.includes(search) || d.debtor_phone?.includes(search) || d.case_code?.includes(search) || d.email?.includes(search) || d.tracking_no?.includes(search)
+    return d.debtor_code?.includes(search) || d.debtor_name?.includes(search) || d.debtor_phone?.includes(search) || d.case_code?.includes(search) || d.contact_email?.includes(search) || d.tracking_no?.includes(search)
   })
   const paged = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE)
 
@@ -414,7 +425,7 @@ export default function IssuingPage() {
                       onChange={(val) => handleStatusChange(d.case_id, val)}
                     />
                   </td>
-                  <td>{d.email || d.tracking_no || '-'}</td>
+                  <td>{d.contact_email || '-'}</td>
                   <td>
                     <div style={{ display: 'flex', gap: 6, justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
                       {/* ปุ่มเอกสาร */}

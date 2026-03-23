@@ -125,7 +125,9 @@ function Pagination({ total, page, setPage }) {
 
 const propertyTypeLabel = {
   land: 'ที่ดินเปล่า', house: 'บ้าน', single_house: 'บ้านเดี่ยว',
-  condo: 'คอนโด', townhouse: 'ทาวน์โฮม', shophouse: 'ตึกแถว', other: 'อื่นๆ',
+  condo: 'คอนโด', townhouse: 'ทาวน์โฮม', shophouse: 'ตึกแถว',
+  apartment: 'หอพัก / อพาร์ตเมนต์', commercial: 'อาคารพาณิชย์ / ออฟฟิศ',
+  warehouse: 'โกดัง / โรงงาน', agri: 'ที่ดินเกษตร / ไร่ / นา', other: 'อื่นๆ',
 }
 const deedTypeLabel = { chanote: 'โฉนด (น.ส.4)', ns4k: 'น.ส.4ก.', ns3: 'นส.3', ns3k: 'นส.3ก.', spk: 'ส.ป.ก.', other: 'อื่นๆ' }
 const deedTypeOk = { chanote: true, ns4k: true, ns3: false, ns3k: false, spk: false }
@@ -327,9 +329,9 @@ function DebtorsTab({ search, searchField, refreshKey }) {
     <div>
       <div className="table-responsive">
         <table className="table-green">
-          <thead><tr><th>ลำดับ</th><th>IDลูกหนี้</th><th>ชื่อ-นามสกุล</th><th>เบอร์โทร</th><th>นายหน้า</th><th>ประเภททรัพย์</th><th>ประเภทสินเชื่อ</th><th>SOP</th><th>สถานะชำระ</th><th>สถานะ</th><th>วันที่สมัคร</th><th>จัดการ</th></tr></thead>
+          <thead><tr><th>ลำดับ</th><th>IDลูกหนี้</th><th>ชื่อ-นามสกุล</th><th>เบอร์โทร</th><th>นายหน้า</th><th>ผู้สร้าง/แก้ไข</th><th>ประเภททรัพย์</th><th>ประเภทสินเชื่อ</th><th>SOP</th><th>สถานะชำระ</th><th>สถานะ</th><th>วันที่สมัคร</th><th>จัดการ</th></tr></thead>
           <tbody>
-            {filtered.length === 0 ? (<tr><td colSpan="12"><div className="empty-state"><i className="fas fa-inbox"></i><p>ยังไม่มีข้อมูลลูกหนี้</p></div></td></tr>) : paged.map((d, i) => (
+            {filtered.length === 0 ? (<tr><td colSpan="13"><div className="empty-state"><i className="fas fa-inbox"></i><p>ยังไม่มีข้อมูลลูกหนี้</p></div></td></tr>) : paged.map((d, i) => (
               <tr key={d.id}>
                 <td>{String((page - 1) * PER_PAGE + i + 1).padStart(2, '0')}</td>
                 <td><strong style={{ color: 'var(--primary)' }}>{d.debtor_code || '-'}</strong></td>
@@ -349,6 +351,12 @@ function DebtorsTab({ search, searchField, refreshKey }) {
                       {d.agent_code && <div style={{ fontSize: 11, color: '#888' }}>{d.agent_code}</div>}
                     </div>
                   ) : <span style={{ color: '#ccc', fontSize: 12 }}>-</span>}
+                </td>
+                <td>
+                  <span style={{ fontSize: 11, color: '#555', background: '#f0f4ff', padding: '2px 8px', borderRadius: 10, whiteSpace: 'nowrap' }}>
+                    <i className="fas fa-user-edit" style={{ marginRight: 4, color: '#3498db' }}></i>
+                    {d.case_creator || '-'}
+                  </span>
                 </td>
                 <td>{propertyTypeLabel[d.property_type] || d.property_type || '-'}</td>
                 <td>
@@ -459,9 +467,9 @@ function CasesTab({ search, searchField, refreshKey, onReload }) {
     <div>
       <div className="table-responsive">
         <table className="table-green">
-          <thead><tr><th>ลำดับ</th><th>IDลูกหนี้</th><th>ID Case</th><th>ประเภทสินเชื่อ</th><th>ชื่อ-สกุล</th><th>เบอร์โทร</th><th>นายหน้า</th><th>ค่าประเมิน</th><th>วงเงินอนุมัติ</th><th>สถานะชำระ</th><th>สถานะ</th><th>Follow-up</th><th>คัดทรัพย์</th><th>วันที่สร้าง</th><th>จัดการ</th></tr></thead>
+          <thead><tr><th>ลำดับ</th><th>IDลูกหนี้</th><th>ID Case</th><th>ประเภทสินเชื่อ</th><th>ชื่อ-สกุล</th><th>เบอร์โทร</th><th>นายหน้า</th><th>ผู้สร้าง/แก้ไข</th><th>สถานะชำระ</th><th>สถานะ</th><th>วันที่สร้าง</th><th>จัดการ</th></tr></thead>
           <tbody>
-            {filtered.length === 0 ? (<tr><td colSpan="15"><div className="empty-state"><i className="fas fa-folder-open"></i><p>ยังไม่มีเคส</p></div></td></tr>) : paged.map((c, i) => (
+            {filtered.length === 0 ? (<tr><td colSpan="12"><div className="empty-state"><i className="fas fa-folder-open"></i><p>ยังไม่มีเคส</p></div></td></tr>) : paged.map((c, i) => (
               <tr key={c.id}>
                 <td>{String((page - 1) * PER_PAGE + i + 1).padStart(2, '0')}</td>
                 <td><strong style={{ color: 'var(--primary)' }}>{c.debtor_code || '-'}</strong></td>
@@ -478,12 +486,14 @@ function CasesTab({ search, searchField, refreshKey, onReload }) {
                 <td>{c.debtor_name || '-'}</td>
                 <td>{c.debtor_phone || '-'}</td>
                 <td>{c.agent_name || '-'}</td>
-                <td>฿{formatMoney(c.appraisal_fee)}</td>
-                <td>{c.approved_amount ? `฿${formatMoney(c.approved_amount)}` : '-'}</td>
+                <td>
+                  <span style={{ fontSize: 11, color: '#555', background: '#f0f4ff', padding: '2px 8px', borderRadius: 10, whiteSpace: 'nowrap' }}>
+                    <i className="fas fa-user-edit" style={{ marginRight: 4, color: '#3498db' }}></i>
+                    {c.recorded_by || c.sales_name || '-'}
+                  </span>
+                </td>
                 <td><StatusDropdown value={c.payment_status || 'unpaid'} options={allPayments} badgeMap={paymentBadge} labelMap={paymentLabel} onChange={async (val) => { try { const res = await fetch(`/api/admin/accounting/debtor-master-status/${c.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` }, body: JSON.stringify({ status: val }) }); const r = await res.json(); if (r.success) setData(prev => prev.map(x => x.id === c.id ? { ...x, payment_status: val } : x)) } catch { } }} /></td>
                 <td><span className={`badge ${statusBadge[c.status] || 'badge-pending'}`}>{statusLabel[c.status] || c.status || '-'}</span></td>
-                <td><FollowUpBadge nextAt={c.next_follow_up_at} followCount={c.follow_up_count} /></td>
-                <td><ScreeningBadge ineligible={c.ineligible_property} status={c.screening_status} reason={c.ineligible_reason} /></td>
                 <td>{formatDate(c.created_at)}</td>
                 <td>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -540,16 +550,15 @@ function AgentsTab({ search, searchField, refreshKey, onReload }) {
     <div>
       <div className="table-responsive">
         <table className="table-green">
-          <thead><tr><th>ลำดับ</th><th>รหัส</th><th>ชื่อ-นามสกุล</th><th>เบอร์โทร</th><th>อีเมล</th><th>ค่าคอม %</th><th>จำนวนเคส</th><th>สถานะ</th><th>อัพเดทล่าสุด</th><th>จัดการ</th></tr></thead>
+          <thead><tr><th>ลำดับ</th><th>รหัส</th><th>ชื่อ-นามสกุล</th><th>เบอร์โทร</th><th>อีเมล</th><th>จำนวนเคส</th><th>สถานะ</th><th>อัพเดทล่าสุด</th><th>จัดการ</th></tr></thead>
           <tbody>
-            {filtered.length === 0 ? (<tr><td colSpan="10"><div className="empty-state"><i className="fas fa-user-slash"></i><p>ยังไม่มีนายหน้า</p></div></td></tr>) : paged.map((a, i) => (
+            {filtered.length === 0 ? (<tr><td colSpan="9"><div className="empty-state"><i className="fas fa-user-slash"></i><p>ยังไม่มีนายหน้า</p></div></td></tr>) : paged.map((a, i) => (
               <tr key={a.id}>
                 <td>{String((page - 1) * PER_PAGE + i + 1).padStart(2, '0')}</td>
                 <td><strong style={{ color: 'var(--primary)' }}>{a.agent_code || '-'}</strong></td>
                 <td><strong>{a.full_name}</strong></td>
                 <td>{a.phone}</td>
                 <td>{a.email || '-'}</td>
-                <td>{a.commission_rate}%</td>
                 <td>{a.total_cases}</td>
                 <td><span className={`badge ${a.status === 'active' ? 'badge-completed' : 'badge-cancelled'}`}>{a.status === 'active' ? 'ใช้งาน' : 'ปิดใช้งาน'}</span></td>
                 <td>{formatDate(a.updated_at)}</td>

@@ -117,19 +117,23 @@ exports.getIssuingCases = (req, res) => {
       a.full_name AS agent_name,
       it.issuing_status,
       it.tracking_no,
-      it.tracking_no AS email,
+      lr.contact_email,
       it.updated_at AS issuing_updated_at,
       lt.officer_name,
       lt.land_office,
       lt.visit_date,
       lt.legal_status,
-      lt.attachment,
-      lt.doc_selling_pledge,
-      lt.deed_selling_pledge,
-      lt.doc_extension,
-      lt.deed_extension,
-      lt.doc_redemption,
-      lt.deed_redemption
+      it.doc_selling_pledge AS issuing_doc_selling_pledge,
+      it.doc_mortgage       AS issuing_doc_mortgage,
+      it.commission_slip    AS issuing_commission_slip,
+      c.broker_contract_file AS issuing_broker_contract,
+      c.broker_id_file       AS issuing_broker_id,
+      it.doc_sp_broker      AS issuing_doc_sp_broker,
+      it.doc_sp_appendix    AS issuing_doc_sp_appendix,
+      it.doc_sp_notice      AS issuing_doc_sp_notice,
+      it.doc_mg_addendum    AS issuing_doc_mg_addendum,
+      it.doc_mg_appendix    AS issuing_doc_mg_appendix,
+      it.doc_mg_broker      AS issuing_doc_mg_broker
     FROM cases c
     LEFT JOIN loan_requests lr ON lr.id = c.loan_request_id
     LEFT JOIN agents a ON a.id = c.agent_id

@@ -46,9 +46,11 @@ exports.getLegalCases = (req, res) => {
       lr.debtor_code, lr.contact_name AS debtor_name,
       lr.contact_phone AS debtor_phone,
       lr.province, lr.district, lr.property_address, lr.location_url,
-      lt.id AS legal_id, lt.officer_name, lt.visit_date, lt.land_office, lt.time_slot, lt.team,
+      lt.id AS legal_id, lt.visit_date, lt.land_office, lt.time_slot, lt.team,
       lt.legal_status, lt.attachment, lt.doc_selling_pledge, lt.deed_selling_pledge,
       lt.doc_extension, lt.deed_extension, lt.doc_redemption, lt.deed_redemption,
+      lt.tax_receipt, lt.borrower_id_card_legal,
+      c.transaction_slip, c.advance_slip,
       lt.note, lt.created_at AS legal_created_at, lt.updated_at AS legal_updated_at
     FROM cases c
     LEFT JOIN loan_requests lr ON lr.id = c.loan_request_id
@@ -517,4 +519,87 @@ exports.deleteLegalDocument = (req, res) => {
       res.json({ success: true })
     })
   })
+}
+
+// ========== รวมเอกสารทั้งหมดของเคสเป็น PDF เดียว ==========
+exports.mergeCaseDocs = async (req, res) => {
+  const { caseId } = req.params
+  try {
+    const { PDFDocument, rgb, StandardFonts } = require('pdf-lib')
+
+    // ดึงข้อมูลเคส + เส้นทางไฟล์ทั้งหมด
+    const sql = `
+      SELECT
+        c.case_code, lr.contact_name AS debtor_name, lr.debtor_code,
+        lt.attachment, lt.doc_selling_pledge, lt.deed_selling_pledge,
+        lt.doc_extension, lt.deed_extension, lt.doc_redemption, lt.deed_redemption,
+        lt.tax_receipt, lt.borrower_id_card_legal,
+        c.transaction_slip, c.advance_slip
+      FROM cases c
+      LEFT JOIN loan_requests lr ON lr.id = c.loan_request_id
+      LEFT JOIN legal_transactions lt ON lt.case_id = c.id
+      WHERE c.id = ?
+    `
+    db.query(sql, [caseId], async (err, rows) => {
+      if (err) return res.status(500).json({ success: false, message: err.message })
+      if (!rows || rows.length === 0) return res.status(404).json({ success: false, message: 'ไม่พบเคส' })
+
+      const row = rows[0]
+      const docFields = [
+        { label: 'สลิปโอนเงินค่าปากถุง',    src: row.transaction_slip },
+        { label: 'สลิปค่าหักล่วงหน้า',       src: row.advance_slip },
+        { label: 'ใบเสร็จค่าธรรมเนียม/ภาษี', src: row.tax_receipt },
+        { label: 'บัตรประชาชนเจ้าของทรัพย์',  src: row.borrower_id_card_legal },
+        { label: 'เอกสารแนบท้าย',            src: row.attachment },
+        { label: 'เอกสารขายฝาก/จำนอง',       src: row.doc_selling_pledge },
+        { label: 'โฉนดขายฝาก/จำนอง',         src: row.deed_selling_pledge },
+        { label: 'เอกสารขยาย',              src: row.doc_extension },
+        { label: 'โฉนดขยาย',                src: row.deed_extension },
+        { label: 'เอกสารไถ่ถอน',            src: row.doc_redemption },
+        { label: 'โฉนดไถ่ถอน',              src: row.deed_redemption },
+      ].filter(d => d.src)
+
+      if (docFields.length === 0) {
+        return res.status(404).json({ success: false, message: 'ไม่มีเอกสารในเคสนี้' })
+      }
+
+      const mergedPdf = await PDFDocument.create()
+      const font = await mergedPdf.embedFont(StandardFonts.Helvetica)
+
+      for (const doc of docFields) {
+        const filePath = path.join(__dirname, '..', doc.src)
+        if (!fs.existsSync(filePath)) continue
+
+        const fileBytes = fs.readFileSync(filePath)
+        const ext = path.extname(filePath).toLowerCase()
+
+        try {
+          if (ext === '.pdf') {
+            // merge PDF pages
+            const srcPdf = await PDFDocument.load(fileBytes)
+            const pages = await mergedPdf.copyPages(srcPdf, srcPdf.getPageIndices())
+            pages.forEach(p => mergedPdf.addPage(p))
+          } else if (['.jpg', '.jpeg'].includes(ext)) {
+            const img = await mergedPdf.embedJpg(fileBytes)
+            const page = mergedPdf.addPage([img.width, img.height])
+            page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height })
+          } else if (ext === '.png') {
+            const img = await mergedPdf.embedPng(fileBytes)
+            const page = mergedPdf.addPage([img.width, img.height])
+            page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height })
+          }
+        } catch (embedErr) {
+          console.error(`ข้ามไฟล์ ${doc.label}:`, embedErr.message)
+        }
+      }
+
+      const pdfBytes = await mergedPdf.save()
+      const filename = `docs_${row.case_code || caseId}.pdf`
+      res.setHeader('Content-Type', 'application/pdf')
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+      res.end(Buffer.from(pdfBytes))
+    })
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message })
+  }
 }

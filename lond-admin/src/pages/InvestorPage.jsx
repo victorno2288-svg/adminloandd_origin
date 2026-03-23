@@ -85,6 +85,11 @@ function InvestorModal({ isOpen, onClose, onSaved, editData }) {
   const [houseRegFile, setHouseRegFile] = useState(null)
   const [uploadingHouseReg, setUploadingHouseReg] = useState(false)
   const [houseRegMsg, setHouseRegMsg] = useState('')
+  // file previews
+  const [idCardPreview, setIdCardPreview] = useState(null)
+  const [houseRegPreview, setHouseRegPreview] = useState(null)
+  const [passbookPreview, setPassbookPreview] = useState(null)
+  const [contractPreview, setContractPreview] = useState(null)
   // OCR — บัตรประชาชน
   const [ocrLoading, setOcrLoading] = useState(false)
   const [ocrMsg, setOcrMsg] = useState('')
@@ -97,13 +102,13 @@ function InvestorModal({ isOpen, onClose, onSaved, editData }) {
 
   useEffect(() => {
     if (isOpen) {
-      setIdCardFile(null); setIdCardMsg('')
+      setIdCardFile(null); setIdCardMsg(''); setIdCardPreview(null)
+      setHouseRegFile(null); setHouseRegMsg(''); setHouseRegPreview(null)
+      setPassbookFile(null); setPassbookMsg(''); setPassbookPreview(null)
+      setContractFile(null); setContractMsg(''); setContractPreview(null)
       setOcrLoading(false); setOcrMsg('')
       setHouseOcrLoading(false); setHouseOcrMsg('')
       setPassbookOcrLoading(false); setPassbookOcrMsg('')
-      setPassbookFile(null); setPassbookMsg('')
-      setContractFile(null); setContractMsg('')
-      setHouseRegFile(null); setHouseRegMsg('')
       if (editData) {
         setForm({
           investor_code: editData.investor_code || '',
@@ -528,22 +533,81 @@ function InvestorModal({ isOpen, onClose, onSaved, editData }) {
                 </button>
               </div>
             )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <input type="file" accept=".jpg,.jpeg,.png"
+            {/* ── styled upload zone with preview ── */}
+            <label style={{
+              display: 'block', cursor: ocrLoading ? 'default' : 'pointer', marginBottom: 8,
+              background: idCardPreview ? '#faf5ff' : '#f9f0ff',
+              border: `2px dashed ${idCardPreview ? '#a855f7' : '#c39bd3'}`,
+              borderRadius: 10, padding: 12, transition: 'border-color 0.2s',
+            }}
+              onMouseEnter={e => { if (!idCardPreview) e.currentTarget.style.borderColor = '#8e44ad' }}
+              onMouseLeave={e => { if (!idCardPreview) e.currentTarget.style.borderColor = '#c39bd3' }}
+            >
+              <input type="file" accept=".jpg,.jpeg,.png" style={{ display: 'none' }}
+                disabled={ocrLoading}
                 onChange={e => {
                   const f = e.target.files[0] || null
+                  if (!f) return
                   setIdCardFile(f); setIdCardMsg(''); setOcrMsg('')
+                  setIdCardPreview(URL.createObjectURL(f))
                   handleOcr(f)
-                }}
-                style={{ fontSize: 12, flex: 1 }} />
-              {isEdit && (
-                <button type="button" onClick={() => handleUploadIdCard()}
-                  disabled={uploadingIdCard || !idCardFile}
-                  style={{ padding: '5px 12px', background: '#8e44ad', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                  {uploadingIdCard ? <><i className="fas fa-spinner fa-spin"></i> กำลังอัพโหลด...</> : <><i className="fas fa-upload"></i> อัพโหลด</>}
-                </button>
-              )}
-            </div>
+                  e.target.value = ''
+                }} />
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                {/* thumbnail */}
+                <div style={{
+                  width: 72, height: 72, flexShrink: 0, borderRadius: 8, overflow: 'hidden',
+                  background: '#ede9fe', border: '1px solid #d8b4fe',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
+                }}>
+                  {idCardPreview
+                    ? <img src={idCardPreview} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    : <i className="fas fa-id-card" style={{ fontSize: 26, color: '#a855f7' }}></i>
+                  }
+                  {idCardPreview && !ocrLoading && (
+                    <button type="button"
+                      onClick={e => { e.preventDefault(); e.stopPropagation(); setIdCardFile(null); setIdCardPreview(null); setOcrMsg('') }}
+                      style={{
+                        position: 'absolute', top: 3, right: 3, width: 18, height: 18, borderRadius: '50%',
+                        background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff', fontSize: 10,
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, zIndex: 2,
+                      }} title="ลบรูป">✕</button>
+                  )}
+                  {ocrLoading && (
+                    <div style={{ position: 'absolute', inset: 0, background: 'rgba(139,92,246,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <i className="fas fa-spinner fa-spin" style={{ color: '#fff', fontSize: 20 }}></i>
+                    </div>
+                  )}
+                </div>
+                {/* text */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#7e22ce', marginBottom: 3 }}>
+                    <i className="fas fa-camera" style={{ marginRight: 5 }}></i>
+                    {ocrLoading ? 'กำลังอ่านบัตร...' : idCardPreview ? 'เปลี่ยนรูปบัตรประชาชน' : 'สแกน / อัพโหลดบัตรประชาชน'}
+                  </div>
+                  <div style={{ fontSize: 10, color: '#9ca3af', lineHeight: 1.5 }}>
+                    {ocrLoading
+                      ? 'AI กำลังอ่านข้อมูลจากบัตร...'
+                      : idCardPreview
+                        ? <><span style={{ color: '#16a34a', fontWeight: 600 }}>✓ อัพโหลดบัตรแล้ว</span> — คลิกเพื่อเปลี่ยน</>
+                        : <>JPG / PNG — OCR อ่านชื่อ-เลขบัตรอัตโนมัติ</>
+                    }
+                  </div>
+                  {idCardFile && !ocrLoading && (
+                    <div style={{ fontSize: 10, color: '#7d3c98', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <i className="fas fa-paperclip" style={{ marginRight: 3 }}></i>{idCardFile.name}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </label>
+            {isEdit && (
+              <button type="button" onClick={() => handleUploadIdCard()}
+                disabled={uploadingIdCard || !idCardFile}
+                style={{ padding: '5px 12px', background: '#8e44ad', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                {uploadingIdCard ? <><i className="fas fa-spinner fa-spin"></i> กำลังอัพโหลด...</> : <><i className="fas fa-upload"></i> อัพโหลด</>}
+              </button>
+            )}
             {ocrMsg && <div style={{ fontSize: 11, marginTop: 5, padding: '5px 10px', borderRadius: 6, background: ocrMsg.startsWith('✅') ? '#eafaf1' : ocrMsg.startsWith('⚠️') ? '#fef9e7' : '#fdf2f0', color: ocrMsg.startsWith('✅') ? '#1e8449' : ocrMsg.startsWith('⚠️') ? '#9a7d0a' : '#c0392b', fontWeight: 500 }}>{ocrMsg}</div>}
             {idCardMsg && <div style={{ fontSize: 11, marginTop: 6, color: idCardMsg.startsWith('✅') ? '#27ae60' : '#e74c3c' }}>{idCardMsg}</div>}
           </div>
@@ -567,23 +631,73 @@ function InvestorModal({ isOpen, onClose, onSaved, editData }) {
                 </button>
               </div>
             )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <input type="file" accept=".jpg,.jpeg,.png,.pdf"
+            <label style={{
+              display: 'block', cursor: houseOcrLoading ? 'default' : 'pointer', marginBottom: 8,
+              background: houseRegPreview ? '#fff5f5' : '#fdf2f0',
+              border: `2px dashed ${houseRegPreview ? '#e53e3e' : '#f5a5a5'}`,
+              borderRadius: 10, padding: 12, transition: 'border-color 0.2s',
+            }}>
+              <input type="file" accept=".jpg,.jpeg,.png,.pdf" style={{ display: 'none' }}
+                disabled={houseOcrLoading}
                 onChange={e => {
                   const f = e.target.files[0] || null
+                  if (!f) return
                   setHouseRegFile(f); setHouseRegMsg('')
+                  setHouseRegPreview(f.type === 'application/pdf' ? 'pdf' : URL.createObjectURL(f))
                   handleHouseOcr(f)
-                }}
-                style={{ fontSize: 12, flex: 1 }} />
-              {isEdit && (
-                <button type="button"
-                  onClick={() => handleUploadFile(null, 'house_registration_image', houseRegFile, setUploadingHouseReg, setHouseRegMsg)}
-                  disabled={uploadingHouseReg || !houseRegFile}
-                  style={{ padding: '5px 12px', background: '#c0392b', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                  {uploadingHouseReg ? <><i className="fas fa-spinner fa-spin"></i> กำลังอัพโหลด...</> : <><i className="fas fa-upload"></i> อัพโหลด</>}
-                </button>
-              )}
-            </div>
+                  e.target.value = ''
+                }} />
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                <div style={{
+                  width: 72, height: 72, flexShrink: 0, borderRadius: 8, overflow: 'hidden',
+                  background: '#fee2e2', border: '1px solid #fca5a5',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
+                }}>
+                  {houseRegPreview === 'pdf'
+                    ? <i className="fas fa-file-pdf" style={{ fontSize: 26, color: '#e53e3e' }}></i>
+                    : houseRegPreview
+                      ? <img src={houseRegPreview} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : <i className="fas fa-home" style={{ fontSize: 26, color: '#e53e3e' }}></i>
+                  }
+                  {houseRegPreview && !houseOcrLoading && (
+                    <button type="button"
+                      onClick={e => { e.preventDefault(); e.stopPropagation(); setHouseRegFile(null); setHouseRegPreview(null); setHouseOcrMsg('') }}
+                      style={{ position: 'absolute', top: 3, right: 3, width: 18, height: 18, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, zIndex: 2 }}
+                      title="ลบไฟล์">✕</button>
+                  )}
+                  {houseOcrLoading && (
+                    <div style={{ position: 'absolute', inset: 0, background: 'rgba(229,62,62,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <i className="fas fa-spinner fa-spin" style={{ color: '#fff', fontSize: 20 }}></i>
+                    </div>
+                  )}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#c0392b', marginBottom: 3 }}>
+                    <i className="fas fa-upload" style={{ marginRight: 5 }}></i>
+                    {houseOcrLoading ? 'กำลังอ่านข้อมูล...' : houseRegPreview ? 'เปลี่ยนไฟล์ทะเบียนบ้าน' : 'อัพโหลดสำเนาทะเบียนบ้าน'}
+                  </div>
+                  <div style={{ fontSize: 10, color: '#9ca3af', lineHeight: 1.5 }}>
+                    {houseRegPreview
+                      ? <><span style={{ color: '#16a34a', fontWeight: 600 }}>✓ เลือกไฟล์แล้ว</span> — คลิกเพื่อเปลี่ยน</>
+                      : <>JPG / PNG / PDF</>
+                    }
+                  </div>
+                  {houseRegFile && !houseOcrLoading && (
+                    <div style={{ fontSize: 10, color: '#c0392b', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <i className="fas fa-paperclip" style={{ marginRight: 3 }}></i>{houseRegFile.name}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </label>
+            {isEdit && (
+              <button type="button"
+                onClick={() => handleUploadFile(null, 'house_registration_image', houseRegFile, setUploadingHouseReg, setHouseRegMsg)}
+                disabled={uploadingHouseReg || !houseRegFile}
+                style={{ padding: '5px 12px', background: '#c0392b', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                {uploadingHouseReg ? <><i className="fas fa-spinner fa-spin"></i> กำลังอัพโหลด...</> : <><i className="fas fa-upload"></i> อัพโหลด</>}
+              </button>
+            )}
             {houseOcrMsg && <div style={{ fontSize: 11, marginTop: 5, padding: '4px 8px', borderRadius: 6,
               background: houseOcrMsg.startsWith('✅') ? '#e8f5e9' : '#fff3e0',
               color: houseOcrMsg.startsWith('✅') ? '#2e7d32' : '#e65100', fontWeight: 500 }}>{houseOcrMsg}</div>}
@@ -609,23 +723,73 @@ function InvestorModal({ isOpen, onClose, onSaved, editData }) {
                 </button>
               </div>
             )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <input type="file" accept=".jpg,.jpeg,.png,.pdf"
+            <label style={{
+              display: 'block', cursor: passbookOcrLoading ? 'default' : 'pointer', marginBottom: 8,
+              background: passbookPreview ? '#eff6ff' : '#f0f4ff',
+              border: `2px dashed ${passbookPreview ? '#1d4ed8' : '#93c5fd'}`,
+              borderRadius: 10, padding: 12, transition: 'border-color 0.2s',
+            }}>
+              <input type="file" accept=".jpg,.jpeg,.png,.pdf" style={{ display: 'none' }}
+                disabled={passbookOcrLoading}
                 onChange={e => {
                   const f = e.target.files[0] || null
+                  if (!f) return
                   setPassbookFile(f); setPassbookMsg('')
+                  setPassbookPreview(f.type === 'application/pdf' ? 'pdf' : URL.createObjectURL(f))
                   handlePassbookOcr(f)
-                }}
-                style={{ fontSize: 12, flex: 1 }} />
-              {isEdit && (
-                <button type="button"
-                  onClick={() => handleUploadFile(null, 'passbook_image', passbookFile, setUploadingPassbook, setPassbookMsg)}
-                  disabled={uploadingPassbook || !passbookFile}
-                  style={{ padding: '5px 12px', background: '#1565c0', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                  {uploadingPassbook ? <><i className="fas fa-spinner fa-spin"></i> กำลังอัพโหลด...</> : <><i className="fas fa-upload"></i> อัพโหลด</>}
-                </button>
-              )}
-            </div>
+                  e.target.value = ''
+                }} />
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                <div style={{
+                  width: 72, height: 72, flexShrink: 0, borderRadius: 8, overflow: 'hidden',
+                  background: '#dbeafe', border: '1px solid #93c5fd',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
+                }}>
+                  {passbookPreview === 'pdf'
+                    ? <i className="fas fa-file-pdf" style={{ fontSize: 26, color: '#1565c0' }}></i>
+                    : passbookPreview
+                      ? <img src={passbookPreview} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : <i className="fas fa-book-open" style={{ fontSize: 26, color: '#1565c0' }}></i>
+                  }
+                  {passbookPreview && !passbookOcrLoading && (
+                    <button type="button"
+                      onClick={e => { e.preventDefault(); e.stopPropagation(); setPassbookFile(null); setPassbookPreview(null); setPassbookOcrMsg('') }}
+                      style={{ position: 'absolute', top: 3, right: 3, width: 18, height: 18, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, zIndex: 2 }}
+                      title="ลบไฟล์">✕</button>
+                  )}
+                  {passbookOcrLoading && (
+                    <div style={{ position: 'absolute', inset: 0, background: 'rgba(29,78,216,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <i className="fas fa-spinner fa-spin" style={{ color: '#fff', fontSize: 20 }}></i>
+                    </div>
+                  )}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#1565c0', marginBottom: 3 }}>
+                    <i className="fas fa-upload" style={{ marginRight: 5 }}></i>
+                    {passbookOcrLoading ? 'กำลังอ่านข้อมูล...' : passbookPreview ? 'เปลี่ยนไฟล์สมุดบัญชี' : 'อัพโหลดหน้าสมุดบัญชี'}
+                  </div>
+                  <div style={{ fontSize: 10, color: '#9ca3af', lineHeight: 1.5 }}>
+                    {passbookPreview
+                      ? <><span style={{ color: '#16a34a', fontWeight: 600 }}>✓ เลือกไฟล์แล้ว</span> — คลิกเพื่อเปลี่ยน</>
+                      : <>JPG / PNG / PDF</>
+                    }
+                  </div>
+                  {passbookFile && !passbookOcrLoading && (
+                    <div style={{ fontSize: 10, color: '#1565c0', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <i className="fas fa-paperclip" style={{ marginRight: 3 }}></i>{passbookFile.name}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </label>
+            {isEdit && (
+              <button type="button"
+                onClick={() => handleUploadFile(null, 'passbook_image', passbookFile, setUploadingPassbook, setPassbookMsg)}
+                disabled={uploadingPassbook || !passbookFile}
+                style={{ padding: '5px 12px', background: '#1565c0', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                {uploadingPassbook ? <><i className="fas fa-spinner fa-spin"></i> กำลังอัพโหลด...</> : <><i className="fas fa-upload"></i> อัพโหลด</>}
+              </button>
+            )}
             {passbookOcrMsg && <div style={{ fontSize: 11, marginTop: 5, padding: '4px 8px', borderRadius: 6,
               background: passbookOcrMsg.startsWith('✅') ? '#e8f5e9' : '#fff3e0',
               color: passbookOcrMsg.startsWith('✅') ? '#2e7d32' : '#e65100', fontWeight: 500 }}>{passbookOcrMsg}</div>}
@@ -650,19 +814,66 @@ function InvestorModal({ isOpen, onClose, onSaved, editData }) {
                 </button>
               </div>
             )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <input type="file" accept=".jpg,.jpeg,.png,.pdf"
-                onChange={e => { setContractFile(e.target.files[0] || null); setContractMsg('') }}
-                style={{ fontSize: 12, flex: 1 }} />
-              {isEdit && (
-                <button type="button"
-                  onClick={() => handleUploadFile(null, 'investor_contract', contractFile, setUploadingContract, setContractMsg)}
-                  disabled={uploadingContract || !contractFile}
-                  style={{ padding: '5px 12px', background: '#6d28d9', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                  {uploadingContract ? <><i className="fas fa-spinner fa-spin"></i> กำลังอัพโหลด...</> : <><i className="fas fa-upload"></i> อัพโหลด</>}
-                </button>
-              )}
-            </div>
+            <label style={{
+              display: 'block', cursor: 'pointer', marginBottom: 8,
+              background: contractPreview ? '#f5f3ff' : '#f3f0ff',
+              border: `2px dashed ${contractPreview ? '#7c3aed' : '#c4b5fd'}`,
+              borderRadius: 10, padding: 12, transition: 'border-color 0.2s',
+            }}>
+              <input type="file" accept=".jpg,.jpeg,.png,.pdf" style={{ display: 'none' }}
+                onChange={e => {
+                  const f = e.target.files[0] || null
+                  if (!f) return
+                  setContractFile(f); setContractMsg('')
+                  setContractPreview(f.type === 'application/pdf' ? 'pdf' : URL.createObjectURL(f))
+                  e.target.value = ''
+                }} />
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                <div style={{
+                  width: 72, height: 72, flexShrink: 0, borderRadius: 8, overflow: 'hidden',
+                  background: '#ede9fe', border: '1px solid #c4b5fd',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
+                }}>
+                  {contractPreview === 'pdf'
+                    ? <i className="fas fa-file-pdf" style={{ fontSize: 26, color: '#7c3aed' }}></i>
+                    : contractPreview
+                      ? <img src={contractPreview} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : <i className="fas fa-file-signature" style={{ fontSize: 26, color: '#7c3aed' }}></i>
+                  }
+                  {contractPreview && (
+                    <button type="button"
+                      onClick={e => { e.preventDefault(); e.stopPropagation(); setContractFile(null); setContractPreview(null) }}
+                      style={{ position: 'absolute', top: 3, right: 3, width: 18, height: 18, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, zIndex: 2 }}
+                      title="ลบไฟล์">✕</button>
+                  )}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#6d28d9', marginBottom: 3 }}>
+                    <i className="fas fa-upload" style={{ marginRight: 5 }}></i>
+                    {contractPreview ? 'เปลี่ยนไฟล์สัญญา' : 'อัพโหลดสัญญานายทุน'}
+                  </div>
+                  <div style={{ fontSize: 10, color: '#9ca3af', lineHeight: 1.5 }}>
+                    {contractPreview
+                      ? <><span style={{ color: '#16a34a', fontWeight: 600 }}>✓ เลือกไฟล์แล้ว</span> — คลิกเพื่อเปลี่ยน</>
+                      : <>JPG / PNG / PDF</>
+                    }
+                  </div>
+                  {contractFile && (
+                    <div style={{ fontSize: 10, color: '#6d28d9', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <i className="fas fa-paperclip" style={{ marginRight: 3 }}></i>{contractFile.name}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </label>
+            {isEdit && (
+              <button type="button"
+                onClick={() => handleUploadFile(null, 'investor_contract', contractFile, setUploadingContract, setContractMsg)}
+                disabled={uploadingContract || !contractFile}
+                style={{ padding: '5px 12px', background: '#6d28d9', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                {uploadingContract ? <><i className="fas fa-spinner fa-spin"></i> กำลังอัพโหลด...</> : <><i className="fas fa-upload"></i> อัพโหลด</>}
+              </button>
+            )}
             {contractMsg && <div style={{ fontSize: 11, marginTop: 6, color: contractMsg.startsWith('✅') ? '#27ae60' : '#e74c3c' }}>{contractMsg}</div>}
           </div>
         </div>

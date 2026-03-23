@@ -297,6 +297,9 @@ export default function SalesFormPage() {
   // ★ Manual OCR
   const [ocrLoading, setOcrLoading] = useState(false)  // กำลังอ่านเอกสาร
   const [ocrMsg, setOcrMsg]         = useState(null)   // { type: 'success'|'error', text, filled }
+  // ★ file previews
+  const [idCardLocalPreview, setIdCardLocalPreview] = useState(null)
+  const [paymentSchedPreview, setPaymentSchedPreview] = useState(null)
 
   // ★ Geocoding — แปลงที่อยู่ → พิกัด GPS ด้วย Nominatim (OpenStreetMap, ฟรี)
   const geocodeAddress = async (province, district, subdistrict) => {
@@ -1871,26 +1874,77 @@ export default function SalesFormPage() {
               })()}
 
               <div className="form-group">
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 6 }}>
                   รูปหน้าบัตรประชาชน
-                  {ocrLoading
-                    ? <span style={{ fontSize: 11, color: '#6366f1', display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 700 }}><i className="fas fa-spinner fa-spin"></i> กำลัง OCR...</span>
-                    : <span style={{ fontSize: 11, color: '#6366f1', fontWeight: 600 }}><i className="fas fa-magic"></i> อัพโหลดแล้ว OCR อัตโนมัติ</span>
-                  }
                   {ocrMsg && (
-                    <span style={{ fontSize: 11, color: ocrMsg.type === 'error' ? '#dc2626' : ocrMsg.type === 'warn' ? '#d97706' : '#16a34a', fontWeight: 600 }}>
+                    <span style={{ marginLeft: 8, fontSize: 11, color: ocrMsg.type === 'error' ? '#dc2626' : ocrMsg.type === 'warn' ? '#d97706' : '#16a34a', fontWeight: 600 }}>
                       {ocrMsg.text}
                     </span>
                   )}
                 </label>
-                <input type="file" accept="image/*,.pdf" multiple
-                  onChange={e => {
-                    if (e.target.files[0]) {
-                      set('id_card_files', Array.from(e.target.files))
-                      handleManualOcr(e.target.files[0], 'id_card')
-                    }
-                  }} />
-                {form.id_card_files && <small style={{ color: 'var(--primary)', fontSize: 11 }}>เลือก {form.id_card_files.length} ไฟล์ <button type="button" onClick={() => set('id_card_files', null)} style={xBtnStyle}><i className="fas fa-times"></i></button></small>}
+                <label style={{
+                  display: 'block', cursor: ocrLoading ? 'default' : 'pointer', marginBottom: 6,
+                  background: idCardLocalPreview ? '#f5f3ff' : '#faf5ff',
+                  border: `2px dashed ${idCardLocalPreview ? '#7c3aed' : '#c4b5fd'}`,
+                  borderRadius: 10, padding: 12, transition: 'border-color 0.2s',
+                }}>
+                  <input type="file" accept="image/*,.pdf" multiple style={{ display: 'none' }}
+                    disabled={ocrLoading}
+                    onChange={e => {
+                      if (e.target.files[0]) {
+                        const files = Array.from(e.target.files)
+                        set('id_card_files', files)
+                        const f = e.target.files[0]
+                        setIdCardLocalPreview(f.type === 'application/pdf' ? 'pdf' : URL.createObjectURL(f))
+                        handleManualOcr(f, 'id_card')
+                        e.target.value = ''
+                      }
+                    }} />
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                    <div style={{
+                      width: 72, height: 72, flexShrink: 0, borderRadius: 8, overflow: 'hidden',
+                      background: '#ede9fe', border: '1px solid #d8b4fe',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
+                    }}>
+                      {idCardLocalPreview === 'pdf'
+                        ? <i className="fas fa-file-pdf" style={{ fontSize: 26, color: '#7c3aed' }}></i>
+                        : idCardLocalPreview
+                          ? <img src={idCardLocalPreview} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          : <i className="fas fa-id-card" style={{ fontSize: 26, color: '#7c3aed' }}></i>
+                      }
+                      {idCardLocalPreview && !ocrLoading && (
+                        <button type="button"
+                          onClick={e => { e.preventDefault(); e.stopPropagation(); set('id_card_files', null); setIdCardLocalPreview(null); setOcrMsg(null) }}
+                          style={{ position: 'absolute', top: 3, right: 3, width: 18, height: 18, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, zIndex: 2 }}
+                          title="ลบไฟล์">✕</button>
+                      )}
+                      {ocrLoading && (
+                        <div style={{ position: 'absolute', inset: 0, background: 'rgba(124,58,237,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <i className="fas fa-spinner fa-spin" style={{ color: '#fff', fontSize: 20 }}></i>
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#6d28d9', marginBottom: 3 }}>
+                        <i className="fas fa-camera" style={{ marginRight: 5 }}></i>
+                        {ocrLoading ? 'กำลัง OCR...' : idCardLocalPreview ? 'เปลี่ยนรูปบัตรประชาชน' : 'สแกน / อัพโหลดบัตรประชาชน'}
+                      </div>
+                      <div style={{ fontSize: 10, color: '#9ca3af', lineHeight: 1.5 }}>
+                        {ocrLoading
+                          ? <span style={{ color: '#6366f1', fontWeight: 600 }}><i className="fas fa-magic" style={{ marginRight: 3 }}></i>AI กำลังอ่านข้อมูลจากบัตร...</span>
+                          : idCardLocalPreview
+                            ? <><span style={{ color: '#16a34a', fontWeight: 600 }}>✓ เลือกไฟล์แล้ว</span> — คลิกเพื่อเปลี่ยน</>
+                            : <><i className="fas fa-magic" style={{ marginRight: 3, color: '#6366f1' }}></i>OCR อ่านชื่อ-ที่อยู่อัตโนมัติ | รูป / PDF</>
+                        }
+                      </div>
+                      {form.id_card_files && !ocrLoading && (
+                        <div style={{ fontSize: 10, color: '#7c3aed', marginTop: 3 }}>
+                          <i className="fas fa-paperclip" style={{ marginRight: 3 }}></i>{form.id_card_files.length} ไฟล์
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </label>
                 {isEdit && existingImages.filter(p => p.includes('id-cards')).length > 0 && (
                   <div>
                     <small style={{ color: '#888', fontSize: 11 }}><i className="fas fa-image"></i> รูปเดิม ({existingImages.filter(p => p.includes('id-cards')).length} ไฟล์)</small>
@@ -2014,7 +2068,7 @@ export default function SalesFormPage() {
                 const allDone = hasLoanType && hasBook && hasTable
                 const hasCaseAlready = !!caseInfo?.case_id
 
-                const Step = ({ done, label, who }) => (
+                const Step = ({ done, label, who, href }) => (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderBottom: '1px solid #f0f0f0' }}>
                     <div style={{
                       width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
@@ -2027,7 +2081,13 @@ export default function SalesFormPage() {
                       <span style={{ fontSize: 13, fontWeight: done ? 600 : 400, color: done ? '#166534' : '#374151' }}>{label}</span>
                       {!done && <span style={{ fontSize: 11, color: '#9ca3af', marginLeft: 6 }}>({who})</span>}
                     </div>
-                    {done && <i className="fas fa-check-circle" style={{ color: '#16a34a', fontSize: 12 }}></i>}
+                    {done && href && (
+                      <a href={href.startsWith('/') ? href : `/${href}`} target="_blank" rel="noreferrer"
+                        style={{ padding: '3px 10px', background: '#1565c0', color: '#fff', borderRadius: 5, fontSize: 11, fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                        <i className="fas fa-eye" style={{ marginRight: 4 }}></i>ดูไฟล์
+                      </a>
+                    )}
+                    {done && !href && <i className="fas fa-check-circle" style={{ color: '#16a34a', fontSize: 12 }}></i>}
                   </div>
                 )
 
@@ -2041,7 +2101,7 @@ export default function SalesFormPage() {
                     {!hasCaseAlready && (
                       <div style={{ marginBottom: 12 }}>
                         <Step done={hasLoanType} label={`ประเภทสินเชื่อ${hasLoanType ? `: ${form.loan_type_detail === 'mortgage' ? 'จำนอง' : 'ขายฝาก'}` : ''}`} who="ฝ่ายขายกรอก" />
-                        <Step done={hasBook} label="อัพโหลดเล่มประเมิน" who="ฝ่ายประเมิน" />
+                        <Step done={hasBook} label="อัพโหลดเล่มประเมิน" who="ฝ่ายประเมิน" href={caseInfo?.appraisal_book_image} />
                         <Step done={hasTable} label="ตารางวงเงิน (ขายฝาก/จำนอง)" who="ฝ่ายอนุมัติ" />
                       </div>
                     )}
@@ -2428,12 +2488,18 @@ export default function SalesFormPage() {
                         )
                       })()}
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                        <input type="file" accept="image/*,.pdf" multiple id="payment_schedule_input"
-                          style={{ fontSize: 12, flex: 1, minWidth: 0 }}
+                      <label style={{
+                        display: 'block', cursor: 'pointer', marginTop: 4,
+                        background: paymentSchedPreview ? '#fdf4ff' : '#f9f0ff',
+                        border: `2px dashed ${paymentSchedPreview ? '#a855f7' : '#d8b4fe'}`,
+                        borderRadius: 10, padding: 10, transition: 'border-color 0.2s',
+                      }}>
+                        <input type="file" accept="image/*,.pdf" multiple style={{ display: 'none' }}
                           onChange={async (e) => {
                             const files = Array.from(e.target.files)
                             if (!files.length) return
+                            const f = files[0]
+                            setPaymentSchedPreview(f.type === 'application/pdf' ? 'pdf' : URL.createObjectURL(f))
                             for (const file of files) {
                               const fd = new FormData()
                               fd.append('payment_schedule_file', file)
@@ -2446,8 +2512,39 @@ export default function SalesFormPage() {
                             }
                             e.target.value = ''
                           }} />
-                        <span style={{ fontSize: 11, color: '#ba68c8', whiteSpace: 'nowrap' }}>PNG / PDF</span>
-                      </div>
+                        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                          <div style={{
+                            width: 56, height: 56, flexShrink: 0, borderRadius: 8, overflow: 'hidden',
+                            background: '#f3e8ff', border: '1px solid #d8b4fe',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
+                          }}>
+                            {paymentSchedPreview === 'pdf'
+                              ? <i className="fas fa-file-pdf" style={{ fontSize: 22, color: '#9333ea' }}></i>
+                              : paymentSchedPreview
+                                ? <img src={paymentSchedPreview} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                : <i className="fas fa-table" style={{ fontSize: 22, color: '#9333ea' }}></i>
+                            }
+                            {paymentSchedPreview && (
+                              <button type="button"
+                                onClick={e => { e.preventDefault(); e.stopPropagation(); setPaymentSchedPreview(null) }}
+                                style={{ position: 'absolute', top: 2, right: 2, width: 16, height: 16, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff', fontSize: 9, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, zIndex: 2 }}
+                                title="ลบ">✕</button>
+                            )}
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: '#7e22ce' }}>
+                              <i className="fas fa-upload" style={{ marginRight: 4 }}></i>
+                              {paymentSchedPreview ? 'อัพโหลดสำเร็จ — คลิกเพื่อเปลี่ยน' : 'อัพโหลดตารางผ่อนชำระ'}
+                            </div>
+                            <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>
+                              {paymentSchedPreview
+                                ? <span style={{ color: '#16a34a', fontWeight: 600 }}>✓ อัพโหลดแล้ว</span>
+                                : 'PNG / PDF'
+                              }
+                            </div>
+                          </div>
+                        </div>
+                      </label>
                     </div>
                   )}
                 </div>
@@ -2765,14 +2862,47 @@ export default function SalesFormPage() {
                         </button>
                       </div>
                     )}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <label style={{
+                      display: 'block', cursor: 'pointer',
+                      background: slipFiles.length > 0 ? '#fffde7' : '#fffff0',
+                      border: `2px dashed ${slipFiles.length > 0 ? '#f59e0b' : '#fde68a'}`,
+                      borderRadius: 10, padding: 10, transition: 'border-color 0.2s',
+                    }}>
                       <input type="file" accept="image/*,.pdf" id="create-slip-file-input" style={{ display: 'none' }}
-                        onChange={e => { if (e.target.files[0]) setSlipFiles([e.target.files[0]]) }} />
-                      <label htmlFor="create-slip-file-input" style={{ padding: '6px 14px', background: '#fff9c4', border: '1px solid #fdd835', borderRadius: 6, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>
-                        <i className="fas fa-paperclip" style={{ marginRight: 5 }}></i>
-                        {slipFiles.length > 0 ? 'เปลี่ยนสลิป' : 'แนบสลิป'}
-                      </label>
-                    </div>
+                        onChange={e => { if (e.target.files[0]) setSlipFiles([e.target.files[0]]); e.target.value = '' }} />
+                      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                        <div style={{
+                          width: 56, height: 56, flexShrink: 0, borderRadius: 8, overflow: 'hidden',
+                          background: '#fef3c7', border: '1px solid #fde68a',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
+                        }}>
+                          {slipFiles[0] && slipFiles[0].type !== 'application/pdf'
+                            ? <img src={URL.createObjectURL(slipFiles[0])} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            : slipFiles[0]
+                              ? <i className="fas fa-file-pdf" style={{ fontSize: 22, color: '#d97706' }}></i>
+                              : <i className="fas fa-receipt" style={{ fontSize: 22, color: '#d97706' }}></i>
+                          }
+                          {slipFiles.length > 0 && (
+                            <button type="button"
+                              onClick={e => { e.preventDefault(); e.stopPropagation(); setSlipFiles([]) }}
+                              style={{ position: 'absolute', top: 2, right: 2, width: 16, height: 16, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff', fontSize: 9, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, zIndex: 2 }}
+                              title="ลบ">✕</button>
+                          )}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#92400e' }}>
+                            <i className="fas fa-paperclip" style={{ marginRight: 4 }}></i>
+                            {slipFiles.length > 0 ? 'เปลี่ยนสลิป' : 'แนบสลิปค่าประเมิน'}
+                          </div>
+                          <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>
+                            {slipFiles.length > 0
+                              ? <><span style={{ color: '#16a34a', fontWeight: 600 }}>✓ เลือกแล้ว</span> — {slipFiles[0].name}</>
+                              : 'รูปภาพ / PDF'
+                            }
+                          </div>
+                        </div>
+                      </div>
+                    </label>
                     {/* วันที่ชำระ */}
                     <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                       <label style={{ fontSize: 12, fontWeight: 700, color: '#e65100', whiteSpace: 'nowrap' }}>
@@ -2816,18 +2946,57 @@ export default function SalesFormPage() {
                     })() : (
                       <p style={{ margin: '0 0 10px', fontSize: 12, color: '#bbb' }}>ยังไม่มีสลิปค่าประเมิน</p>
                     )}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <label style={{
+                      display: 'block', cursor: uploadingSlip ? 'default' : 'pointer', marginBottom: 8,
+                      background: slipFiles.length > 0 ? '#fffde7' : '#fffff0',
+                      border: `2px dashed ${slipFiles.length > 0 ? '#f59e0b' : '#fde68a'}`,
+                      borderRadius: 10, padding: 10, transition: 'border-color 0.2s',
+                    }}>
                       <input type="file" accept="image/*,.pdf" multiple id="slip-file-input" style={{ display: 'none' }}
-                        onChange={e => { setSlipFiles(Array.from(e.target.files)); setSlipMsg('') }} />
-                      <label htmlFor="slip-file-input" style={{ padding: '6px 14px', background: '#fff9c4', border: '1px solid #fdd835', borderRadius: 6, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>
-                        <i className="fas fa-paperclip" style={{ marginRight: 5 }}></i>
-                        {slipFiles.length > 0 ? `${slipFiles.length} ไฟล์` : ((caseInfo.case_slip_image || caseInfo.slip_image) ? 'เปลี่ยนสลิป' : 'แนบสลิป')}
-                      </label>
-                      <button onClick={handleUploadSlip} disabled={!slipFiles.length || uploadingSlip}
-                        style={{ padding: '6px 14px', background: slipFiles.length ? '#f57f17' : '#bdbdbd', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: slipFiles.length ? 'pointer' : 'not-allowed', opacity: slipFiles.length ? 1 : 0.6 }}>
-                        {uploadingSlip ? <><i className="fas fa-spinner fa-spin"></i> กำลังอัพโหลด...</> : <><i className="fas fa-upload" style={{ marginRight: 4 }}></i>อัพโหลด</>}
-                      </button>
-                    </div>
+                        disabled={uploadingSlip}
+                        onChange={e => { setSlipFiles(Array.from(e.target.files)); setSlipMsg(''); e.target.value = '' }} />
+                      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                        <div style={{
+                          width: 56, height: 56, flexShrink: 0, borderRadius: 8, overflow: 'hidden',
+                          background: '#fef3c7', border: '1px solid #fde68a',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
+                        }}>
+                          {slipFiles[0] && slipFiles[0].type !== 'application/pdf'
+                            ? <img src={URL.createObjectURL(slipFiles[0])} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            : slipFiles[0]
+                              ? <i className="fas fa-file-pdf" style={{ fontSize: 22, color: '#d97706' }}></i>
+                              : <i className="fas fa-receipt" style={{ fontSize: 22, color: '#d97706' }}></i>
+                          }
+                          {slipFiles.length > 0 && !uploadingSlip && (
+                            <button type="button"
+                              onClick={e => { e.preventDefault(); e.stopPropagation(); setSlipFiles([]); setSlipMsg('') }}
+                              style={{ position: 'absolute', top: 2, right: 2, width: 16, height: 16, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff', fontSize: 9, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, zIndex: 2 }}
+                              title="ลบ">✕</button>
+                          )}
+                          {uploadingSlip && (
+                            <div style={{ position: 'absolute', inset: 0, background: 'rgba(245,127,23,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <i className="fas fa-spinner fa-spin" style={{ color: '#fff', fontSize: 18 }}></i>
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#92400e' }}>
+                            <i className="fas fa-paperclip" style={{ marginRight: 4 }}></i>
+                            {uploadingSlip ? 'กำลังอัพโหลด...' : slipFiles.length > 0 ? `เลือกแล้ว ${slipFiles.length} ไฟล์ — คลิกเพื่อเปลี่ยน` : ((caseInfo.case_slip_image || caseInfo.slip_image) ? 'เปลี่ยนสลิป' : 'แนบสลิป')}
+                          </div>
+                          <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>
+                            {slipFiles.length > 0
+                              ? <span style={{ color: '#16a34a', fontWeight: 600 }}>✓ พร้อมอัพโหลด</span>
+                              : 'รูปภาพ / PDF'
+                            }
+                          </div>
+                        </div>
+                      </div>
+                    </label>
+                    <button onClick={handleUploadSlip} disabled={!slipFiles.length || uploadingSlip}
+                      style={{ padding: '6px 14px', background: slipFiles.length ? '#f57f17' : '#bdbdbd', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: slipFiles.length ? 'pointer' : 'not-allowed', opacity: slipFiles.length ? 1 : 0.6 }}>
+                      {uploadingSlip ? <><i className="fas fa-spinner fa-spin"></i> กำลังอัพโหลด...</> : <><i className="fas fa-upload" style={{ marginRight: 4 }}></i>อัพโหลด</>}
+                    </button>
                     {slipMsg && <p style={{ marginTop: 6, fontSize: 12, color: slipMsg.includes('✅') ? '#2e7d32' : '#c62828', margin: '6px 0 0' }}>{slipMsg}</p>}
                     {/* วันที่ชำระ — ฝ่ายขายเป็นคนตั้ง (บันทึกลง lr.payment_date ก่อนมีเคส / cases.payment_date หลังมีเคส) */}
                     <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>

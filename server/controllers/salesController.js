@@ -247,16 +247,21 @@ exports.getDebtors = (req, res) => {
       latest_case.approved_amount,
       COALESCE(latest_case.agent_id, lr.agent_id) AS agent_id,
       COALESCE(latest_case.agent_code, direct_agent.agent_code) AS agent_code,
-      COALESCE(latest_case.agent_name, direct_agent.full_name) AS agent_name
+      COALESCE(latest_case.agent_name, direct_agent.full_name) AS agent_name,
+      latest_case.case_recorded_by,
+      latest_case.case_creator
     FROM loan_requests lr
     LEFT JOIN (
       SELECT c.loan_request_id,
         c.id AS case_id, c.case_code, c.status AS case_status,
         c.pipeline_stage,
         c.payment_status, c.approved_amount, c.agent_id,
+        c.recorded_by AS case_recorded_by,
+        COALESCE(c.recorded_by, au.full_name, au.username) AS case_creator,
         a.agent_code, a.full_name AS agent_name
       FROM cases c
       LEFT JOIN agents a ON a.id = c.agent_id
+      LEFT JOIN admin_users au ON au.id = c.assigned_sales_id
       WHERE c.id = (
         SELECT c2.id FROM cases c2
         WHERE c2.loan_request_id = c.loan_request_id
@@ -284,6 +289,7 @@ exports.getCases = (req, res) => {
       lr.appraisal_fee, c.approved_amount, c.note,
       lr.slip_image, lr.appraisal_book_image,
       c.created_at, c.updated_at,
+      c.recorded_by,
       lr.id AS loan_request_id, lr.debtor_code,
       lr.contact_name AS debtor_name,
       lr.contact_phone AS debtor_phone,
@@ -448,7 +454,7 @@ exports.createCase = (req, res) => {
           const params = [
             case_code,
             loan_request_id || null,
-            user_id || null,
+            (req.user ? req.user.id : null),
             agent_id || null,
             finalSalesId || null,
             note || null,
