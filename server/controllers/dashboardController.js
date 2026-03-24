@@ -615,25 +615,53 @@ exports.getCeoDashboard = (req, res) => {
     `, (err, rows) => resolve({ key: 'commission_monthly', data: err ? [] : rows }))
   }))
 
-  // ── 4. Top Sales เดือนนี้ (ranked by completed + approved cases)
+  // ── 4. Top Sales เดือนนี้ (ranked by completed + approved cases + bag_fee)
   queries.push(new Promise(resolve => {
     db.query(`
       SELECT
+        au.id          AS sales_id,
         au.full_name   AS sales_name,
         au.nickname,
         COUNT(c.id)    AS total_cases,
         SUM(CASE WHEN c.status IN ('completed','auction_completed') THEN 1 ELSE 0 END) AS closed,
         SUM(CASE WHEN c.status IN ('credit_approved','auction_completed','completed','pending_auction','preparing_docs','legal_scheduled','legal_completed') THEN 1 ELSE 0 END) AS approved,
-        COALESCE(SUM(lr.loan_amount), 0) AS total_loan_amount
+        COALESCE(SUM(lr.loan_amount), 0) AS total_loan_amount,
+        COALESCE(SUM(da.bag_fee_amount), 0) AS total_bag_fee,
+        COUNT(CASE WHEN da.bag_fee_status = 'paid' THEN 1 END) AS bag_fee_paid_count
       FROM cases c
       LEFT JOIN loan_requests lr ON lr.id = c.loan_request_id
       LEFT JOIN admin_users au   ON au.id  = c.assigned_sales_id
+      LEFT JOIN debtor_accounting da ON da.case_id = c.id
       WHERE c.created_at >= DATE_FORMAT(NOW(), '%Y-%m-01')
         AND au.id IS NOT NULL
       GROUP BY au.id, au.full_name, au.nickname
       ORDER BY closed DESC, approved DESC
       LIMIT 10
     `, (err, rows) => resolve({ key: 'top_sales', data: err ? [] : rows }))
+  }))
+
+  // ── 4b. Sales Performance รายบุคคล 3 เดือนล่าสุด
+  queries.push(new Promise(resolve => {
+    db.query(`
+      SELECT
+        au.id          AS sales_id,
+        au.full_name   AS sales_name,
+        au.nickname,
+        DATE_FORMAT(c.created_at, '%Y-%m') AS month,
+        COUNT(c.id)    AS total_cases,
+        SUM(CASE WHEN c.status IN ('completed','auction_completed') THEN 1 ELSE 0 END) AS closed,
+        SUM(CASE WHEN c.status IN ('credit_approved','auction_completed','completed','pending_auction','preparing_docs','legal_scheduled','legal_completed') THEN 1 ELSE 0 END) AS approved,
+        COALESCE(SUM(lr.loan_amount), 0) AS total_loan_amount,
+        COALESCE(SUM(da.bag_fee_amount), 0) AS total_bag_fee
+      FROM cases c
+      LEFT JOIN loan_requests lr ON lr.id = c.loan_request_id
+      LEFT JOIN admin_users au   ON au.id  = c.assigned_sales_id
+      LEFT JOIN debtor_accounting da ON da.case_id = c.id
+      WHERE c.created_at >= DATE_SUB(NOW(), INTERVAL 3 MONTH)
+        AND au.id IS NOT NULL
+      GROUP BY au.id, au.full_name, au.nickname, DATE_FORMAT(c.created_at, '%Y-%m')
+      ORDER BY month DESC, closed DESC
+    `, (err, rows) => resolve({ key: 'sales_monthly', data: err ? [] : rows }))
   }))
 
   // ── 5. Lead source summary เดือนนี้

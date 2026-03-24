@@ -155,6 +155,7 @@ export default function AdminLayout() {
     // — ภาพรวม —
     { type: 'section', label: 'ภาพรวม' },
     { path: '/dashboard', icon: 'fas fa-chart-pie', label: 'Dashboard' },
+    { path: '/ceo-dashboard', icon: 'fas fa-crown', label: 'CEO Dashboard' },
     { path: '/calendar', icon: 'fas fa-calendar-alt', label: 'ปฏิทินนัดหมาย' },
     { path: '/weekly-report', icon: 'fas fa-calendar-week', label: 'รายงานประจำสัปดาห์' },
 

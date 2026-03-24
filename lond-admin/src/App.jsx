@@ -49,6 +49,10 @@ import WeeklyReportPage from './pages/WeeklyReportPage'
 import ContractPage from './pages/ContractPage'
 import BrokerAppointmentPage from './pages/BrokerAppointmentPage'
 import PropertyScreeningPage from './pages/PropertyScreeningPage'
+import CeoDashboardPage from './pages/CeoDashboardPage'
+import DailyReportPage from './pages/DailyReportPage'
+import SalesUsersPage from './pages/SalesUsersPage'
+import SalesTeamsPage from './pages/SalesTeamsPage'
 
 // เช็คล็อกอินอย่างเดียว (ไม่เช็คสิทธิ์หน้า)
 function RequireLogin({ children }) {
@@ -158,6 +162,16 @@ function App() {
 
           {/* Weekly Report */}
           <Route path="weekly-report" element={<ProtectedRoute><WeeklyReportPage /></ProtectedRoute>} />
+
+          {/* CEO Dashboard */}
+          <Route path="ceo-dashboard" element={<ProtectedRoute><CeoDashboardPage /></ProtectedRoute>} />
+
+          {/* Daily Report */}
+          <Route path="daily-report" element={<ProtectedRoute><DailyReportPage /></ProtectedRoute>} />
+
+          {/* Sales Users & Teams */}
+          <Route path="sales-users" element={<ProtectedRoute><SalesUsersPage /></ProtectedRoute>} />
+          <Route path="sales-teams" element={<ProtectedRoute><SalesTeamsPage /></ProtectedRoute>} />
 
           {/* จัดการแอคเคาท์ (super_admin เท่านั้น) */}
           <Route path="account-user" element={<ProtectedRoute><AccountUserPage /></ProtectedRoute>} />

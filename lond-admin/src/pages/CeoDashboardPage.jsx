@@ -134,7 +134,16 @@ export default function CeoDashboardPage() {
   const monthlyKpi = data.monthly_kpi || []
   const commMonthly = data.commission_monthly || []
   const leadSources = data.lead_sources || []
+  const salesMonthly = data.sales_monthly || []
   const maxLeads = Math.max(...leadSources.map(l => l.count), 1)
+
+  // เตรียม sales แต่ละคนพร้อม 3 เดือนย้อนหลัง
+  const salesPersons = [...new Map(salesMonthly.map(r => [r.sales_id, { id: r.sales_id, name: r.sales_name, nickname: r.nickname }])).values()]
+  const last3Months = Array.from({ length: 3 }, (_, i) => {
+    const d = new Date()
+    d.setMonth(d.getMonth() - (2 - i))
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  })
 
   // เตรียม 12 เดือนล่าสุดสำหรับ chart (fill เดือนที่ไม่มีข้อมูลด้วย 0)
   const last12 = Array.from({ length: 12 }, (_, i) => {
@@ -288,7 +297,7 @@ export default function CeoDashboardPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
                 <tr style={{ background: '#f8fafc' }}>
-                  {['#', 'ชื่อ', 'เคสใหม่', 'อนุมัติ', 'ปิดดีล', 'วงเงิน'].map((h, i) => (
+                  {['#', 'ชื่อ', 'เคสใหม่', 'อนุมัติ', 'ปิดดีล', 'วงเงิน', 'ค่าปากถุง'].map((h, i) => (
                     <th key={i} style={{
                       padding: '6px 8px', textAlign: i > 1 ? 'center' : 'left',
                       color: '#888', fontWeight: 700, fontSize: 10,
@@ -312,6 +321,9 @@ export default function CeoDashboardPage() {
                     <td style={{ padding: '8px', textAlign: 'center', fontWeight: 700, color: '#f39c12' }}>{s.closed}</td>
                     <td style={{ padding: '8px', textAlign: 'center', fontSize: 11, color: '#555' }}>
                       ฿{fmt(s.total_loan_amount)}
+                    </td>
+                    <td style={{ padding: '8px', textAlign: 'center', fontSize: 11, color: '#9b59b6', fontWeight: 700 }}>
+                      {s.total_bag_fee > 0 ? `฿${fmt(s.total_bag_fee)}` : '-'}
                     </td>
                   </tr>
                 ))}
@@ -420,6 +432,61 @@ export default function CeoDashboardPage() {
           </tbody>
         </table>
       </div>
+
+      {/* ── Sales Performance รายบุคคล 3 เดือนล่าสุด ── */}
+      {salesPersons.length > 0 && (
+        <div style={{ background: '#fff', borderRadius: 14, padding: '18px 20px', boxShadow: '0 2px 12px rgba(0,0,0,0.07)', marginTop: 20, overflowX: 'auto' }}>
+          <h4 style={{ margin: '0 0 14px', fontSize: 13, fontWeight: 700 }}>
+            <i className="fas fa-user-chart" style={{ color: '#e74c3c', marginRight: 7 }}></i>
+            Performance เซลล์รายบุคคล (3 เดือนล่าสุด)
+          </h4>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <thead>
+              <tr style={{ background: '#f8fafc' }}>
+                <th style={{ padding: '8px 12px', textAlign: 'left', color: '#666', fontWeight: 700, fontSize: 11, borderBottom: '2px solid #f0f0f0', whiteSpace: 'nowrap' }}>ชื่อ-นามสกุล</th>
+                {last3Months.map(m => (
+                  <th key={m} colSpan={4} style={{ padding: '8px 12px', textAlign: 'center', color: '#3498db', fontWeight: 700, fontSize: 11, borderBottom: '2px solid #f0f0f0', borderLeft: '1px solid #e8e8e8', whiteSpace: 'nowrap' }}>
+                    {monthTH(m)}
+                  </th>
+                ))}
+              </tr>
+              <tr style={{ background: '#fafafa' }}>
+                <th style={{ padding: '6px 12px', borderBottom: '1px solid #f0f0f0' }}></th>
+                {last3Months.map(m => (
+                  ['เคส', 'อนุมัติ', 'ปิดดีล', 'ค่าปากถุง'].map((h, hi) => (
+                    <th key={`${m}-${hi}`} style={{
+                      padding: '5px 8px', textAlign: 'center', color: '#aaa',
+                      fontWeight: 600, fontSize: 10, borderBottom: '1px solid #f0f0f0',
+                      borderLeft: hi === 0 ? '1px solid #e8e8e8' : 'none',
+                    }}>{h}</th>
+                  ))
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {salesPersons.map((sp, si) => (
+                <tr key={si} style={{ borderBottom: '1px solid #f5f5f5', background: si % 2 === 0 ? '#fff' : '#fafafa' }}>
+                  <td style={{ padding: '9px 12px', fontWeight: 700, color: '#1a1a2e', whiteSpace: 'nowrap' }}>
+                    {sp.name}
+                    {sp.nickname && <span style={{ fontSize: 10, color: '#aaa', marginLeft: 6 }}>({sp.nickname})</span>}
+                  </td>
+                  {last3Months.map(m => {
+                    const row = salesMonthly.find(r => r.sales_id === sp.id && r.month === m) || {}
+                    return [
+                      <td key={`${m}-cases`} style={{ padding: '9px 8px', textAlign: 'center', color: '#3498db', fontWeight: 700, borderLeft: '1px solid #eee' }}>{row.total_cases || 0}</td>,
+                      <td key={`${m}-app`} style={{ padding: '9px 8px', textAlign: 'center', color: '#27ae60', fontWeight: 700 }}>{row.approved || 0}</td>,
+                      <td key={`${m}-cls`} style={{ padding: '9px 8px', textAlign: 'center', color: '#f39c12', fontWeight: 700 }}>{row.closed || 0}</td>,
+                      <td key={`${m}-bag`} style={{ padding: '9px 8px', textAlign: 'center', color: '#9b59b6', fontSize: 11 }}>
+                        {row.total_bag_fee > 0 ? `฿${fmt(row.total_bag_fee)}` : '-'}
+                      </td>,
+                    ]
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <style>{`
         @media (max-width: 900px) {
