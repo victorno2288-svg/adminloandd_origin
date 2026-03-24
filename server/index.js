@@ -192,7 +192,7 @@ app.use('/api/admin/contract-expiry', authMiddleware, contractExpiryRoutes);
 // ========== Auto-migrate: เพิ่ม column ที่อาจยังไม่มีใน DB ==========
 ;(function autoMigrate() {
   // ★ สร้าง auction_transactions — schema จาก backup SQL (loandd_db (1).sql)
-  // ใช้ Aria engine โดยตรง เพื่อหลีกเลี่ยง InnoDB orphaned .ibd tablespace
+  // ใช้ InnoDB engine (รองรับทั้ง MySQL 8 บน Linux และ MariaDB บน Windows)
   const createAucAria = `CREATE TABLE IF NOT EXISTS auction_transactions (
     id int(11) NOT NULL AUTO_INCREMENT,
     case_id int(11) NOT NULL,
@@ -237,7 +237,7 @@ app.use('/api/admin/contract-expiry', authMiddleware, contractExpiryRoutes);
     land_transfer_note text DEFAULT NULL,
     bank_book_file varchar(500) DEFAULT NULL,
     PRIMARY KEY (id)
-  ) ENGINE=Aria DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci`;
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci`;
 
   // ขั้น 1: ลบไฟล์ค้างจากดิสก์ก่อน (safety net)
   const fs = require('fs');
@@ -250,7 +250,7 @@ app.use('/api/admin/contract-expiry', authMiddleware, contractExpiryRoutes);
   // ขั้น 2: DROP TABLE เก่า (ล้าง dictionary ทุกกรณี)
   db.query('DROP TABLE IF EXISTS auction_transactions', () => {
 
-    // ขั้น 3: สร้างด้วย Aria engine (ไม่ใช้ .ibd → ไม่ชน InnoDB tablespace cache)
+    // ขั้น 3: สร้างด้วย InnoDB engine
     db.query(createAucAria, (err) => {
       if (err) {
         console.error('[migrate] ❌ auction_transactions:', err.message);
@@ -264,14 +264,14 @@ app.use('/api/admin/contract-expiry', authMiddleware, contractExpiryRoutes);
               console.error('[migrate] ❌ auction_transactions retry failed:', err2.message);
               console.error('[migrate] 🔧 ต้องแก้ด้วยมือ: ปิด MySQL → ลบไฟล์ auction_transactions.* ใน C:\\xampp\\mysql\\data\\loandd_db\\ → เปิด MySQL → restart server');
             } else {
-              console.log('[migrate] ✅ auction_transactions table created (Aria, retry)');
+              console.log('[migrate] ✅ auction_transactions table created (InnoDB, retry)');
               restoreAuctionData();
             }
           });
         });
         return;
       }
-      console.log('[migrate] ✅ auction_transactions table created (Aria engine)');
+      console.log('[migrate] ✅ auction_transactions table created (InnoDB engine)');
       restoreAuctionData();
     });
   });
