@@ -615,7 +615,7 @@ exports.getCaseDocsList = (req, res) => {
   let sql = `
     SELECT
       lr.id AS loan_request_id, lr.debtor_code, lr.contact_name AS debtor_name,
-      lr.contact_phone AS debtor_phone, lr.bank_account_number, lr.bank_name, NULL AS bank_account_name, lr.bank_book_file,
+      lr.contact_phone AS debtor_phone, lr.bank_account_number, lr.bank_name, lr.bank_account_name, lr.bank_book_file,
       lr.updated_at,
       c.id AS case_id, c.case_code, c.status AS case_status,
       a.full_name AS agent_name,
@@ -654,7 +654,7 @@ exports.getCaseDocsList = (req, res) => {
         SELECT
           lr.id AS loan_request_id, lr.debtor_code, lr.contact_name AS debtor_name,
           lr.contact_phone AS debtor_phone,
-          NULL AS bank_account_number, NULL AS bank_name, NULL AS bank_account_name, NULL AS bank_book_file,
+          NULL AS bank_account_number, NULL AS bank_name, lr.bank_account_name, NULL AS bank_book_file,
           lr.updated_at,
           c.id AS case_id, c.case_code, c.status AS case_status,
           a.full_name AS agent_name,
@@ -776,9 +776,9 @@ exports.getCaseDocs = (req, res) => {
     LEFT JOIN legal_transactions lt ON lt.case_id = c.id
     WHERE lr.id = ? GROUP BY lr.id LIMIT 1`
 
-  const sqlFull = `SELECT ${coreFields} lr.bank_account_number, lr.bank_name, NULL AS bank_account_name, lr.bank_book_file, ${otherFields} ${joins}`
-  const sqlBasic = `SELECT ${coreFields} NULL AS bank_account_number, NULL AS bank_name, NULL AS bank_account_name, NULL AS bank_book_file, ${otherFieldsSafe} ${joins}`
-  const sqlMinimal = `SELECT ${coreFields} lr.bank_account_number, lr.bank_name, NULL AS bank_account_name, lr.bank_book_file, ${otherFieldsSafe} ${joinsSafe}`
+  const sqlFull = `SELECT ${coreFields} lr.bank_account_number, lr.bank_name, lr.bank_account_name, lr.bank_book_file, ${otherFields} ${joins}`
+  const sqlBasic = `SELECT ${coreFields} NULL AS bank_account_number, NULL AS bank_name, lr.bank_account_name, NULL AS bank_book_file, ${otherFieldsSafe} ${joins}`
+  const sqlMinimal = `SELECT ${coreFields} lr.bank_account_number, lr.bank_name, lr.bank_account_name, lr.bank_book_file, ${otherFieldsSafe} ${joinsSafe}`
 
   const isTableError = (e) => e && (
     e.code === 'ER_BAD_FIELD_ERROR' ||

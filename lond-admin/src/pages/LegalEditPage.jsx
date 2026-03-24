@@ -26,6 +26,14 @@ const legalStatusOptions = [
   { value: 'cancelled', label: 'ยกเลิก' },
 ]
 
+const BANKS = [
+  'กรุงเทพ (BBL)', 'กสิกรไทย (KBANK)', 'กรุงไทย (KTB)', 'ไทยพาณิชย์ (SCB)',
+  'กรุงศรีอยุธยา (BAY)', 'ทีทีบี (TTB)', 'ออมสิน', 'ธ.ก.ส.',
+  'ซีไอเอ็มบี (CIMB)', 'ยูโอบี (UOB)', 'แลนด์ แอนด์ เฮาส์ (LH Bank)',
+  'ทิสโก้ (TISCO)', 'เกียรตินาคินภัทร (KKP)', 'ซีไอเอ็มบีไทย (CIMBT)',
+  'ไอซีบีซี (ไทย) (ICBC)', 'ธนาคารอิสลาม (IBANK)',
+]
+
 function formatDate(d) {
   if (!d) return '-'
   return new Date(d).toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -574,6 +582,21 @@ export default function LegalEditPage() {
   const [investorPassbookOcrLoading, setInvestorPassbookOcrLoading] = useState(false)
   const [investorPassbookOcrMsg, setInvestorPassbookOcrMsg] = useState('')
 
+  // ★ local preview URLs (URL.createObjectURL) สำหรับแสดงรูปก่อน save
+  const [localPreviews, setLocalPreviews] = useState({
+    agent_bank_book: null,
+    agent_payment_slip: null,
+    debtor_bank_book: null,
+    investor_bank_book: null,
+  })
+  const setLocalPreview = (field, file) => {
+    if (file && file.type && file.type.startsWith('image/')) {
+      setLocalPreviews(prev => ({ ...prev, [field]: URL.createObjectURL(file) }))
+    } else {
+      setLocalPreviews(prev => ({ ...prev, [field]: null }))
+    }
+  }
+
   const [fileNames, setFileNames] = useState({
     attachment: '', doc_selling_pledge: '', deed_selling_pledge: '',
     doc_extension: '', deed_extension: '', doc_redemption: '', deed_redemption: '',
@@ -862,7 +885,8 @@ export default function LegalEditPage() {
 
       if (lData.success) {
         setSuccess('บันทึกข้อมูลสำเร็จ!')
-        setTimeout(() => navigate('/legal'), 1000)
+        setLocalPreviews({ agent_bank_book: null, agent_payment_slip: null, debtor_bank_book: null, investor_bank_book: null })
+        setTimeout(() => navigate('/legal'), 1200)
       } else {
         setMsg(lData.message || 'เกิดข้อผิดพลาด')
       }
@@ -1106,13 +1130,72 @@ export default function LegalEditPage() {
                     {passbookOcrLoading && <span style={{ color: '#1565c0', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 4 }}><i className="fas fa-spinner fa-spin"></i> OCR...</span>}
                     <span style={{ fontSize: 10, color: '#9ca3af', fontWeight: 400 }}>อัพโหลดแล้ว OCR จะ auto-fill ข้อมูลธนาคาร</span>
                   </div>
-                  {caseData.agent_bank_book && (
-                    <div style={{ marginBottom: 6 }}>
-                      <a href={caseData.agent_bank_book.startsWith('/') ? caseData.agent_bank_book : `/${caseData.agent_bank_book}`}
-                        target="_blank" rel="noreferrer"
-                        style={{ fontSize: 11, color: '#b45309', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                        <i className="fas fa-book-open"></i> ดูสมุดบัญชีปัจจุบัน
-                      </a>
+                  {(localPreviews.agent_bank_book || caseData.agent_bank_book) && (
+                    <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+                      {localPreviews.agent_bank_book ? (
+                        /* preview ไฟล์ที่เพิ่งเลือก (ยังไม่ save) */
+                        <>
+                          <div style={{ position: 'relative' }}>
+                            <img src={localPreviews.agent_bank_book} alt="preview"
+                              style={{ width: 90, height: 60, objectFit: 'cover', borderRadius: 6, border: '2px solid #f59e0b', display: 'block' }} />
+                            <span style={{ position: 'absolute', top: -6, right: -6, background: '#f59e0b', color: '#fff', fontSize: 9, borderRadius: 10, padding: '1px 5px', fontWeight: 700 }}>ใหม่</span>
+                          </div>
+                          <a href={localPreviews.agent_bank_book} target="_blank" rel="noreferrer"
+                            style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #fcd34d', background: '#fffbeb', color: '#92400e', display: 'inline-flex', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
+                            <i className="fas fa-external-link-alt"></i> เปิด
+                          </a>
+                          <button type="button" title="ยกเลิกการเลือกไฟล์"
+                            onClick={() => {
+                              setLocalPreviews(prev => ({ ...prev, agent_bank_book: null }))
+                              if (agentBankBookRef.current) agentBankBookRef.current.value = ''
+                              const lbl = document.getElementById('agentBookLabel')
+                              if (lbl) lbl.textContent = caseData.agent_bank_book ? 'เปลี่ยนสมุดบัญชี' : 'อัพโหลดหน้าสมุดบัญชี'
+                            }}
+                            style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #d1d5db', background: '#f3f4f6', color: '#374151', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <i className="fas fa-times"></i> ยกเลิก
+                          </button>
+                        </>
+                      ) : (() => {
+                        const bookUrl = caseData.agent_bank_book.startsWith('/') ? caseData.agent_bank_book : `/${caseData.agent_bank_book}`
+                        const isImg = /\.(jpg|jpeg|png|webp|gif)$/i.test(caseData.agent_bank_book)
+                        return (
+                          <>
+                            <a href={bookUrl} target="_blank" rel="noreferrer">
+                              {isImg ? (
+                                <img src={bookUrl} alt="สมุดบัญชีนายหน้า"
+                                  style={{ width: 90, height: 60, objectFit: 'cover', borderRadius: 6, border: '2px solid #fcd34d', display: 'block' }}
+                                  onError={e => { e.target.style.display='none' }} />
+                              ) : (
+                                <div style={{ width: 90, height: 60, borderRadius: 6, border: '2px solid #fcd34d', background: '#fff7ed',
+                                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+                                  <i className="fas fa-file-pdf" style={{ fontSize: 22, color: '#e53935' }}></i>
+                                  <span style={{ fontSize: 9, color: '#92400e' }}>PDF</span>
+                                </div>
+                              )}
+                            </a>
+                            <a href={bookUrl} target="_blank" rel="noreferrer"
+                              style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #fcd34d', background: '#fffbeb', color: '#92400e', display: 'inline-flex', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
+                              <i className="fas fa-external-link-alt"></i> เปิด
+                            </a>
+                          </>
+                        )
+                      })()}
+                      {!localPreviews.agent_bank_book && caseData.agent_bank_book && (
+                        <button type="button" title="ลบสมุดบัญชี"
+                          onClick={async () => {
+                            if (!window.confirm('ยืนยันลบสมุดบัญชีนายหน้า?')) return
+                            const r = await fetch(`${LEGAL_API}/delete-document`, {
+                              method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+                              body: JSON.stringify({ case_id: caseData.id, column: 'agent_bank_book' })
+                            })
+                            const d = await r.json()
+                            if (d.success) setCaseData(prev => ({ ...prev, agent_bank_book: null }))
+                            else alert('ลบไม่สำเร็จ: ' + (d.message || ''))
+                          }}
+                          style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #fca5a5', background: '#fee2e2', color: '#b91c1c', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <i className="fas fa-trash-alt"></i> ลบ
+                        </button>
+                      )}
                     </div>
                   )}
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 12, color: '#78350f' }}>
@@ -1123,6 +1206,7 @@ export default function LegalEditPage() {
                         const f = e.target.files[0]
                         const lbl = document.getElementById('agentBookLabel')
                         if (lbl) lbl.textContent = f ? `✓ ${f.name}` : (caseData.agent_bank_book ? 'เปลี่ยนสมุดบัญชี' : 'อัพโหลดหน้าสมุดบัญชี')
+                        setLocalPreview('agent_bank_book', f)
                         if (f) handlePassbookOcr(f)
                       }} />
                   </label>
@@ -1139,8 +1223,11 @@ export default function LegalEditPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
                   <div className="form-group" style={{ margin: 0 }}>
                     <label style={{ fontSize: 12, color: '#92400e', fontWeight: 600 }}>ธนาคาร</label>
-                    <input type="text" value={legalForm.agent_bank_name} onChange={e => setL('agent_bank_name', e.target.value)}
-                      placeholder="เช่น กสิกรไทย, กรุงไทย" style={{ fontSize: 13 }} />
+                    <select value={legalForm.agent_bank_name || ''} onChange={e => setL('agent_bank_name', e.target.value)}
+                      style={{ fontSize: 13, padding: '8px 10px', borderRadius: 8, border: '1px solid #fcd34d', width: '100%', background: '#fff' }}>
+                      <option value="">-- เลือกธนาคาร --</option>
+                      {BANKS.map(b => <option key={b} value={b}>{b}</option>)}
+                    </select>
                   </div>
                   <div className="form-group" style={{ margin: 0 }}>
                     <label style={{ fontSize: 12, color: '#92400e', fontWeight: 600 }}>เลขบัญชี</label>
@@ -1158,15 +1245,69 @@ export default function LegalEditPage() {
                 <label style={{ fontSize: 12, color: '#92400e', fontWeight: 600, display: 'block', marginBottom: 6 }}>
                   <i className="fas fa-receipt" style={{ marginRight: 4 }}></i>สลิปค่านายหน้า
                 </label>
-                {caseData.agent_payment_slip && (
-                  <div style={{ marginBottom: 6 }}>
-                    <a href={caseData.agent_payment_slip.startsWith('/') ? caseData.agent_payment_slip : `/${caseData.agent_payment_slip}`}
-                      target="_blank" rel="noreferrer"
-                      style={{ fontSize: 11, color: '#b45309', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                      <i className="fas fa-file-alt"></i> ดูสลิปปัจจุบัน
-                    </a>
-                  </div>
-                )}
+                {/* preview + open + delete */}
+                {(localPreviews.agent_payment_slip || caseData.agent_payment_slip) && (() => {
+                  const previewSrc = localPreviews.agent_payment_slip
+                  const savedSrc = caseData.agent_payment_slip
+                    ? (caseData.agent_payment_slip.startsWith('/') ? caseData.agent_payment_slip : `/${caseData.agent_payment_slip}`)
+                    : null
+                  const displaySrc = previewSrc || savedSrc
+                  const isPdf = !previewSrc && savedSrc && /\.pdf$/i.test(savedSrc)
+                  return (
+                    <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {/* thumbnail */}
+                      <div style={{ position: 'relative', flexShrink: 0 }}>
+                        {isPdf ? (
+                          <div style={{ width: 90, height: 60, borderRadius: 6, border: '2px solid #fcd34d', background: '#fff7ed',
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+                            <i className="fas fa-file-pdf" style={{ fontSize: 22, color: '#e53935' }}></i>
+                            <span style={{ fontSize: 9, color: '#92400e' }}>PDF</span>
+                          </div>
+                        ) : (
+                          <img src={displaySrc} alt="สลิปนายหน้า"
+                            style={{ width: 90, height: 60, objectFit: 'cover', borderRadius: 6, border: `2px solid ${previewSrc ? '#f59e0b' : '#fcd34d'}`, display: 'block' }}
+                            onError={e => { e.target.style.display='none' }} />
+                        )}
+                        {previewSrc && <span style={{ position: 'absolute', top: -6, right: -6, background: '#f59e0b', color: '#fff', fontSize: 9, borderRadius: 10, padding: '1px 5px', fontWeight: 700 }}>ใหม่</span>}
+                      </div>
+                      {/* open button */}
+                      <a href={displaySrc} target="_blank" rel="noreferrer"
+                        style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #fcd34d', background: '#fffbeb', color: '#92400e', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
+                        <i className="fas fa-external-link-alt"></i> เปิด
+                      </a>
+                      {/* ยกเลิก — เฉพาะไฟล์ที่เพิ่งเลือก (ยังไม่ save) */}
+                      {previewSrc && (
+                        <button type="button" title="ยกเลิกการเลือกไฟล์"
+                          onClick={() => {
+                            setLocalPreviews(prev => ({ ...prev, agent_payment_slip: null }))
+                            if (agentPaymentSlipRef.current) agentPaymentSlipRef.current.value = ''
+                            const lbl = document.getElementById('agentSlipLabel')
+                            if (lbl) lbl.textContent = caseData.agent_payment_slip ? 'เปลี่ยนสลิปค่านายหน้า' : 'อัพโหลดสลิปค่านายหน้า'
+                          }}
+                          style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #d1d5db', background: '#f3f4f6', color: '#374151', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <i className="fas fa-times"></i> ยกเลิก
+                        </button>
+                      )}
+                      {/* ลบ — เฉพาะไฟล์ที่ save แล้ว */}
+                      {!previewSrc && savedSrc && (
+                        <button type="button"
+                          onClick={async () => {
+                            if (!window.confirm('ยืนยันลบสลิปค่านายหน้า?')) return
+                            const r = await fetch(`${LEGAL_API}/delete-document`, {
+                              method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+                              body: JSON.stringify({ case_id: caseData.id, column: 'agent_payment_slip' })
+                            })
+                            const d = await r.json()
+                            if (d.success) setCaseData(prev => ({ ...prev, agent_payment_slip: null }))
+                            else alert('ลบไม่สำเร็จ: ' + (d.message || ''))
+                          }}
+                          style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #fca5a5', background: '#fee2e2', color: '#b91c1c', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <i className="fas fa-trash-alt"></i> ลบ
+                        </button>
+                      )}
+                    </div>
+                  )
+                })()}
                 <label style={{
                   display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px',
                   background: '#fff', border: '1.5px dashed #fbbf24', borderRadius: 8, cursor: 'pointer',
@@ -1176,8 +1317,10 @@ export default function LegalEditPage() {
                   <span id="agentSlipLabel">{caseData.agent_payment_slip ? 'เปลี่ยนสลิปค่านายหน้า' : 'อัพโหลดสลิปค่านายหน้า'}</span>
                   <input ref={agentPaymentSlipRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }}
                     onChange={e => {
+                      const f = e.target.files[0]
                       const lbl = document.getElementById('agentSlipLabel')
-                      if (lbl) lbl.textContent = e.target.files[0] ? `✓ ${e.target.files[0].name}` : (caseData.agent_payment_slip ? 'เปลี่ยนสลิปค่านายหน้า' : 'อัพโหลดสลิปค่านายหน้า')
+                      if (lbl) lbl.textContent = f ? `✓ ${f.name}` : (caseData.agent_payment_slip ? 'เปลี่ยนสลิปค่านายหน้า' : 'อัพโหลดสลิปค่านายหน้า')
+                      setLocalPreview('agent_payment_slip', f)
                     }} />
                 </label>
               </div>}
@@ -1196,13 +1339,71 @@ export default function LegalEditPage() {
                     {debtorPassbookOcrLoading && <span style={{ color: '#1565c0', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 4 }}><i className="fas fa-spinner fa-spin"></i> OCR...</span>}
                     <span style={{ fontSize: 10, color: '#9ca3af', fontWeight: 400 }}>อัพโหลดแล้ว OCR จะ auto-fill ข้อมูลธนาคาร</span>
                   </div>
-                  {caseData.debtor_bank_book && (
-                    <div style={{ marginBottom: 6 }}>
-                      <a href={caseData.debtor_bank_book.startsWith('/') ? caseData.debtor_bank_book : `/${caseData.debtor_bank_book}`}
-                        target="_blank" rel="noreferrer"
-                        style={{ fontSize: 11, color: '#1e40af', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                        <i className="fas fa-book-open"></i> ดูสมุดบัญชีปัจจุบัน
-                      </a>
+                  {(localPreviews.debtor_bank_book || caseData.debtor_bank_book) && (
+                    <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+                      {localPreviews.debtor_bank_book ? (
+                        <>
+                          <div style={{ position: 'relative' }}>
+                            <img src={localPreviews.debtor_bank_book} alt="preview"
+                              style={{ width: 90, height: 60, objectFit: 'cover', borderRadius: 6, border: '2px solid #3b82f6', display: 'block' }} />
+                            <span style={{ position: 'absolute', top: -6, right: -6, background: '#3b82f6', color: '#fff', fontSize: 9, borderRadius: 10, padding: '1px 5px', fontWeight: 700 }}>ใหม่</span>
+                          </div>
+                          <a href={localPreviews.debtor_bank_book} target="_blank" rel="noreferrer"
+                            style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #93c5fd', background: '#eff6ff', color: '#1e40af', display: 'inline-flex', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
+                            <i className="fas fa-external-link-alt"></i> เปิด
+                          </a>
+                          <button type="button" title="ยกเลิกการเลือกไฟล์"
+                            onClick={() => {
+                              setLocalPreviews(prev => ({ ...prev, debtor_bank_book: null }))
+                              if (debtorBankBookRef.current) debtorBankBookRef.current.value = ''
+                              const lbl = document.getElementById('debtorBookLabel')
+                              if (lbl) lbl.textContent = caseData.debtor_bank_book ? 'เปลี่ยนสมุดบัญชี' : 'อัพโหลดหน้าสมุดบัญชี'
+                            }}
+                            style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #d1d5db', background: '#f3f4f6', color: '#374151', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <i className="fas fa-times"></i> ยกเลิก
+                          </button>
+                        </>
+                      ) : (() => {
+                        const bookUrl = caseData.debtor_bank_book.startsWith('/') ? caseData.debtor_bank_book : `/${caseData.debtor_bank_book}`
+                        const isImg = /\.(jpg|jpeg|png|webp|gif)$/i.test(caseData.debtor_bank_book)
+                        return (
+                          <>
+                            <a href={bookUrl} target="_blank" rel="noreferrer">
+                              {isImg ? (
+                                <img src={bookUrl} alt="สมุดบัญชีลูกหนี้"
+                                  style={{ width: 90, height: 60, objectFit: 'cover', borderRadius: 6, border: '2px solid #93c5fd', display: 'block' }}
+                                  onError={e => { e.target.style.display='none' }} />
+                              ) : (
+                                <div style={{ width: 90, height: 60, borderRadius: 6, border: '2px solid #93c5fd', background: '#eff6ff',
+                                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+                                  <i className="fas fa-file-pdf" style={{ fontSize: 22, color: '#e53935' }}></i>
+                                  <span style={{ fontSize: 9, color: '#1e40af' }}>PDF</span>
+                                </div>
+                              )}
+                            </a>
+                            <a href={bookUrl} target="_blank" rel="noreferrer"
+                              style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #93c5fd', background: '#eff6ff', color: '#1e40af', display: 'inline-flex', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
+                              <i className="fas fa-external-link-alt"></i> เปิด
+                            </a>
+                          </>
+                        )
+                      })()}
+                      {!localPreviews.debtor_bank_book && caseData.debtor_bank_book && (
+                        <button type="button" title="ลบสมุดบัญชี"
+                          onClick={async () => {
+                            if (!window.confirm('ยืนยันลบสมุดบัญชีลูกหนี้?')) return
+                            const r = await fetch(`${LEGAL_API}/delete-document`, {
+                              method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+                              body: JSON.stringify({ case_id: caseData.id, column: 'debtor_bank_book' })
+                            })
+                            const d = await r.json()
+                            if (d.success) setCaseData(prev => ({ ...prev, debtor_bank_book: null }))
+                            else alert('ลบไม่สำเร็จ: ' + (d.message || ''))
+                          }}
+                          style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #fca5a5', background: '#fee2e2', color: '#b91c1c', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <i className="fas fa-trash-alt"></i> ลบ
+                        </button>
+                      )}
                     </div>
                   )}
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 12, color: '#1e3a8a' }}>
@@ -1213,6 +1414,7 @@ export default function LegalEditPage() {
                         const f = e.target.files[0]
                         const lbl = document.getElementById('debtorBookLabel')
                         if (lbl) lbl.textContent = f ? `✓ ${f.name}` : (caseData.debtor_bank_book ? 'เปลี่ยนสมุดบัญชี' : 'อัพโหลดหน้าสมุดบัญชี')
+                        setLocalPreview('debtor_bank_book', f)
                         if (f) handleDebtorPassbookOcr(f)
                       }} />
                   </label>
@@ -1229,8 +1431,11 @@ export default function LegalEditPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
                   <div className="form-group" style={{ margin: 0 }}>
                     <label style={{ fontSize: 12, color: '#1e40af', fontWeight: 600 }}>ธนาคาร</label>
-                    <input type="text" value={legalForm.debtor_bank_name} onChange={e => setL('debtor_bank_name', e.target.value)}
-                      placeholder="เช่น กสิกรไทย, กรุงไทย" style={{ fontSize: 13 }} />
+                    <select value={legalForm.debtor_bank_name || ''} onChange={e => setL('debtor_bank_name', e.target.value)}
+                      style={{ fontSize: 13, padding: '8px 10px', borderRadius: 8, border: '1px solid #93c5fd', width: '100%', background: '#fff' }}>
+                      <option value="">-- เลือกธนาคาร --</option>
+                      {BANKS.map(b => <option key={b} value={b}>{b}</option>)}
+                    </select>
                   </div>
                   <div className="form-group" style={{ margin: 0 }}>
                     <label style={{ fontSize: 12, color: '#1e40af', fontWeight: 600 }}>เลขบัญชี</label>
@@ -1713,13 +1918,71 @@ export default function LegalEditPage() {
                     {investorPassbookOcrLoading && <span style={{ color: '#1565c0', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 4 }}><i className="fas fa-spinner fa-spin"></i> OCR...</span>}
                     <span style={{ fontSize: 10, color: '#9ca3af', fontWeight: 400 }}>อัพโหลดแล้ว OCR จะ auto-fill ข้อมูลธนาคาร</span>
                   </div>
-                  {caseData.investor_bank_book && (
-                    <div style={{ marginBottom: 6 }}>
-                      <a href={caseData.investor_bank_book.startsWith('/') ? caseData.investor_bank_book : `/${caseData.investor_bank_book}`}
-                        target="_blank" rel="noreferrer"
-                        style={{ fontSize: 11, color: '#6d28d9', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                        <i className="fas fa-book-open"></i> ดูสมุดบัญชีปัจจุบัน
-                      </a>
+                  {(localPreviews.investor_bank_book || caseData.investor_bank_book) && (
+                    <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+                      {localPreviews.investor_bank_book ? (
+                        <>
+                          <div style={{ position: 'relative' }}>
+                            <img src={localPreviews.investor_bank_book} alt="preview"
+                              style={{ width: 90, height: 60, objectFit: 'cover', borderRadius: 6, border: '2px solid #a855f7', display: 'block' }} />
+                            <span style={{ position: 'absolute', top: -6, right: -6, background: '#a855f7', color: '#fff', fontSize: 9, borderRadius: 10, padding: '1px 5px', fontWeight: 700 }}>ใหม่</span>
+                          </div>
+                          <a href={localPreviews.investor_bank_book} target="_blank" rel="noreferrer"
+                            style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #c4b5fd', background: '#f5f3ff', color: '#6d28d9', display: 'inline-flex', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
+                            <i className="fas fa-external-link-alt"></i> เปิด
+                          </a>
+                          <button type="button" title="ยกเลิกการเลือกไฟล์"
+                            onClick={() => {
+                              setLocalPreviews(prev => ({ ...prev, investor_bank_book: null }))
+                              if (investorBankBookRef.current) investorBankBookRef.current.value = ''
+                              const lbl = document.getElementById('investorBookLabel')
+                              if (lbl) lbl.textContent = caseData.investor_bank_book ? 'เปลี่ยนสมุดบัญชี' : 'อัพโหลดหน้าสมุดบัญชี'
+                            }}
+                            style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #d1d5db', background: '#f3f4f6', color: '#374151', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <i className="fas fa-times"></i> ยกเลิก
+                          </button>
+                        </>
+                      ) : (() => {
+                        const bookUrl = caseData.investor_bank_book.startsWith('/') ? caseData.investor_bank_book : `/${caseData.investor_bank_book}`
+                        const isImg = /\.(jpg|jpeg|png|webp|gif)$/i.test(caseData.investor_bank_book)
+                        return (
+                          <>
+                            <a href={bookUrl} target="_blank" rel="noreferrer">
+                              {isImg ? (
+                                <img src={bookUrl} alt="สมุดบัญชีนายทุน"
+                                  style={{ width: 90, height: 60, objectFit: 'cover', borderRadius: 6, border: '2px solid #c4b5fd', display: 'block' }}
+                                  onError={e => { e.target.style.display='none' }} />
+                              ) : (
+                                <div style={{ width: 90, height: 60, borderRadius: 6, border: '2px solid #c4b5fd', background: '#f5f3ff',
+                                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+                                  <i className="fas fa-file-pdf" style={{ fontSize: 22, color: '#e53935' }}></i>
+                                  <span style={{ fontSize: 9, color: '#6d28d9' }}>PDF</span>
+                                </div>
+                              )}
+                            </a>
+                            <a href={bookUrl} target="_blank" rel="noreferrer"
+                              style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #c4b5fd', background: '#f5f3ff', color: '#6d28d9', display: 'inline-flex', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
+                              <i className="fas fa-external-link-alt"></i> เปิด
+                            </a>
+                          </>
+                        )
+                      })()}
+                      {!localPreviews.investor_bank_book && caseData.investor_bank_book && (
+                        <button type="button" title="ลบสมุดบัญชี"
+                          onClick={async () => {
+                            if (!window.confirm('ยืนยันลบสมุดบัญชีนายทุน?')) return
+                            const r = await fetch(`${LEGAL_API}/delete-document`, {
+                              method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+                              body: JSON.stringify({ case_id: caseData.id, column: 'investor_bank_book' })
+                            })
+                            const d = await r.json()
+                            if (d.success) setCaseData(prev => ({ ...prev, investor_bank_book: null }))
+                            else alert('ลบไม่สำเร็จ: ' + (d.message || ''))
+                          }}
+                          style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #fca5a5', background: '#fee2e2', color: '#b91c1c', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <i className="fas fa-trash-alt"></i> ลบ
+                        </button>
+                      )}
                     </div>
                   )}
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 12, color: '#4c1d95' }}>
@@ -1730,6 +1993,7 @@ export default function LegalEditPage() {
                         const f = e.target.files[0]
                         const lbl = document.getElementById('investorBookLabel')
                         if (lbl) lbl.textContent = f ? `✓ ${f.name}` : (caseData.investor_bank_book ? 'เปลี่ยนสมุดบัญชี' : 'อัพโหลดหน้าสมุดบัญชี')
+                        setLocalPreview('investor_bank_book', f)
                         if (f) handleInvestorPassbookOcr(f)
                       }} />
                   </label>
@@ -1746,8 +2010,11 @@ export default function LegalEditPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
                   <div className="form-group" style={{ margin: 0 }}>
                     <label style={{ fontSize: 12, color: '#6d28d9', fontWeight: 600 }}>ธนาคาร</label>
-                    <input type="text" value={legalForm.investor_bank_name} onChange={e => setL('investor_bank_name', e.target.value)}
-                      placeholder="เช่น กสิกรไทย, กรุงไทย" style={{ fontSize: 13 }} />
+                    <select value={legalForm.investor_bank_name || ''} onChange={e => setL('investor_bank_name', e.target.value)}
+                      style={{ fontSize: 13, padding: '8px 10px', borderRadius: 8, border: '1px solid #c4b5fd', width: '100%', background: '#fff' }}>
+                      <option value="">-- เลือกธนาคาร --</option>
+                      {BANKS.map(b => <option key={b} value={b}>{b}</option>)}
+                    </select>
                   </div>
                   <div className="form-group" style={{ margin: 0 }}>
                     <label style={{ fontSize: 12, color: '#6d28d9', fontWeight: 600 }}>เลขบัญชี</label>

@@ -239,40 +239,57 @@ app.use('/api/admin/contract-expiry', authMiddleware, contractExpiryRoutes);
     PRIMARY KEY (id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci`;
 
-  // ขั้น 1: ลบไฟล์ค้างจากดิสก์ก่อน (safety net)
   const fs = require('fs');
   const path = require('path');
   const dataDir = 'C:\\xampp\\mysql\\data\\loandd_db';
-  for (const f of ['auction_transactions.ibd','auction_transactions.frm','auction_transactions.MAI','auction_transactions.MAD']) {
-    try { const fp = path.join(dataDir, f); if (fs.existsSync(fp)) { fs.unlinkSync(fp); console.log('[migrate] 🗑️  ลบไฟล์ค้าง:', fp); } } catch(e) {}
-  }
 
-  // ขั้น 2: DROP TABLE เก่า (ล้าง dictionary ทุกกรณี)
-  db.query('DROP TABLE IF EXISTS auction_transactions', () => {
-
-    // ขั้น 3: สร้างด้วย InnoDB engine
-    db.query(createAucAria, (err) => {
-      if (err) {
-        console.error('[migrate] ❌ auction_transactions:', err.message);
-        // ลอง retry อีกรอบ — ลบ .frm ที่อาจค้างจาก DROP
-        for (const f of ['auction_transactions.frm','auction_transactions.ibd']) {
-          try { const fp = path.join(dataDir, f); if (fs.existsSync(fp)) fs.unlinkSync(fp); } catch(e) {}
-        }
-        db.query('DROP TABLE IF EXISTS auction_transactions', () => {
-          db.query(createAucAria, (err2) => {
-            if (err2) {
-              console.error('[migrate] ❌ auction_transactions retry failed:', err2.message);
-              console.error('[migrate] 🔧 ต้องแก้ด้วยมือ: ปิด MySQL → ลบไฟล์ auction_transactions.* ใน C:\\xampp\\mysql\\data\\loandd_db\\ → เปิด MySQL → restart server');
-            } else {
-              console.log('[migrate] ✅ auction_transactions table created (InnoDB, retry)');
-              restoreAuctionData();
-            }
+  // ★ ขั้น 1: ทดสอบว่า table ยังใช้งานได้ปกติไหม
+  db.query('SELECT COUNT(*) AS cnt FROM auction_transactions', (testErr) => {
+    if (!testErr) {
+      // ✅ Table ดีอยู่แล้ว — ไม่ต้องทำอะไร แค่ ensure bank_book_file column
+      console.log('[migrate] ✅ auction_transactions — ใช้งานได้ปกติ (skip recreate)');
+      db.query("SHOW COLUMNS FROM auction_transactions LIKE 'bank_book_file'", (colErr, cols) => {
+        if (!colErr && (!cols || cols.length === 0)) {
+          db.query("ALTER TABLE auction_transactions ADD COLUMN bank_book_file varchar(500) DEFAULT NULL", () => {
+            console.log('[migrate] ✅ auction_transactions: เพิ่ม bank_book_file column');
           });
-        });
-        return;
-      }
-      console.log('[migrate] ✅ auction_transactions table created (InnoDB engine)');
-      restoreAuctionData();
+        }
+      });
+      return;
+    }
+
+    // ❌ Table ใช้งานไม่ได้ — ต้องสร้างใหม่
+    console.log('[migrate] 🔧 auction_transactions ไม่พร้อม (' + testErr.message + ') — กำลัง recreate...');
+
+    // ลบไฟล์ค้างจากดิสก์ก่อน
+    for (const f of ['auction_transactions.ibd','auction_transactions.frm','auction_transactions.MAI','auction_transactions.MAD']) {
+      try { const fp = path.join(dataDir, f); if (fs.existsSync(fp)) { fs.unlinkSync(fp); console.log('[migrate] 🗑️  ลบไฟล์ค้าง:', fp); } } catch(e) {}
+    }
+
+    db.query('DROP TABLE IF EXISTS auction_transactions', () => {
+      db.query(createAucAria, (err) => {
+        if (err) {
+          console.error('[migrate] ❌ auction_transactions:', err.message);
+          // retry อีกรอบ
+          for (const f of ['auction_transactions.frm','auction_transactions.ibd']) {
+            try { const fp = path.join(dataDir, f); if (fs.existsSync(fp)) fs.unlinkSync(fp); } catch(e) {}
+          }
+          db.query('DROP TABLE IF EXISTS auction_transactions', () => {
+            db.query(createAucAria, (err2) => {
+              if (err2) {
+                console.error('[migrate] ❌ auction_transactions retry failed:', err2.message);
+                console.error('[migrate] 🔧 ต้องแก้ด้วยมือ: ปิด MySQL → ลบไฟล์ auction_transactions.* ใน C:\\xampp\\mysql\\data\\loandd_db\\ → เปิด MySQL → restart server');
+              } else {
+                console.log('[migrate] ✅ auction_transactions table created (retry)');
+                restoreAuctionData();
+              }
+            });
+          });
+          return;
+        }
+        console.log('[migrate] ✅ auction_transactions table created');
+        restoreAuctionData();
+      });
     });
   });
 
@@ -297,99 +314,6 @@ app.use('/api/admin/contract-expiry', authMiddleware, contractExpiryRoutes);
     });
   }
 
-  const migrations = [
-    // ── Checklist doc columns (marital + property) ──────────────────────────────
-    { name: 'loan_requests: marital_status',     sql: `ALTER TABLE loan_requests ADD COLUMN IF NOT EXISTS marital_status VARCHAR(50) NULL DEFAULT NULL` },
-    { name: 'loan_requests: borrower_id_card',   sql: `ALTER TABLE loan_requests ADD COLUMN IF NOT EXISTS borrower_id_card TEXT NULL DEFAULT NULL` },
-    { name: 'loan_requests: house_reg_book',     sql: `ALTER TABLE loan_requests ADD COLUMN IF NOT EXISTS house_reg_book TEXT NULL DEFAULT NULL` },
-    { name: 'loan_requests: name_change_doc',    sql: `ALTER TABLE loan_requests ADD COLUMN IF NOT EXISTS name_change_doc TEXT NULL DEFAULT NULL` },
-    { name: 'loan_requests: divorce_doc',        sql: `ALTER TABLE loan_requests ADD COLUMN IF NOT EXISTS divorce_doc TEXT NULL DEFAULT NULL` },
-    { name: 'loan_requests: spouse_id_card',     sql: `ALTER TABLE loan_requests ADD COLUMN IF NOT EXISTS spouse_id_card TEXT NULL DEFAULT NULL` },
-    { name: 'loan_requests: spouse_reg_copy',    sql: `ALTER TABLE loan_requests ADD COLUMN IF NOT EXISTS spouse_reg_copy TEXT NULL DEFAULT NULL` },
-    { name: 'loan_requests: marriage_cert',      sql: `ALTER TABLE loan_requests ADD COLUMN IF NOT EXISTS marriage_cert TEXT NULL DEFAULT NULL` },
-    { name: 'loan_requests: single_cert',        sql: `ALTER TABLE loan_requests ADD COLUMN IF NOT EXISTS single_cert TEXT NULL DEFAULT NULL` },
-    { name: 'loan_requests: death_cert',         sql: `ALTER TABLE loan_requests ADD COLUMN IF NOT EXISTS death_cert TEXT NULL DEFAULT NULL` },
-    { name: 'loan_requests: will_court_doc',     sql: `ALTER TABLE loan_requests ADD COLUMN IF NOT EXISTS will_court_doc TEXT NULL DEFAULT NULL` },
-    { name: 'loan_requests: testator_house_reg', sql: `ALTER TABLE loan_requests ADD COLUMN IF NOT EXISTS testator_house_reg TEXT NULL DEFAULT NULL` },
-    { name: 'loan_requests: deed_copy',          sql: `ALTER TABLE loan_requests ADD COLUMN IF NOT EXISTS deed_copy TEXT NULL DEFAULT NULL` },
-    { name: 'loan_requests: building_permit',    sql: `ALTER TABLE loan_requests ADD COLUMN IF NOT EXISTS building_permit TEXT NULL DEFAULT NULL` },
-    { name: 'loan_requests: house_reg_prop',     sql: `ALTER TABLE loan_requests ADD COLUMN IF NOT EXISTS house_reg_prop TEXT NULL DEFAULT NULL` },
-    { name: 'loan_requests: sale_contract',      sql: `ALTER TABLE loan_requests ADD COLUMN IF NOT EXISTS sale_contract TEXT NULL DEFAULT NULL` },
-    { name: 'loan_requests: debt_free_cert',     sql: `ALTER TABLE loan_requests ADD COLUMN IF NOT EXISTS debt_free_cert TEXT NULL DEFAULT NULL` },
-    { name: 'loan_requests: blueprint',          sql: `ALTER TABLE loan_requests ADD COLUMN IF NOT EXISTS blueprint TEXT NULL DEFAULT NULL` },
-    { name: 'loan_requests: property_photos',    sql: `ALTER TABLE loan_requests ADD COLUMN IF NOT EXISTS property_photos TEXT NULL DEFAULT NULL` },
-    { name: 'loan_requests: land_tax_receipt',   sql: `ALTER TABLE loan_requests ADD COLUMN IF NOT EXISTS land_tax_receipt TEXT NULL DEFAULT NULL` },
-    { name: 'loan_requests: maps_url',           sql: `ALTER TABLE loan_requests ADD COLUMN IF NOT EXISTS maps_url TEXT NULL DEFAULT NULL` },
-    { name: 'loan_requests: condo_title_deed',   sql: `ALTER TABLE loan_requests ADD COLUMN IF NOT EXISTS condo_title_deed TEXT NULL DEFAULT NULL` },
-    { name: 'loan_requests: condo_location_map', sql: `ALTER TABLE loan_requests ADD COLUMN IF NOT EXISTS condo_location_map TEXT NULL DEFAULT NULL` },
-    { name: 'loan_requests: common_fee_receipt', sql: `ALTER TABLE loan_requests ADD COLUMN IF NOT EXISTS common_fee_receipt TEXT NULL DEFAULT NULL` },
-    { name: 'loan_requests: floor_plan',         sql: `ALTER TABLE loan_requests ADD COLUMN IF NOT EXISTS floor_plan TEXT NULL DEFAULT NULL` },
-    { name: 'loan_requests: location_sketch_map',sql: `ALTER TABLE loan_requests ADD COLUMN IF NOT EXISTS location_sketch_map TEXT NULL DEFAULT NULL` },
-    { name: 'loan_requests: land_use_cert',      sql: `ALTER TABLE loan_requests ADD COLUMN IF NOT EXISTS land_use_cert TEXT NULL DEFAULT NULL` },
-    { name: 'loan_requests: rental_contract',    sql: `ALTER TABLE loan_requests ADD COLUMN IF NOT EXISTS rental_contract TEXT NULL DEFAULT NULL` },
-    { name: 'loan_requests: business_reg',       sql: `ALTER TABLE loan_requests ADD COLUMN IF NOT EXISTS business_reg TEXT NULL DEFAULT NULL` },
-    { name: 'loan_requests: property_video',     sql: `ALTER TABLE loan_requests ADD COLUMN IF NOT EXISTS property_video TEXT NULL DEFAULT NULL` },
-    { name: 'loan_requests: prop_checklist_json',  sql: `ALTER TABLE loan_requests ADD COLUMN IF NOT EXISTS prop_checklist_json TEXT NULL DEFAULT NULL` },
-    { name: 'loan_requests: checklist_ticks_json', sql: `ALTER TABLE loan_requests ADD COLUMN IF NOT EXISTS checklist_ticks_json TEXT NULL DEFAULT NULL` },
-    // ── CRITICAL: แปลง TINYINT(1) → TEXT (migration เก่าสร้าง TINYINT ทำให้ JSON path array บันทึกไม่ได้) ──
-    // MODIFY COLUMN ปลอดภัยรันซ้ำ — ถ้าเป็น TEXT อยู่แล้วก็ OK ไม่มี error
-    { name: 'fix: borrower_id_card → TEXT',     sql: `ALTER TABLE loan_requests MODIFY COLUMN borrower_id_card TEXT NULL DEFAULT NULL` },
-    { name: 'fix: house_reg_book → TEXT',       sql: `ALTER TABLE loan_requests MODIFY COLUMN house_reg_book TEXT NULL DEFAULT NULL` },
-    { name: 'fix: name_change_doc → TEXT',      sql: `ALTER TABLE loan_requests MODIFY COLUMN name_change_doc TEXT NULL DEFAULT NULL` },
-    { name: 'fix: divorce_doc → TEXT',          sql: `ALTER TABLE loan_requests MODIFY COLUMN divorce_doc TEXT NULL DEFAULT NULL` },
-    { name: 'fix: spouse_id_card → TEXT',       sql: `ALTER TABLE loan_requests MODIFY COLUMN spouse_id_card TEXT NULL DEFAULT NULL` },
-    { name: 'fix: spouse_reg_copy → TEXT',      sql: `ALTER TABLE loan_requests MODIFY COLUMN spouse_reg_copy TEXT NULL DEFAULT NULL` },
-    { name: 'fix: marriage_cert → TEXT',        sql: `ALTER TABLE loan_requests MODIFY COLUMN marriage_cert TEXT NULL DEFAULT NULL` },
-    { name: 'fix: single_cert → TEXT',          sql: `ALTER TABLE loan_requests MODIFY COLUMN single_cert TEXT NULL DEFAULT NULL` },
-    { name: 'fix: death_cert → TEXT',           sql: `ALTER TABLE loan_requests MODIFY COLUMN death_cert TEXT NULL DEFAULT NULL` },
-    { name: 'fix: will_court_doc → TEXT',       sql: `ALTER TABLE loan_requests MODIFY COLUMN will_court_doc TEXT NULL DEFAULT NULL` },
-    { name: 'fix: testator_house_reg → TEXT',   sql: `ALTER TABLE loan_requests MODIFY COLUMN testator_house_reg TEXT NULL DEFAULT NULL` },
-    { name: 'fix: deed_copy → TEXT',            sql: `ALTER TABLE loan_requests MODIFY COLUMN deed_copy TEXT NULL DEFAULT NULL` },
-    { name: 'fix: building_permit → TEXT',      sql: `ALTER TABLE loan_requests MODIFY COLUMN building_permit TEXT NULL DEFAULT NULL` },
-    { name: 'fix: house_reg_prop → TEXT',       sql: `ALTER TABLE loan_requests MODIFY COLUMN house_reg_prop TEXT NULL DEFAULT NULL` },
-    { name: 'fix: sale_contract → TEXT',        sql: `ALTER TABLE loan_requests MODIFY COLUMN sale_contract TEXT NULL DEFAULT NULL` },
-    { name: 'fix: debt_free_cert → TEXT',       sql: `ALTER TABLE loan_requests MODIFY COLUMN debt_free_cert TEXT NULL DEFAULT NULL` },
-    { name: 'fix: blueprint → TEXT',            sql: `ALTER TABLE loan_requests MODIFY COLUMN blueprint TEXT NULL DEFAULT NULL` },
-    { name: 'fix: property_photos → TEXT',      sql: `ALTER TABLE loan_requests MODIFY COLUMN property_photos TEXT NULL DEFAULT NULL` },
-    { name: 'fix: land_tax_receipt → TEXT',     sql: `ALTER TABLE loan_requests MODIFY COLUMN land_tax_receipt TEXT NULL DEFAULT NULL` },
-    { name: 'fix: maps_url → TEXT',             sql: `ALTER TABLE loan_requests MODIFY COLUMN maps_url TEXT NULL DEFAULT NULL` },
-    { name: 'fix: condo_title_deed → TEXT',     sql: `ALTER TABLE loan_requests MODIFY COLUMN condo_title_deed TEXT NULL DEFAULT NULL` },
-    { name: 'fix: condo_location_map → TEXT',   sql: `ALTER TABLE loan_requests MODIFY COLUMN condo_location_map TEXT NULL DEFAULT NULL` },
-    { name: 'fix: common_fee_receipt → TEXT',   sql: `ALTER TABLE loan_requests MODIFY COLUMN common_fee_receipt TEXT NULL DEFAULT NULL` },
-    { name: 'fix: floor_plan → TEXT',           sql: `ALTER TABLE loan_requests MODIFY COLUMN floor_plan TEXT NULL DEFAULT NULL` },
-    { name: 'fix: location_sketch_map → TEXT',  sql: `ALTER TABLE loan_requests MODIFY COLUMN location_sketch_map TEXT NULL DEFAULT NULL` },
-    { name: 'fix: land_use_cert → TEXT',        sql: `ALTER TABLE loan_requests MODIFY COLUMN land_use_cert TEXT NULL DEFAULT NULL` },
-    { name: 'fix: rental_contract → TEXT',      sql: `ALTER TABLE loan_requests MODIFY COLUMN rental_contract TEXT NULL DEFAULT NULL` },
-    { name: 'fix: business_reg → TEXT',         sql: `ALTER TABLE loan_requests MODIFY COLUMN business_reg TEXT NULL DEFAULT NULL` },
-    { name: 'fix: property_video → TEXT',       sql: `ALTER TABLE loan_requests MODIFY COLUMN property_video TEXT NULL DEFAULT NULL` },
-    // ── Other tables ────────────────────────────────────────────────────────────
-    { name: 'legal_transactions: doc_checklist_json', sql: `ALTER TABLE legal_transactions ADD COLUMN IF NOT EXISTS doc_checklist_json TEXT NULL DEFAULT NULL` },
-    {
-      name: 'approval_transactions: credit_table_file2',
-      sql: `ALTER TABLE approval_transactions ADD COLUMN IF NOT EXISTS credit_table_file2 TEXT DEFAULT NULL COMMENT 'ตารางวงเงินไฟล์ที่ 2'`
-    },
-    {
-      name: 'approval_transactions: payment_schedule_approved',
-      sql: `ALTER TABLE approval_transactions ADD COLUMN IF NOT EXISTS payment_schedule_approved TINYINT(1) DEFAULT 0 COMMENT 'ฝ่ายอนุมัติ approve ตารางที่ฝ่ายขายอัพโหลด'`
-    },
-    {
-      name: 'approval_transactions: payment_schedule_approved_at',
-      sql: `ALTER TABLE approval_transactions ADD COLUMN IF NOT EXISTS payment_schedule_approved_at DATETIME DEFAULT NULL COMMENT 'วันเวลาที่อนุมัติ'`
-    },
-    {
-      name: 'approval_transactions: approval_schedule_file',
-      sql: `ALTER TABLE approval_transactions ADD COLUMN IF NOT EXISTS approval_schedule_file TEXT DEFAULT NULL COMMENT 'ตารางที่ฝ่ายอนุมัติทำเอง'`
-    },
-  ]
-  migrations.forEach(m => {
-    db.query(m.sql, (err) => {
-      if (err && err.code !== 'ER_DUP_FIELDNAME') {
-        console.warn(`[migrate] ⚠️  ${m.name}: ${err.message}`)
-      } else {
-        console.log(`[migrate] ✅ ${m.name}`)
-      }
-    })
-  })
 })()
 
 server.listen(port, () => {

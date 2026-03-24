@@ -150,7 +150,7 @@ function fetchLegalDetail(caseId, res) {
       lt.agent_payment_slip, lt.agent_bank_book,
       -- ★ บัญชีลูกหนี้
       lr.bank_name AS debtor_bank_name, lr.bank_account_number AS debtor_bank_account_no,
-      NULL AS debtor_bank_account_name, lr.bank_book_file AS debtor_bank_book,
+      lr.bank_account_name AS debtor_bank_account_name, lr.bank_book_file AS debtor_bank_book,
       -- ★ บัญชีนายทุน per-case (จาก auction_transactions)
       auc.bank_name AS investor_bank_name, auc.bank_account_no AS investor_bank_account_no,
       auc.bank_account_name AS investor_bank_account_name, auc.bank_book_file AS investor_bank_book,
@@ -410,7 +410,9 @@ exports.updateLegal = (req, res) => {
       if (iFields.length) {
         iVals.push(caseId)
         db.query(`UPDATE auction_transactions SET ${iFields.join(', ')} WHERE case_id=? AND is_cancelled=0`, iVals, (errI) => {
-          if (errI) console.error('[legal] update investor bank error:', errI)
+          if (errI && errI.code !== 'ER_NO_SUCH_TABLE' && errI.errno !== 1932) {
+            console.error('[legal] update investor bank error:', errI)
+          }
         })
       }
     }
@@ -419,7 +421,9 @@ exports.updateLegal = (req, res) => {
     if (files['investor_bank_book'] && files['investor_bank_book'].length > 0) {
       const bookPath = `uploads/legal/investor-bank-book/${files['investor_bank_book'][0].filename}`
       db.query('UPDATE auction_transactions SET bank_book_file=? WHERE case_id=? AND is_cancelled=0', [bookPath, caseId], (errIB) => {
-        if (errIB) console.error('[legal] update investor bank_book_file error:', errIB)
+        if (errIB && errIB.code !== 'ER_NO_SUCH_TABLE' && errIB.errno !== 1932) {
+          console.error('[legal] update investor bank_book_file error:', errIB)
+        }
       })
     }
 
@@ -559,10 +563,45 @@ exports.deleteDocument = (req, res) => {
     'tax_receipt',         // ★ ใบเสร็จค่าธรรมเนียม/ภาษี
     'transaction_slip',    // ★ สลิปค่าปากถุง (บันทึกลง cases)
     'advance_slip',        // ★ สลิปค่าหักล่วงหน้า (บันทึกลง cases)
+    'agent_bank_book',     // ★ สมุดบัญชีนายหน้า (legal_transactions)
+    'agent_payment_slip',  // ★ สลิปค่านายหน้า (legal_transactions)
+    'debtor_bank_book',    // ★ สมุดบัญชีลูกหนี้ (loan_requests.bank_book_file)
+    'investor_bank_book',  // ★ สมุดบัญชีนายทุน (auction_transactions.bank_book_file)
   ]
 
   if (!allowed.includes(column)) {
     return res.status(400).json({ success: false, message: 'Not allowed' })
+  }
+
+  // debtor_bank_book อยู่ใน loan_requests.bank_book_file
+  if (column === 'debtor_bank_book') {
+    db.query('SELECT loan_request_id FROM cases WHERE id=?', [case_id], (errC, cRows) => {
+      if (errC || !cRows.length) return res.status(500).json({ success: false, message: 'Server Error' })
+      const lrId = cRows[0].loan_request_id
+      if (!lrId) return res.json({ success: true })
+      db.query('SELECT bank_book_file FROM loan_requests WHERE id=?', [lrId], (errS, sRows) => {
+        const oldPath = sRows && sRows[0] ? sRows[0].bank_book_file : null
+        db.query('UPDATE loan_requests SET bank_book_file=NULL WHERE id=?', [lrId], (errU) => {
+          if (errU) return res.status(500).json({ success: false, message: 'Server Error' })
+          if (oldPath) { try { fs.unlinkSync(path.join(__dirname, '..', oldPath)) } catch(e) {} }
+          res.json({ success: true })
+        })
+      })
+    })
+    return
+  }
+
+  // investor_bank_book อยู่ใน auction_transactions.bank_book_file
+  if (column === 'investor_bank_book') {
+    db.query('SELECT bank_book_file FROM auction_transactions WHERE case_id=? AND is_cancelled=0', [case_id], (errS, sRows) => {
+      const oldPath = sRows && sRows[0] ? sRows[0].bank_book_file : null
+      db.query('UPDATE auction_transactions SET bank_book_file=NULL WHERE case_id=? AND is_cancelled=0', [case_id], (errU) => {
+        if (errU) return res.status(500).json({ success: false, message: 'Server Error' })
+        if (oldPath) { try { fs.unlinkSync(path.join(__dirname, '..', oldPath)) } catch(e) {} }
+        res.json({ success: true })
+      })
+    })
+    return
   }
 
   // transaction_slip / advance_slip อยู่ใน cases table
