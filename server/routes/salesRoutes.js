@@ -18,13 +18,15 @@ const debtorUpload = upload.fields([
 
 // ฟิลด์ไฟล์สำหรับนายหน้า (บัตร ปชช. นายหน้า + ไฟล์ลูกหนี้ทั้งหมด)
 const agentUpload = upload.fields([
-  { name: 'id_card_image', maxCount: 1 },        // บัตร ปชช. นายหน้า
-  { name: 'agent_contract_file', maxCount: 1 },  // สัญญาแต่งตั้งนายหน้า
-  { name: 'debtor_id_card', maxCount: 5 },        // บัตร ปชช. ลูกหนี้
-  { name: 'deed_image', maxCount: 5 },             // รูปโฉนด
-  { name: 'property_image', maxCount: 10 },        // รูปทรัพย์
-  { name: 'building_permit', maxCount: 5 },        // ใบอนุญาต
-  { name: 'property_video', maxCount: 5 },         // วีดีโอ
+  { name: 'id_card_image', maxCount: 1 },             // บัตร ปชช. นายหน้า
+  { name: 'agent_contract_file', maxCount: 1 },       // สัญญาแต่งตั้งนายหน้า
+  { name: 'house_registration_image', maxCount: 1 },  // ทะเบียนบ้านนายหน้า
+  { name: 'debtor_id_card', maxCount: 5 },             // บัตร ปชช. ลูกหนี้
+  { name: 'deed_image', maxCount: 5 },                 // รูปโฉนด
+  { name: 'property_image', maxCount: 10 },            // รูปทรัพย์
+  { name: 'building_permit', maxCount: 5 },            // ใบอนุญาต
+  { name: 'property_video', maxCount: 5 },             // วีดีโอ
+  { name: 'payment_slip', maxCount: 1 },               // สลิปค่านายหน้า
 ])
 
 // ฟิลด์ไฟล์สำหรับเคส (สลิป + เล่มประเมิน + สัญญานายหน้า)

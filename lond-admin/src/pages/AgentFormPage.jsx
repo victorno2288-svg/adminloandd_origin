@@ -140,6 +140,8 @@ export default function AgentFormPage() {
   const [passbookFile, setPassbookFile] = useState(null)
   const [passbookOcrLoading, setPassbookOcrLoading] = useState(false)
   const [passbookOcrMsg, setPassbookOcrMsg] = useState('')
+  const [paymentSlipFile, setPaymentSlipFile] = useState(null)
+  const [existingPaymentSlip, setExistingPaymentSlip] = useState(null)
   const [agentOcrLoading, setAgentOcrLoading] = useState(false)
   const [agentOcrFilled, setAgentOcrFilled] = useState(null)
   const [linkedDebtors, setLinkedDebtors] = useState([])
@@ -206,6 +208,7 @@ export default function AgentFormPage() {
           setAgentCode(a.agent_code || '')
           setExistingIdCard(a.id_card_image || null)
           setExistingHouseReg(a.house_registration_image || null)
+          setExistingPaymentSlip(a.payment_slip || null)
         }
         if (d.linked_debtors) setLinkedDebtors(d.linked_debtors)
       })
@@ -490,6 +493,7 @@ export default function AgentFormPage() {
         fd.append('status', agent.status)
         if (agent.id_card_files)  { for (const f of agent.id_card_files)  fd.append('id_card_image', f) }
         if (houseRegFile)              fd.append('house_registration_image', houseRegFile)
+        if (paymentSlipFile)           fd.append('payment_slip', paymentSlipFile)
 
         const res = await fetch(`${API}/agents`, {
           method: 'POST',
@@ -543,6 +547,7 @@ export default function AgentFormPage() {
         if (removeIdCard)          fd.append('remove_id_card', '1')
         if (houseRegFile)           fd.append('house_registration_image', houseRegFile)
         if (removeHouseReg)        fd.append('remove_house_registration', '1')
+        if (paymentSlipFile)       fd.append('payment_slip', paymentSlipFile)
 
         const res = await fetch(`${API}/agents/${id}`, {
           method: 'PUT',
@@ -963,6 +968,20 @@ export default function AgentFormPage() {
                     </div>
                   )}
                 </div>
+
+                {/* ── สลิปค่านายหน้า (create mode) ── */}
+                <div className="form-group" style={{ marginBottom: 0, marginTop: 14, borderTop: '1px solid #ffe0b2', paddingTop: 12 }}>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: '#e65100', display: 'block', marginBottom: 4 }}>
+                    <i className="fas fa-receipt" style={{ marginRight: 5 }}></i>สลิปค่านายหน้า (Payment Slip)
+                  </label>
+                  <input type="file" accept=".jpg,.jpeg,.png,.pdf" style={{ fontSize: 12 }}
+                    onChange={e => setPaymentSlipFile(e.target.files[0] || null)} />
+                  {paymentSlipFile && (
+                    <div style={{ marginTop: 6, fontSize: 11, color: '#e65100' }}>
+                      <i className="fas fa-paperclip" style={{ marginRight: 3 }}></i>{paymentSlipFile.name}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* คำแนะนำ */}
@@ -1321,6 +1340,68 @@ export default function AgentFormPage() {
                       </button>
                     </div>
                   )}
+                </div>
+
+                {/* ── สลิปค่านายหน้า ── */}
+                <div className="form-group" style={{ marginBottom: 0, marginTop: 14, borderTop: '1px solid #ffe0b2', paddingTop: 12 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, fontWeight: 700, color: '#e65100' }}>
+                    <i className="fas fa-receipt" style={{ marginRight: 4 }}></i>
+                    <span>สลิปค่านายหน้า (Payment Slip)</span>
+                  </label>
+                  {existingPaymentSlip && !paymentSlipFile && (
+                    <div style={{ marginBottom: 8, marginTop: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <a href={existingPaymentSlip.startsWith('/') ? existingPaymentSlip : `/${existingPaymentSlip}`}
+                        target="_blank" rel="noreferrer"
+                        style={{ fontSize: 12, color: '#e65100', textDecoration: 'underline' }}>
+                        <i className="fas fa-paperclip" style={{ marginRight: 4 }}></i>ดูสลิปปัจจุบัน
+                      </a>
+                    </div>
+                  )}
+                  <label style={{
+                    display: 'block', cursor: 'pointer', marginTop: 4,
+                    background: paymentSlipFile ? '#fff8f3' : '#fff3e0',
+                    border: `2px dashed ${paymentSlipFile ? '#e65100' : '#ffb74d'}`,
+                    borderRadius: 10, padding: 10, transition: 'border-color 0.2s',
+                  }}>
+                    <input type="file" accept=".jpg,.jpeg,.png,.pdf" style={{ display: 'none' }}
+                      onChange={e => {
+                        const f = e.target.files[0] || null
+                        setPaymentSlipFile(f)
+                        e.target.value = ''
+                      }} />
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                      <div style={{
+                        width: 60, height: 60, flexShrink: 0, borderRadius: 8,
+                        background: '#ffe0b2', border: '1px solid #ffb74d',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
+                      }}>
+                        {paymentSlipFile && paymentSlipFile.type !== 'application/pdf'
+                          ? <img src={URL.createObjectURL(paymentSlipFile)} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6 }} />
+                          : paymentSlipFile
+                            ? <i className="fas fa-file-pdf" style={{ fontSize: 22, color: '#e65100' }}></i>
+                            : existingPaymentSlip
+                              ? <i className="fas fa-check-circle" style={{ fontSize: 22, color: '#16a34a' }}></i>
+                              : <i className="fas fa-receipt" style={{ fontSize: 22, color: '#e65100' }}></i>
+                        }
+                        {paymentSlipFile && (
+                          <button type="button"
+                            onClick={e => { e.preventDefault(); e.stopPropagation(); setPaymentSlipFile(null) }}
+                            style={{ position: 'absolute', top: -5, right: -5, width: 18, height: 18, borderRadius: '50%', background: '#e53935', border: 'none', color: '#fff', fontSize: 9, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
+                          >✕</button>
+                        )}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: '#e65100' }}>
+                          {paymentSlipFile ? 'เปลี่ยนสลิป' : existingPaymentSlip ? 'เปลี่ยนสลิป' : 'อัพโหลดสลิปค่านายหน้า'}
+                        </div>
+                        <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>
+                          {paymentSlipFile
+                            ? <><span style={{ color: '#16a34a', fontWeight: 600 }}>✓ {paymentSlipFile.name}</span></>
+                            : 'JPG / PNG / PDF'}
+                        </div>
+                      </div>
+                    </div>
+                  </label>
                 </div>
               </div>
 

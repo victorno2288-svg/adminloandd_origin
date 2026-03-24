@@ -23,8 +23,9 @@ const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     let folder = 'general'
 
-    // บัตรประชาชน (ลูกค้า, ลูกหนี้, นายหน้า, คู่สมรส)
-    if (['id_card_image','debtor_id_card','borrower_id_card','spouse_id_card_upload','agent_id_card_image'].includes(file.fieldname))
+    // บัตรประชาชน (ลูกค้า, ลูกหนี้, นายหน้า, คู่สมรส) + ทะเบียนบ้านนายหน้า
+    if (['id_card_image','debtor_id_card','borrower_id_card','spouse_id_card_upload','agent_id_card_image',
+         'house_registration_image'].includes(file.fieldname))
                                                           folder = 'id-cards'
     // โฉนดที่ดิน
     else if (file.fieldname === 'deed_image')             folder = 'deeds'
@@ -45,8 +46,8 @@ const storage = multer.diskStorage({
     else if (file.fieldname === 'appraisal_book_image')   folder = 'appraisal-books'
     // สลิปค่าคอมมิชชั่น (accounting)
     else if (file.fieldname === 'commission_slip')        folder = 'slips'
-    // สัญญาแต่งตั้งนายหน้า + บัตรประชาชนนายหน้า (ในเคส) + สัญญาในโปรไฟล์นายหน้า
-    else if (['broker_contract_file','broker_id_file','agent_contract_file'].includes(file.fieldname))
+    // สัญญาแต่งตั้งนายหน้า + บัตรประชาชนนายหน้า (ในเคส) + สัญญาในโปรไฟล์นายหน้า + สลิปค่านายหน้า
+    else if (['broker_contract_file','broker_id_file','agent_contract_file','payment_slip'].includes(file.fieldname))
                                                           folder = 'contracts/broker'
     // เอกสารโอนกรรมสิทธิ์ / ประมูล + เอกสาร Checklist ส่วนตัว/สมรส
     else if (['house_reg_book','house_reg_book_legal','name_change_doc','divorce_doc',

@@ -88,7 +88,8 @@ const uploadDocMulter = multer({
 }).fields([
   { name: 'passbook_image', maxCount: 1 },
   { name: 'investor_contract', maxCount: 1 },
-  { name: 'house_registration_image', maxCount: 1 }
+  { name: 'house_registration_image', maxCount: 1 },
+  { name: 'deposit_slip', maxCount: 1 },
 ])
 
 // ========== สร้างรหัสนายทุนอัตโนมัติ (CAP0001, CAP0002, ...) ==========
@@ -111,7 +112,7 @@ exports.getInvestors = (req, res) => {
       date_of_birth, nationality, marital_status, spouse_name, spouse_national_id,
       national_id, national_id_expiry, address,
       bank_name, bank_account_no, bank_account_name,
-      id_card_image, passbook_image, investor_contract, house_registration_image, updated_at
+      id_card_image, passbook_image, investor_contract, house_registration_image, deposit_slip, updated_at
     FROM investors
     ORDER BY created_at DESC
   `
@@ -132,7 +133,7 @@ exports.getInvestorById = (req, res) => {
       date_of_birth, nationality, marital_status, spouse_name, spouse_national_id,
       national_id, national_id_expiry, address,
       bank_name, bank_account_no, bank_account_name,
-      id_card_image, passbook_image, investor_contract, house_registration_image, updated_at
+      id_card_image, passbook_image, investor_contract, house_registration_image, deposit_slip, updated_at
      FROM investors WHERE id = ?`,
     [id],
     (err, results) => {
@@ -305,7 +306,7 @@ exports.getInvestorPortfolio = (req, res) => {
 
   // ดึงข้อมูลนายทุน
   db.query(
-    `SELECT id, investor_code, full_name, phone, line_id, email, bank_name, bank_account_no, bank_account_name, id_card_image
+    `SELECT id, investor_code, full_name, phone, line_id, email, bank_name, bank_account_no, bank_account_name, id_card_image, deposit_slip
      FROM investors WHERE id = ?`,
     [id],
     (err, investorRows) => {
@@ -436,7 +437,7 @@ exports.uploadDoc = (req, res) => {
     const params = []
     const result = {}
 
-    const allowedFields = ['passbook_image', 'investor_contract', 'house_registration_image']
+    const allowedFields = ['passbook_image', 'investor_contract', 'house_registration_image', 'deposit_slip']
     for (const field of allowedFields) {
       if (files[field] && files[field].length > 0) {
         const fp = `/uploads/investor_docs/${files[field][0].filename}`
@@ -469,7 +470,7 @@ exports.uploadDoc = (req, res) => {
 exports.deleteDoc = (req, res) => {
   const { id } = req.params
   const { field } = req.body
-  const allowed = ['passbook_image', 'investor_contract', 'house_registration_image', 'id_card_image']
+  const allowed = ['passbook_image', 'investor_contract', 'house_registration_image', 'id_card_image', 'deposit_slip']
   if (!allowed.includes(field)) {
     return res.status(400).json({ success: false, message: 'field ไม่ถูกต้อง' })
   }

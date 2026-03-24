@@ -931,6 +931,7 @@ exports.getInvestorsDocs = (req, res) => {
   let sql = `
     SELECT
       i.id AS investor_id, i.investor_code, i.full_name AS investor_name, i.phone AS investor_phone,
+      i.deposit_slip,
       COUNT(DISTINCT iw.id) AS slip_count,
       GROUP_CONCAT(DISTINCT iw.slip_path ORDER BY iw.id SEPARATOR '|') AS investor_slips,
       GROUP_CONCAT(DISTINCT CONCAT(
@@ -957,6 +958,7 @@ exports.getInvestorsDocs = (req, res) => {
       let sqlFb = `
         SELECT
           i.id AS investor_id, i.investor_code, i.full_name AS investor_name, i.phone AS investor_phone,
+          i.deposit_slip,
           0 AS slip_count, NULL AS investor_slips, NULL AS cases_info
         FROM investors i WHERE 1=1
       `

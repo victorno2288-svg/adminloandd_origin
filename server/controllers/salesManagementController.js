@@ -237,7 +237,7 @@ exports.getAgents = (req, res) => {
     SELECT id, agent_code, full_name, nickname, phone, email, line_id, facebook, national_id,
            commission_rate, status,
            bank_name, bank_account_number, bank_account_name,
-           area, id_card_image, contract_file, contract_date,
+           area, id_card_image, contract_file, contract_date, payment_slip,
            created_at, updated_at
     FROM agents
     ORDER BY id DESC
@@ -330,6 +330,10 @@ exports.updateAgent = (req, res) => {
   if (req.files?.agent_contract_file?.[0]) {
     fields.push('contract_file=?')
     values.push('uploads/contracts/broker/' + req.files.agent_contract_file[0].filename)
+  }
+  if (req.files?.payment_slip?.[0]) {
+    fields.push('payment_slip=?')
+    values.push('uploads/contracts/broker/' + req.files.payment_slip[0].filename)
   }
 
   fields.push('updated_at=NOW()')

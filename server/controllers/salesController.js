@@ -566,12 +566,18 @@ exports.createAgent = (req, res) => {
       houseRegPath = `uploads/id-cards/${files['house_registration_image'][0].filename}`
     }
 
+    // สลิปค่านายหน้า
+    let paymentSlipPath = null
+    if (files['payment_slip'] && files['payment_slip'].length > 0) {
+      paymentSlipPath = `uploads/contracts/broker/${files['payment_slip'][0].filename}`
+    }
+
     // INSERT นายหน้า (รวมฟิลด์ใหม่)
     const agentSql = `
       INSERT INTO agents (agent_code, full_name, nickname, phone, email, line_id, facebook, national_id, commission_rate,
                           date_of_birth, national_id_expiry, address,
-                          bank_name, bank_account_number, bank_account_name, area, contract_file, contract_date, id_card_image, house_registration_image)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                          bank_name, bank_account_number, bank_account_name, area, contract_file, contract_date, id_card_image, house_registration_image, payment_slip)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
     db.query(agentSql, [
       agent_code, full_name || null, nickname || null, phone || null,
@@ -580,7 +586,7 @@ exports.createAgent = (req, res) => {
       date_of_birth || null, national_id_expiry || null, address || null,
       bank_name || null, bank_account_number || null, bank_account_name || null,
       area || null, contractFilePath, contract_date || null,
-      idCardPath, houseRegPath
+      idCardPath, houseRegPath, paymentSlipPath
     ], (err2, agentResult) => {
       if (err2) return res.status(500).json({ success: false, message: 'Server Error: ' + err2.message })
 
@@ -723,6 +729,10 @@ exports.updateAgent = (req, res) => {
   if (files['house_registration_image'] && files['house_registration_image'].length > 0) {
     fields.push('house_registration_image=?')
     values.push(`uploads/id-cards/${files['house_registration_image'][0].filename}`)
+  }
+  if (files['payment_slip'] && files['payment_slip'].length > 0) {
+    fields.push('payment_slip=?')
+    values.push(`uploads/contracts/broker/${files['payment_slip'][0].filename}`)
   }
 
   // ลบรูปบัตรประชาชนเดิม (ถ้าสั่ง และไม่มีรูปใหม่มาแทน)

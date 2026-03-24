@@ -1079,6 +1079,7 @@ function InvestorsTab({ q, searchField, onOpenCase }) {
               <th>รหัสนายทุน</th>
               <th>ชื่อ-สกุล</th>
               <th>เบอร์โทร</th>
+              <th style={{ textAlign: 'center' }}>สลิปมัดจำ 1%</th>
               <th style={{ textAlign: 'center' }}>สลิป</th>
               <th>เคสที่เกี่ยวข้อง</th>
               <th style={{ textAlign: 'center' }}>สลิปถอนเงิน</th>
@@ -1087,7 +1088,7 @@ function InvestorsTab({ q, searchField, onOpenCase }) {
           </thead>
           <tbody>
             {!paged.length
-              ? <tr><td colSpan="8"><div className="empty-state"><i className="fas fa-hand-holding-usd"></i><p>ไม่พบนายทุน</p></div></td></tr>
+              ? <tr><td colSpan="9"><div className="empty-state"><i className="fas fa-hand-holding-usd"></i><p>ไม่พบนายทุน</p></div></td></tr>
               : paged.map((inv, i) => {
                   const slips = (inv.investor_slips || '').split('|').filter(Boolean)
                   const cases = (inv.cases_info || '').split(';;').filter(Boolean).map(ci => { const p = ci.split('||'); return { case_code: p[0], debtor_name: p[1], debtor_code: p[2], loan_request_id: p[3] } })
@@ -1103,6 +1104,14 @@ function InvestorsTab({ q, searchField, onOpenCase }) {
                         </strong>
                       </td>
                       <td>{inv.investor_phone || '-'}</td>
+                      <td style={{ textAlign: 'center' }}>
+                        {inv.deposit_slip
+                          ? <button onClick={() => setPreview(inv.deposit_slip.startsWith('/') ? inv.deposit_slip : `/${inv.deposit_slip}`)}
+                              style={{ padding: '4px 10px', background: '#fffbeb', border: '1px solid #d97706', color: '#b45309', borderRadius: 6, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>
+                              <i className="fas fa-receipt"></i> ดูสลิป
+                            </button>
+                          : <span style={{ color: '#ddd', fontSize: 12 }}>-</span>}
+                      </td>
                       <td style={{ textAlign: 'center' }}>
                         <span style={{ fontWeight: 700, fontSize: 15, color: slips.length > 0 ? 'var(--primary)' : '#ddd' }}>{slips.length}</span>
                       </td>

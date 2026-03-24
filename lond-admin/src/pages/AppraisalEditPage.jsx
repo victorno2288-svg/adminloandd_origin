@@ -91,6 +91,9 @@ export default function AppraisalEditPage() {
   const [propUploadNames, setPropUploadNames] = useState([])
   const [propUploading, setPropUploading] = useState(false)
   const [propMsg, setPropMsg] = useState('')
+  // ===== VDO Upload =====
+  const [uploadingVideo, setUploadingVideo] = useState(false)
+  const [videoFiles, setVideoFiles] = useState([])
 
   const [form, setForm] = useState({
     appraisal_type: 'outside',
@@ -154,6 +157,47 @@ export default function AppraisalEditPage() {
       .then(d => { if (d.success) setAppointments(d.appointments || []) })
       .catch(() => {})
   }, [id])
+
+  // ===== โหลด checklist video docs =====
+  useEffect(() => {
+    if (!id) return
+    fetch(`/api/admin/debtors/${id}/checklist-docs`, {
+      headers: { Authorization: `Bearer ${token()}` }
+    })
+      .then(r => r.json())
+      .then(d => { if (d.success && d.docs?.property_video) setVideoFiles(d.docs.property_video) })
+      .catch(() => {})
+  }, [id])
+
+  const handleVideoUpload = async (files) => {
+    if (!files || files.length === 0) return
+    setUploadingVideo(true)
+    const formData = new FormData()
+    for (const f of files) formData.append('property_video', f)
+    try {
+      const res = await fetch(`/api/admin/debtors/${id}/checklist-docs`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token()}` },
+        body: formData
+      })
+      const data = await res.json()
+      if (data.success && data.docs?.property_video) setVideoFiles(data.docs.property_video)
+    } catch { /* silent */ }
+    setUploadingVideo(false)
+  }
+
+  const handleVideoRemove = async (filePath) => {
+    try {
+      const res = await fetch(`/api/admin/debtors/${id}/checklist-docs/remove`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ field: 'property_video', file_path: filePath })
+      })
+      const data = await res.json()
+      if (data.success && data.docs?.property_video !== undefined) setVideoFiles(data.docs.property_video)
+      else setVideoFiles(prev => prev.filter(p => p !== filePath))
+    } catch { /* silent */ }
+  }
 
   const set = (key, val) => setForm(prev => ({ ...prev, [key]: val }))
 
@@ -633,18 +677,86 @@ export default function AppraisalEditPage() {
                 </div>
               </div>
 
-              {images.filter(img => img.includes('videos')).length > 0 && (
-                <div style={{ marginTop: 16 }}>
-                  <label style={{ fontSize: 13, fontWeight: 600 }}>วีดีโอทรัพย์</label>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
-                    {images.filter(img => img.includes('videos')).map((vid, i) => (
-                      <a key={i} href={vid.startsWith('/') ? vid : `/${vid}`} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: 'var(--primary)' }}>
-                        <i className="fas fa-video"></i> วิดีโอ {i + 1}
-                      </a>
+              {/* ===== VDO ทรัพย์สิน — ฝ่ายประเมินอัพโหลด ===== */}
+              <div style={{ marginTop: 16, padding: '12px 16px', background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#6d28d9', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <i className="fas fa-video"></i> VDO ทรัพย์สิน
+                  </span>
+                  <label style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                    background: uploadingVideo ? '#e0e0e0' : '#7c3aed',
+                    color: '#fff', borderRadius: 7, padding: '5px 14px',
+                    fontSize: 12, fontWeight: 600, cursor: uploadingVideo ? 'default' : 'pointer',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {uploadingVideo
+                      ? <><i className="fas fa-spinner fa-spin" /> กำลังอัพ...</>
+                      : <><i className="fas fa-upload" /> อัพโหลดวีดีโอ</>
+                    }
+                    <input type="file" accept="video/*" multiple style={{ display: 'none' }}
+                      disabled={uploadingVideo}
+                      onChange={e => {
+                        if (e.target.files?.length) {
+                          handleVideoUpload(Array.from(e.target.files))
+                          e.target.value = ''
+                        }
+                      }} />
+                  </label>
+                </div>
+                {/* Thumbnails วีดีโอที่อัพแล้ว */}
+                {videoFiles.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+                    {videoFiles.map((fp, fi) => (
+                      <div key={fi} style={{ position: 'relative', display: 'inline-flex' }}>
+                        <div
+                          onClick={() => window.open(fp.startsWith('/') ? fp : `/${fp}`, '_blank')}
+                          style={{
+                            width: 64, height: 64, borderRadius: 8,
+                            background: '#ede9fe', border: '1.5px solid #c4b5fd',
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                            cursor: 'pointer', gap: 3
+                          }}>
+                          <i className="fas fa-play-circle" style={{ fontSize: 22, color: '#7c3aed' }} />
+                          <span style={{ fontSize: 9, fontWeight: 600, color: '#7c3aed' }}>VDO {fi + 1}</span>
+                        </div>
+                        <button type="button" onClick={() => handleVideoRemove(fp)}
+                          style={{
+                            position: 'absolute', top: -5, right: -5,
+                            width: 18, height: 18, borderRadius: '50%',
+                            background: '#e53935', border: 'none', color: '#fff',
+                            fontSize: 9, cursor: 'pointer', display: 'flex',
+                            alignItems: 'center', justifyContent: 'center', padding: 0
+                          }}>
+                          <i className="fas fa-times" />
+                        </button>
+                      </div>
                     ))}
                   </div>
-                </div>
-              )}
+                )}
+                {/* วีดีโอเก่าจาก images column */}
+                {images.filter(img => img.includes('videos')).length > 0 && (
+                  <div style={{ marginTop: 8 }}>
+                    <small style={{ color: '#9ca3af', fontSize: 10 }}>วีดีโอเก่า:</small>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                      {images.filter(img => img.includes('videos')).map((fp, fi) => (
+                        <div key={fi} onClick={() => window.open(fp.startsWith('/') ? fp : `/${fp}`, '_blank')}
+                          style={{
+                            width: 56, height: 56, borderRadius: 6, background: '#f3f0ff',
+                            border: '1px solid #c4b5fd', display: 'flex', flexDirection: 'column',
+                            alignItems: 'center', justifyContent: 'center', cursor: 'pointer', gap: 2
+                          }}>
+                          <i className="fas fa-play-circle" style={{ fontSize: 18, color: '#7c3aed' }} />
+                          <span style={{ fontSize: 9, color: '#7c3aed' }}>VDO</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {videoFiles.length === 0 && images.filter(img => img.includes('videos')).length === 0 && (
+                  <p style={{ fontSize: 12, color: '#9ca3af', margin: '8px 0 0', fontStyle: 'italic' }}>ยังไม่มีวีดีโอ — กดอัพโหลดเพื่อเพิ่ม</p>
+                )}
+              </div>
             </div>
 
           </div>
