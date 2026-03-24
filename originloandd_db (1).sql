@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Mar 23, 2026 at 02:42 AM
+-- Generation Time: Mar 24, 2026 at 03:41 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -49,8 +49,8 @@ CREATE TABLE `admin_users` (
 --
 
 INSERT INTO `admin_users` (`id`, `username`, `password_hash`, `full_name`, `nickname`, `email`, `phone`, `department`, `position`, `avatar_url`, `status`, `last_login`, `created_at`, `updated_at`) VALUES
-(1, 'ภัคจิรา', '$2b$10$9w8osaagoxsoTPzmEQm83.rnug3meF2iyC0OTS7CEjzxKNgsAjsK6', 'ภัคจิรา อุดมนา', 'แฟรี่', 'lafatano22@gmail.com', '0956504157', 'super_admin', 'เทสเตอร์', NULL, 'active', '2026-03-23 08:27:03', '2026-02-17 04:24:05', '2026-03-23 01:27:03'),
-(3, 'ดา', '$2b$10$ahsOrgwr7Plhyki4HDVZZuw/T5a/QfRGVDW5L14IohiiinZ2lELry', 'ดา', 'ก็ดา', 'loandd02@gmail.com', '0956504157', 'sales', 'เทสเตอร์', NULL, 'active', '2026-03-06 16:59:18', '2026-02-19 08:28:41', '2026-03-06 09:59:18'),
+(1, 'ภัคจิรา', '$2b$10$9w8osaagoxsoTPzmEQm83.rnug3meF2iyC0OTS7CEjzxKNgsAjsK6', 'ภัคจิรา อุดมนา', 'แฟรี่', 'lafatano22@gmail.com', '0956504157', 'super_admin', 'เทสเตอร์', NULL, 'active', '2026-03-23 10:17:11', '2026-02-17 04:24:05', '2026-03-23 03:17:11'),
+(3, 'ดา', '$2b$10$ahsOrgwr7Plhyki4HDVZZuw/T5a/QfRGVDW5L14IohiiinZ2lELry', 'ดา', 'ก็ดา', 'loandd02@gmail.com', '0956504157', 'sales', 'เทสเตอร์', NULL, 'active', '2026-03-23 09:56:30', '2026-02-19 08:28:41', '2026-03-23 02:56:30'),
 (5, 'นุ่น', '$2b$10$2ZMbmErFoZ6rnCU7Ydzi4.cJ3gZimihr88fIhmrlUFKTLxGUHGBqW', 'คคคคค', 'คคคค', 'llll2@gmail.com', '00000000000', 'sales', 'ทาย', NULL, 'active', '2026-02-20 16:44:17', '2026-02-20 09:16:13', '2026-02-20 09:44:17');
 
 -- --------------------------------------------------------
@@ -106,6 +106,7 @@ CREATE TABLE `agents` (
   `commission_rate` decimal(5,2) DEFAULT 0.00,
   `id_card_image` text DEFAULT NULL,
   `contract_file` varchar(500) DEFAULT NULL,
+  `payment_slip` varchar(500) DEFAULT NULL COMMENT 'สลิปการรับเงินค่านายหน้า (path ไฟล์)',
   `contract_date` date DEFAULT NULL,
   `status` enum('active','inactive') DEFAULT 'active',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -120,10 +121,10 @@ CREATE TABLE `agents` (
 -- Dumping data for table `agents`
 --
 
-INSERT INTO `agents` (`id`, `agent_code`, `full_name`, `nickname`, `phone`, `email`, `line_id`, `facebook`, `national_id`, `bank_name`, `bank_account_number`, `bank_account_name`, `area`, `commission_rate`, `id_card_image`, `contract_file`, `contract_date`, `status`, `created_at`, `updated_at`, `date_of_birth`, `national_id_expiry`, `address`, `house_registration_image`) VALUES
-(1, 'LDD0001', 'ง่วง', 'ไม่บอก', '00000000', 'loandd02@gmail.com', '@kkk', NULL, NULL, NULL, NULL, NULL, NULL, 90.00, 'uploads/id-cards/1771467780103-403.jpg', NULL, NULL, 'active', '2026-02-18 04:20:15', '2026-02-23 10:27:33', NULL, NULL, NULL, NULL),
-(2, 'LDD0002', 'ลอง', 'ระบบ', '0956504157', 'aaaa@hotmail.com', 'fffff', NULL, NULL, NULL, NULL, NULL, NULL, 3.00, 'uploads/id-cards/1771813661205-559.jpeg', NULL, NULL, 'active', '2026-02-23 02:27:41', '2026-03-02 09:09:39', NULL, NULL, NULL, NULL),
-(5, 'AGT0001', 'นอนเล่น', 'ธาม', '09998788', 'lo@gmail.com', '@mager', NULL, NULL, NULL, NULL, NULL, NULL, 0.00, NULL, NULL, NULL, 'active', '2026-02-24 08:21:27', '2026-03-20 03:27:34', NULL, NULL, NULL, NULL);
+INSERT INTO `agents` (`id`, `agent_code`, `full_name`, `nickname`, `phone`, `email`, `line_id`, `facebook`, `national_id`, `bank_name`, `bank_account_number`, `bank_account_name`, `area`, `commission_rate`, `id_card_image`, `contract_file`, `payment_slip`, `contract_date`, `status`, `created_at`, `updated_at`, `date_of_birth`, `national_id_expiry`, `address`, `house_registration_image`) VALUES
+(1, 'LDD0001', 'ง่วง', 'ไม่บอก', '00000000', 'loandd02@gmail.com', '@kkk', NULL, NULL, NULL, NULL, NULL, NULL, 90.00, 'uploads/id-cards/1771467780103-403.jpg', NULL, NULL, NULL, 'active', '2026-02-18 04:20:15', '2026-02-23 10:27:33', NULL, NULL, NULL, NULL),
+(2, 'LDD0002', 'ลอง', 'ระบบ', '0956504157', 'aaaa@hotmail.com', 'fffff', NULL, NULL, NULL, NULL, NULL, NULL, 3.00, 'uploads/id-cards/1771813661205-559.jpeg', NULL, NULL, NULL, 'active', '2026-02-23 02:27:41', '2026-03-02 09:09:39', NULL, NULL, NULL, NULL),
+(5, 'AGT0001', 'นอน', 'ลอง', '09998788', 'lo@gmail.com', '@mager', NULL, NULL, NULL, NULL, NULL, NULL, 0.00, 'uploads/id-cards/1774320008355-378.jpg', NULL, NULL, NULL, 'active', '2026-02-24 08:21:27', '2026-03-24 02:40:08', NULL, NULL, '222 หมู่ 4 ถนนกะทา ตำบลบางกะปิ อำเภอบางกะปิ กรุงเทพมหานคร', 'uploads/id-cards/1774320008366-118.jpg');
 
 -- --------------------------------------------------------
 
@@ -401,6 +402,7 @@ CREATE TABLE `cases` (
   `investor_amount` decimal(15,2) DEFAULT NULL,
   `contract_start_date` date DEFAULT NULL,
   `contract_end_date` date DEFAULT NULL,
+  `contract_redemption_amount` decimal(15,2) DEFAULT NULL COMMENT 'ยอดสินไถ่ตามสัญญาขายฝาก (วงเงิน + ดอกเบี้ยตลอดสัญญา)',
   `transaction_slip` text DEFAULT NULL,
   `advance_slip` varchar(500) DEFAULT NULL COMMENT 'สลิปค่าหักล่วงหน้า'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -409,10 +411,10 @@ CREATE TABLE `cases` (
 -- Dumping data for table `cases`
 --
 
-INSERT INTO `cases` (`id`, `case_code`, `loan_request_id`, `user_id`, `agent_id`, `assigned_sales_id`, `appraisal_company_id`, `status`, `pipeline_stage`, `sale_method`, `exclusive_contract_file`, `contract_option`, `contract_auto_generated`, `contract_pdf_file`, `contract_signed_back_image`, `exclusive_contract_signed`, `exclusive_contract_signed_at`, `debtor_docs_complete`, `debtor_docs_complete_at`, `investor_docs_complete`, `investor_docs_complete_at`, `appointment_unlocked`, `last_follow_up_at`, `follow_up_count`, `payment_status`, `appraisal_fee`, `approved_amount`, `note`, `appraisal_type`, `appraisal_result`, `appraisal_date`, `payment_date`, `slip_image`, `appraisal_book_image`, `recorded_by`, `recorded_at`, `created_at`, `updated_at`, `transaction_date`, `transaction_time`, `transaction_land_office`, `transaction_note`, `transaction_recorded_by`, `transaction_recorded_at`, `outside_result`, `outside_reason`, `outside_recorded_at`, `inside_result`, `inside_reason`, `inside_recorded_at`, `check_price_value`, `check_price_detail`, `check_price_recorded_at`, `land_transfer_date`, `land_transfer_note`, `broker_contract_signed`, `broker_contract_date`, `broker_contract_file`, `land_transfer_time`, `land_transfer_location`, `next_follow_up_at`, `investor_marital_status`, `commission_paid`, `commission_amount`, `commission_slip`, `broker_id_file`, `investor_amount`, `contract_start_date`, `contract_end_date`, `transaction_slip`, `advance_slip`) VALUES
-(1, '0001', 18, NULL, 1, NULL, NULL, 'credit_approved', 'chat', 'pending', NULL, NULL, 0, NULL, NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, 0, 'paid', 5000.00, 246666.00, NULL, 'outside', 'passed', '2026-02-18', '2026-02-08', 'uploads/slips/1771467833852-305.jpg', 'uploads/appraisal-books/1771388483754-712.jpg', 'ทาย', '2026-02-15 13:21:23', '2026-02-18 04:21:23', '2026-03-13 03:55:14', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-(8, 'CS0001', 29, NULL, NULL, NULL, NULL, 'preparing_docs', 'chat', 'pending', NULL, NULL, 0, NULL, NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, 0, 'unpaid', 4500.00, 50000.00, NULL, 'outside', NULL, '2026-02-23', NULL, 'uploads/slips/1773303870262-307.png', NULL, 'ระบบ', '2026-03-20 10:20:04', '2026-02-27 08:29:58', '2026-03-20 07:40:52', '2026-03-23', '10.00 น.', 'มีนบุรี', NULL, 'ระบบ', '2026-03-20 10:20:04', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-(9, 'CS0002', 30, NULL, 2, NULL, NULL, 'legal_completed', 'chat', 'pending', NULL, NULL, 0, NULL, NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, 0, 'paid', 1000.00, NULL, NULL, 'inside', NULL, '2026-02-22', NULL, NULL, NULL, 'ระบบ', '2026-03-20 11:28:03', '2026-02-27 08:59:44', '2026-03-20 04:28:03', '2026-02-23', '09.00', 'โคราช', NULL, 'ระบบ', '2026-03-20 11:28:03', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, 'uploads/issuing/broker-contract/1773731310052-734.png', NULL, NULL, NULL, 'married', 0, NULL, NULL, 'uploads/issuing/broker-id/1773731310062-880.png', NULL, NULL, NULL, 'uploads/slips/1773980859795-251.png', 'uploads/slips/1773980883097-533.png');
+INSERT INTO `cases` (`id`, `case_code`, `loan_request_id`, `user_id`, `agent_id`, `assigned_sales_id`, `appraisal_company_id`, `status`, `pipeline_stage`, `sale_method`, `exclusive_contract_file`, `contract_option`, `contract_auto_generated`, `contract_pdf_file`, `contract_signed_back_image`, `exclusive_contract_signed`, `exclusive_contract_signed_at`, `debtor_docs_complete`, `debtor_docs_complete_at`, `investor_docs_complete`, `investor_docs_complete_at`, `appointment_unlocked`, `last_follow_up_at`, `follow_up_count`, `payment_status`, `appraisal_fee`, `approved_amount`, `note`, `appraisal_type`, `appraisal_result`, `appraisal_date`, `payment_date`, `slip_image`, `appraisal_book_image`, `recorded_by`, `recorded_at`, `created_at`, `updated_at`, `transaction_date`, `transaction_time`, `transaction_land_office`, `transaction_note`, `transaction_recorded_by`, `transaction_recorded_at`, `outside_result`, `outside_reason`, `outside_recorded_at`, `inside_result`, `inside_reason`, `inside_recorded_at`, `check_price_value`, `check_price_detail`, `check_price_recorded_at`, `land_transfer_date`, `land_transfer_note`, `broker_contract_signed`, `broker_contract_date`, `broker_contract_file`, `land_transfer_time`, `land_transfer_location`, `next_follow_up_at`, `investor_marital_status`, `commission_paid`, `commission_amount`, `commission_slip`, `broker_id_file`, `investor_amount`, `contract_start_date`, `contract_end_date`, `contract_redemption_amount`, `transaction_slip`, `advance_slip`) VALUES
+(1, '0001', 18, NULL, 1, NULL, NULL, 'credit_approved', 'chat', 'pending', NULL, NULL, 0, NULL, NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, 0, 'paid', 5000.00, 246666.00, NULL, 'outside', 'passed', '2026-02-18', '2026-02-08', 'uploads/slips/1771467833852-305.jpg', 'uploads/appraisal-books/1771388483754-712.jpg', 'ทาย', '2026-02-15 13:21:23', '2026-02-18 04:21:23', '2026-03-13 03:55:14', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(8, 'CS0001', 29, NULL, NULL, NULL, NULL, 'preparing_docs', 'chat', 'pending', NULL, NULL, 0, NULL, NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, 0, 'unpaid', 4500.00, 50000.00, NULL, 'outside', NULL, '2026-02-23', NULL, 'uploads/slips/1773303870262-307.png', NULL, 'ระบบ', '2026-03-20 10:20:04', '2026-02-27 08:29:58', '2026-03-20 07:40:52', '2026-03-23', '10.00 น.', 'มีนบุรี', NULL, 'ระบบ', '2026-03-20 10:20:04', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(9, 'CS0002', 30, NULL, 2, NULL, NULL, 'legal_completed', 'chat', 'pending', NULL, NULL, 0, NULL, NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, 0, 'paid', 1000.00, NULL, NULL, 'inside', NULL, '2026-02-22', NULL, NULL, NULL, 'ระบบ', '2026-03-20 11:28:03', '2026-02-27 08:59:44', '2026-03-20 04:28:03', '2026-02-23', '09.00', 'โคราช', NULL, 'ระบบ', '2026-03-20 11:28:03', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, 'uploads/issuing/broker-contract/1773731310052-734.png', NULL, NULL, NULL, 'married', 0, NULL, NULL, 'uploads/issuing/broker-id/1773731310062-880.png', NULL, NULL, NULL, NULL, 'uploads/slips/1773980859795-251.png', 'uploads/slips/1773980883097-533.png');
 
 -- --------------------------------------------------------
 
@@ -667,6 +669,19 @@ INSERT INTO `chat_tags` (`id`, `name`, `bg_color`, `text_color`, `sort_order`, `
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `contract_expiry_logs`
+--
+
+CREATE TABLE `contract_expiry_logs` (
+  `id` int(11) NOT NULL,
+  `case_id` int(11) NOT NULL COMMENT 'FK → cases.id',
+  `days_before` int(11) NOT NULL COMMENT 'เกณฑ์ที่แจ้งเตือน: 90 / 60 / 30',
+  `notified_at` datetime NOT NULL DEFAULT current_timestamp() COMMENT 'วันเวลาที่แจ้งเตือน'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='บันทึก contract expiry notifications ที่ส่งไปแล้ว';
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `customer_blacklists`
 --
 
@@ -902,6 +917,7 @@ CREATE TABLE `investors` (
   `bank_account_name` varchar(255) DEFAULT NULL,
   `passbook_image` varchar(500) DEFAULT NULL COMMENT 'รูปสมุดบัญชี (path)',
   `investor_contract` varchar(500) DEFAULT NULL COMMENT 'สัญญานายทุน (path)',
+  `deposit_slip` varchar(500) DEFAULT NULL COMMENT 'สลิปเงินมัดจำ 1% จากนายทุน (path ไฟล์)',
   `national_id` varchar(20) DEFAULT NULL COMMENT 'เลขบัตรประชาชนนายทุน',
   `national_id_expiry` date DEFAULT NULL COMMENT 'วันหมดอายุบัตรประชาชน',
   `address` text DEFAULT NULL COMMENT 'ที่อยู่ตามทะเบียนบ้าน',
@@ -917,9 +933,9 @@ CREATE TABLE `investors` (
 -- Dumping data for table `investors`
 --
 
-INSERT INTO `investors` (`id`, `investor_code`, `username`, `full_name`, `avatar_url`, `password_hash`, `email`, `phone`, `line_id`, `company_name`, `province`, `bio`, `is_verified`, `status`, `investor_type`, `estimated_budget`, `total_transactions`, `vip_since`, `investor_level`, `sort_order`, `created_at`, `updated_at`, `id_card_image`, `bank_name`, `bank_account_no`, `bank_account_name`, `passbook_image`, `investor_contract`, `national_id`, `national_id_expiry`, `address`, `house_registration_image`, `date_of_birth`, `nationality`, `marital_status`, `spouse_name`, `spouse_national_id`) VALUES
-(3, 'CAP0001', 'cap0001', 'พี่เป้', NULL, '$2b$10$YOoU/9bRA1G6xbB5phWsi.FJfI1QqkV.AOwzUuz6kgHBFFyYyeWB6', 'loandd02@gmail.com', '000000000', '@rrrr', NULL, NULL, NULL, 0, 'active', 'regular', NULL, 0, NULL, '1', 3, '2026-02-18 09:02:03', '2026-02-21 03:50:07', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'ไทย', NULL, NULL, NULL),
-(4, 'CAP0002', 'cap0002', 'มะเมียมะมะมะเมีย', NULL, '$2b$10$2rfNZVvhg30zMWcGQtc9o.qsnaVksMoYAjy5/xNYsZ7hBS5gLXRma', 'wwww@hotmail.com', '1245677874', 'moon', NULL, NULL, NULL, 0, 'active', 'regular', NULL, 0, NULL, '2', 3, '2026-02-23 02:49:33', '2026-03-20 07:44:18', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'ไทย', NULL, NULL, NULL);
+INSERT INTO `investors` (`id`, `investor_code`, `username`, `full_name`, `avatar_url`, `password_hash`, `email`, `phone`, `line_id`, `company_name`, `province`, `bio`, `is_verified`, `status`, `investor_type`, `estimated_budget`, `total_transactions`, `vip_since`, `investor_level`, `sort_order`, `created_at`, `updated_at`, `id_card_image`, `bank_name`, `bank_account_no`, `bank_account_name`, `passbook_image`, `investor_contract`, `deposit_slip`, `national_id`, `national_id_expiry`, `address`, `house_registration_image`, `date_of_birth`, `nationality`, `marital_status`, `spouse_name`, `spouse_national_id`) VALUES
+(3, 'CAP0001', 'cap0001', 'พี่เป้', NULL, '$2b$10$YOoU/9bRA1G6xbB5phWsi.FJfI1QqkV.AOwzUuz6kgHBFFyYyeWB6', 'loandd02@gmail.com', '000000000', '@rrrr', NULL, NULL, NULL, 0, 'active', 'regular', NULL, 0, NULL, '1', 3, '2026-02-18 09:02:03', '2026-02-21 03:50:07', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'ไทย', NULL, NULL, NULL),
+(4, 'CAP0002', 'cap0002', 'มะเมียมะมะมะเมีย', NULL, '$2b$10$2rfNZVvhg30zMWcGQtc9o.qsnaVksMoYAjy5/xNYsZ7hBS5gLXRma', 'wwww@hotmail.com', '1245677874', 'moon', NULL, NULL, NULL, 0, 'active', 'regular', NULL, 0, NULL, '2', 3, '2026-02-23 02:49:33', '2026-03-23 04:36:10', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'ไทย', NULL, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -1129,7 +1145,7 @@ CREATE TABLE `legal_transactions` (
 INSERT INTO `legal_transactions` (`id`, `case_id`, `officer_name`, `visit_date`, `land_office`, `time_slot`, `team`, `legal_status`, `attachment`, `doc_selling_pledge`, `deed_selling_pledge`, `doc_extension`, `deed_extension`, `doc_redemption`, `deed_redemption`, `note`, `created_at`, `updated_at`, `commission_slip`, `tax_receipt`, `broker_contract`, `broker_id`, `commission_amount`, `commission_collected`, `commission_collected_at`, `commission_slip_verified`, `commission_slip_verified_by`, `commission_slip_verified_at`, `case_closeable`, `net_payout`, `payment_method`, `actual_transfer_fee`, `actual_stamp_duty`, `agent_bank_name`, `agent_bank_account_no`, `agent_bank_account_name`, `doc_checklist_json`, `house_reg_prop_legal`, `borrower_id_card_legal`, `closing_check_schedule`, `closing_check_personal`, `closing_check_legal`, `closing_check_docs`) VALUES
 (1, 1, 'ทาย', '2026-02-15', 'ทาย', '50.33', 'q', 'cancelled', 'uploads/legal/attachment/1771473106000-117.jpeg', 'uploads/legal/doc-selling-pledge/1771473106013-742.pdf', 'uploads/legal/deed-selling-pledge/1771473106015-922.jpg', 'uploads/legal/doc-extension/1771473106025-117.jpg', 'uploads/legal/deed-extension/1771473106029-993.jpg', 'uploads/legal/doc-redemption/1771473106039-241.pdf', 'uploads/legal/deed-redemption/1771473106042-51.jpg', NULL, '2026-02-19 03:37:50', '2026-02-27 07:45:12', NULL, NULL, NULL, NULL, NULL, 0, NULL, 0, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0, 0, 0),
 (7, 8, 'may', '2026-02-27', 'สน.มีนบุรี', '09.00 น.', NULL, 'completed', 'uploads/legal/attachment/1772181425052-528.pdf', 'uploads/legal/doc-selling-pledge/1772181425068-453.pdf', 'uploads/legal/deed-selling-pledge/1772181425082-105.jpg', NULL, NULL, NULL, NULL, NULL, '2026-02-27 08:31:41', '2026-02-27 08:37:05', NULL, NULL, NULL, NULL, NULL, 0, NULL, 0, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0, 0, 0),
-(8, 9, 'f', '2026-02-23', 'โคราช', '09.00', NULL, 'completed', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '2026-02-27 08:59:58', '2026-03-23 01:38:58', NULL, NULL, NULL, NULL, NULL, 0, NULL, 0, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '{}', NULL, NULL, 0, 0, 0, 0);
+(8, 9, 'f', '2026-02-23', 'สำนักงานที่ดินกรุงเทพมหานคร สาขามีนบุรี', '09.00', NULL, 'completed', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '2026-02-27 08:59:58', '2026-03-23 08:52:03', NULL, NULL, NULL, NULL, NULL, 0, NULL, 0, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '{}', NULL, NULL, 0, 0, 0, 0);
 
 -- --------------------------------------------------------
 
@@ -1282,9 +1298,9 @@ CREATE TABLE `loan_requests` (
 
 INSERT INTO `loan_requests` (`id`, `debtor_code`, `source`, `user_id`, `property_type`, `has_obligation`, `obligation_amount`, `obligation_count`, `property_address`, `province`, `district`, `subdistrict`, `house_no`, `village_name`, `additional_details`, `location_url`, `deed_number`, `deed_type`, `preliminary_terms`, `land_area`, `road_access`, `seizure_status`, `building_area`, `loan_type`, `loan_type_detail`, `estimated_value`, `loan_amount`, `loan_duration`, `images`, `deed_images`, `contact_name`, `contact_phone`, `contact_email`, `contact_line`, `contact_facebook`, `preferred_contact`, `status`, `admin_note`, `rejection_reason`, `appraised_value`, `approved_amount`, `interest_rate`, `desired_amount`, `occupation`, `monthly_income`, `loan_purpose`, `contract_years`, `net_desired_amount`, `payment_status`, `payment_date`, `created_at`, `updated_at`, `agent_id`, `appraisal_images`, `appraisal_type`, `appraisal_result`, `appraisal_date`, `appraisal_fee`, `slip_image`, `appraisal_book_image`, `appraisal_note`, `appraisal_recorded_by`, `appraisal_recorded_at`, `outside_result`, `outside_reason`, `outside_recorded_at`, `inside_result`, `inside_reason`, `inside_recorded_at`, `check_price_value`, `check_price_detail`, `check_price_recorded_at`, `marital_status`, `bank_account_number`, `bank_name`, `bank_book_file`, `borrower_id_card`, `house_reg_book`, `name_change_doc`, `divorce_doc`, `spouse_id_card`, `spouse_reg_copy`, `marriage_cert`, `single_cert`, `death_cert`, `will_court_doc`, `testator_house_reg`, `lead_source`, `dead_reason`, `customer_gender`, `customer_age`, `existing_debt`, `reject_category`, `reject_alternative`, `sub_district`, `deed_copy`, `building_permit`, `house_reg_prop`, `sale_contract`, `debt_free_cert`, `blueprint`, `property_photos`, `land_tax_receipt`, `maps_url`, `condo_title_deed`, `condo_location_map`, `common_fee_receipt`, `floor_plan`, `location_sketch_map`, `land_use_cert`, `rental_contract`, `business_reg`, `advance_months`, `road_width`, `utility_access`, `flood_risk`, `ineligible_property`, `ineligible_reason`, `screening_status`, `screened_by_id`, `screened_by_name`, `screened_at`, `prop_checklist_json`, `property_video`, `payment_schedule_file`, `bedrooms`, `project_name`, `appraisal_company`, `appraiser_name`, `building_year`, `floors`, `bathrooms`, `rental_rooms`, `rental_price_per_month`, `advance_slip`, `checklist_ticks_json`) VALUES
 (18, 'LDD0001', NULL, NULL, 'house', 'no', NULL, 1, '', 'กาญจนบุรี', 'ทาย', 'ทาย', NULL, NULL, NULL, 'https://www.thaiproperty.in.th/', '123456', NULL, NULL, 'ทาย', NULL, NULL, NULL, NULL, 'mortgage', NULL, 0.00, 12, '[\"uploads/id-cards/1771464867071-498.jpg\",\"uploads/properties/1771465322902-442.jpg\",\"uploads/permits/1771465322903-861.jpg\"]', '[\"uploads/deeds/1771465322897-54.jpg\"]', 'ทาย', '0000000000', NULL, NULL, NULL, 'phone', '', NULL, NULL, NULL, 69999.97, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'paid', NULL, '2026-02-18 02:10:47', '2026-03-21 04:03:25', 1, '[\"uploads/appraisal-properties/1772186181381-70.jpg\",\"uploads/appraisal-properties/1772186184598-895.jpg\"]', 'inside', 'passed', '2026-02-26', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'passed', NULL, '2026-02-27 16:56:35', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '[\"uploads/auction-docs/1774065801310-361.jpg\"]', '0', '0', '0', '0', '0', '0', '0', NULL, '0', '0', '0', '0', '0', '0', '0', '0', NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, '{\"deed_copy\":true}', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '{\"deed_copy\":true}'),
-(29, 'LDD0002', NULL, NULL, 'house', 'no', NULL, NULL, '', 'กรุงเทพมหานคร', 'มีนบุรี', 'มีนบุรี', '23', 'หมู่บ้านโคกน้อย', '5 ห้องนอน', 'https://www.google.com/maps/search/%E0%B8%95%E0%B8%B3%E0%B8%9A%E0%B8%A5%E0%B8%A1%E0%B8%B5%E0%B8%99%E0%B8%9A%E0%B8%B8%E0%B8%A3%E0%B8%B5%20%E0%B8%AD%E0%B8%B3%E0%B9%80%E0%B8%A0%E0%B8%AD%E0%B8%A1%E0%B8%B5%E0%B8%99%E0%B8%9A%E0%B8%B8%E0%B8%A3%E0%B8%B5%20%E0%B8%88%E0%B8%B1%E0%B8%87%E0%B8%AB%E0%B8%A7%E0%B8%B1%E0%B8%94%E0%B8%81%E0%B8%A3%E0%B8%B8%E0%B8%87%E0%B9%80%E0%B8%97%E0%B8%9E%E0%B8%A1%E0%B8%AB%E0%B8%B2%E0%B8%99%E0%B8%84%E0%B8%A3', '106512', 'chanote', NULL, '1 ไร่ 1 งาน 1 ตร.ว.', 'yes', NULL, NULL, NULL, 'selling_pledge', 200000.00, 0.00, 12, '[\"uploads/id-cards/1772172795623-599.jpg\",\"uploads/properties/1772172834242-887.jpg\",\"uploads/properties/1772172838301-631.jpg\",\"uploads/properties/1772172844870-219.jpg\",\"uploads/permits/1772180730973-360.pdf\"]', '[\"uploads/deeds/1772172795628-958.jpg\"]', 'นายธีระวุฒิ ทองไพฑูรย์', '0987654390', NULL, NULL, NULL, 'phone', 'reviewing', NULL, NULL, NULL, 29999.98, 50.00, '900000', 'ร้านค้า', '20000', 'เปิดธุรกิจใหม่', '3', '30000', 'paid', NULL, '2026-02-27 06:13:15', '2026-03-20 10:10:22', NULL, '[\"uploads/appraisal-properties/1772174287034-646.jpg\",\"uploads/appraisal-properties/1772174294229-619.jpg\",\"uploads/appraisal-properties/1772174300032-117.jpg\"]', 'outside', 'passed', '2026-02-20', 3000.00, 'uploads/slips/1772176992133-677.jpg', 'uploads/appraisal-books/1772179447844-355.pdf', NULL, 'fairy', NULL, 'passed', NULL, '2026-02-27 15:04:07', NULL, NULL, NULL, 60000.00, NULL, '2026-02-27 15:04:07', 'married_unreg', NULL, NULL, NULL, '[\"uploads/id-cards/1774001417686-655.png\"]', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '[\"uploads/auction-docs/1773976479384-748.jpg\"]', '0', '0', '0', '0', '0', '0', '0', NULL, '0', '0', '0', '0', '0', '0', '0', '0', NULL, '4to6', 'yes', 'never', 0, NULL, NULL, NULL, NULL, NULL, '{\"deed_copy\":true,\"borrower_id_card\":true}', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '{\"borrower_id_card\":true}'),
-(30, 'LDD0003', NULL, NULL, 'townhouse', 'no', NULL, NULL, '', 'นครราชสีมา', 'นคร', 'นคร', '12', 'นคร', NULL, 'https://www.pinterest.com/pin/34902965860068215/', '2477', 'ns4k', NULL, '69', 'yes', 'none', NULL, NULL, 'mortgage', 7000.00, 0.00, 12, '[\"uploads/id-cards/1772182516545-816.jpg\",\"uploads/properties/1772182516550-166.jpg\",\"uploads/permits/1772182516551-879.jpg\"]', '[\"uploads/deeds/1772182516546-697.jpg\"]', 'ภัทร', '097680', 'loandd55@gmail.com', NULL, NULL, 'phone', 'approved', NULL, NULL, NULL, 3000.00, 1.70, '609', 'ขายน้ำ', '5000', 'งานหยาบ', '3', '500', 'paid', NULL, '2026-02-27 08:55:16', '2026-03-20 09:48:07', 2, '[\"uploads/appraisal-properties/1772182694926-11.jpg\",\"uploads/appraisal-properties/1772182698921-540.jpg\",\"uploads/appraisal-properties/1772182702730-874.jpg\"]', 'inside', 'passed', '2026-02-21', 1000.00, 'uploads/slips/1772182576375-656.jpg', 'uploads/appraisal-books/1772182576375-705.pdf', NULL, 'f', NULL, NULL, NULL, NULL, 'passed', NULL, '2026-02-27 16:58:36', 600000.00, NULL, '2026-03-13 10:55:06', 'married_unreg', NULL, NULL, NULL, '[\"uploads/id-cards/1774000085240-749.png\"]', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'female', NULL, 20000.00, NULL, NULL, NULL, '0', '0', '0', '0', '0', '0', '[\"uploads/auction-docs/1773638161003-703.jpg\"]', '0', NULL, '0', '0', '0', '0', '0', '0', '0', '0', NULL, '4to6', 'yes', 'never', 0, NULL, NULL, NULL, NULL, NULL, '{\"borrower_id_card\":true}', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '{\"borrower_id_card\":true}'),
-(33, 'LDD0004', NULL, NULL, 'apartment', 'no', NULL, NULL, '', 'ระยอง', 'เมืองระยอง', 'ห้วยโป่ง', NULL, 'หมู่ 1', NULL, 'https://www.google.com/maps/@12.7264856,101.423939,16z', '115566', 'chanote', NULL, '1 ไร่ 2 งาน 88 ตร.ว.', 'yes', 'none', NULL, NULL, 'mortgage', 700000.00, 0.00, 12, '[\"uploads/id-cards/1773719841119-762.jpg\"]', NULL, 'นางภิรญา แสงศิริมล', '0955635331', NULL, NULL, NULL, 'phone', '', NULL, NULL, NULL, NULL, 1.50, '2000', 'พนักงานบริษัท ชัยรัชการ(กรุงเทพ) จำกัด', NULL, 'กู้ให้แม่', '7', '4000', 'paid', '2026-02-13', '2026-02-28 04:16:00', '2026-03-21 01:28:33', NULL, '[\"uploads/appraisal-properties/1772446290094-263.jpg\",\"uploads/appraisal-properties/1772446305289-701.jpg\",\"uploads/appraisal-properties/1772446305291-572.jpg\",\"uploads/appraisal-properties/1772446305294-90.jpg\",\"uploads/appraisal-properties/1772446321072-194.jpg\",\"uploads/appraisal-properties/1772446321073-578.jpg\"]', 'outside', 'passed', '2026-02-13', 2888.00, 'uploads/slips/1773305706983-213.jpg', 'uploads/appraisal-books/1772446405711-558.jpg', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1200000.00, NULL, '2026-03-21 08:28:33', 'married_reg', NULL, NULL, NULL, '[\"uploads/id-cards/1773997527259-840.jpg\"]', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'line', NULL, 'male', NULL, NULL, NULL, NULL, NULL, '[\"uploads/auction-docs/1773803024158-625.jpg\"]', '0', '[\"uploads/auction-docs/1773997728562-59.jpg\"]', '0', '0', '0', '[\"uploads/auction-docs/1773295735058-802.jpg\",\"uploads/auction-docs/1773295756010-779.jpg\"]', '[]', NULL, '0', '0', '0', '0', '0', '0', '0', '0', NULL, 'gt6', 'yes', 'never', 0, NULL, 'eligible', 1, NULL, '2026-03-17 16:27:42', '{\"maps_url\":false,\"deed_copy\":true,\"building_permit\":false,\"house_reg_prop\":true,\"sale_contract\":false,\"debt_free_cert\":false,\"property_photos\":true,\"land_tax_receipt\":false,\"blueprint\":false}', NULL, 'uploads/payment-schedules/1773374381071-38.png', NULL, NULL, NULL, NULL, NULL, 8, NULL, 50, 3999.00, NULL, '{\"house_reg_book\":true,\"borrower_id_card\":true}');
+(29, 'LDD0002', NULL, NULL, 'house', 'no', NULL, NULL, '', 'กรุงเทพมหานคร', 'มีนบุรี', 'มีนบุรี', '23', 'หมู่บ้านโคกน้อย', '5 ห้องนอน', 'https://www.google.com/maps/@13.821732026637724,100.73631626085239,16z', '106512', 'chanote', NULL, '1 ไร่ 1 งาน 1 ตร.ว.', 'yes', NULL, NULL, NULL, 'selling_pledge', 200000.00, 0.00, 12, '[\"uploads/id-cards/1772172795623-599.jpg\",\"uploads/properties/1772172834242-887.jpg\",\"uploads/properties/1772172838301-631.jpg\",\"uploads/properties/1772172844870-219.jpg\",\"uploads/permits/1772180730973-360.pdf\"]', '[\"uploads/deeds/1772172795628-958.jpg\"]', 'นายธีระวุฒิ ทองไพฑูรย์', '0987654390', NULL, NULL, NULL, 'phone', 'reviewing', NULL, NULL, NULL, 29999.98, 50.00, '900000', 'ร้านค้า', '20000', 'เปิดธุรกิจใหม่', '3', '30000', 'paid', NULL, '2026-02-27 06:13:15', '2026-03-23 08:24:27', NULL, '[\"uploads/appraisal-properties/1772174287034-646.jpg\",\"uploads/appraisal-properties/1772174294229-619.jpg\",\"uploads/appraisal-properties/1772174300032-117.jpg\"]', 'outside', 'passed', '2026-02-19', 3000.00, 'uploads/slips/1772176992133-677.jpg', 'uploads/appraisal-books/1772179447844-355.pdf', NULL, 'fairy', NULL, 'passed', NULL, '2026-02-27 15:04:07', NULL, NULL, NULL, 60000.00, NULL, '2026-02-27 15:04:07', 'married_unreg', NULL, NULL, NULL, '[\"uploads/id-cards/1774001417686-655.png\"]', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '[\"uploads/auction-docs/1773976479384-748.jpg\"]', '0', '0', '0', '0', '0', '0', '0', NULL, '0', '0', '0', '0', '0', '0', '0', '0', NULL, '4to6', 'yes', 'never', 0, NULL, NULL, NULL, NULL, NULL, '{\"deed_copy\":true,\"borrower_id_card\":true}', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '{\"borrower_id_card\":true}'),
+(30, 'LDD0003', NULL, NULL, 'townhouse', 'no', NULL, NULL, '', 'นครราชสีมา', 'นคร', 'นคร', '12', 'นคร', NULL, 'https://www.pinterest.com/pin/34902965860068215/', '2477', 'ns4k', NULL, '69', 'yes', 'none', NULL, NULL, 'mortgage', 7000.00, 0.00, 12, '[\"uploads/id-cards/1772182516545-816.jpg\",\"uploads/properties/1772182516550-166.jpg\",\"uploads/permits/1772182516551-879.jpg\"]', '[\"uploads/deeds/1772182516546-697.jpg\"]', 'ภัทร', '097680', 'loandd55@gmail.com', NULL, NULL, 'phone', 'approved', NULL, NULL, NULL, 3000.00, 1.70, '609', 'ขายน้ำ', '5000', 'งานหยาบ', '3', '500', 'paid', NULL, '2026-02-27 08:55:16', '2026-03-23 02:56:36', 2, '[\"uploads/appraisal-properties/1772182694926-11.jpg\",\"uploads/appraisal-properties/1772182698921-540.jpg\",\"uploads/appraisal-properties/1772182702730-874.jpg\"]', 'inside', 'passed', '2026-02-20', 1000.00, 'uploads/slips/1772182576375-656.jpg', 'uploads/appraisal-books/1772182576375-705.pdf', NULL, 'f', NULL, NULL, NULL, NULL, 'passed', NULL, '2026-02-27 16:58:36', 600000.00, NULL, '2026-03-13 10:55:06', 'married_unreg', NULL, NULL, NULL, '[\"uploads/id-cards/1774000085240-749.png\"]', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'female', NULL, 20000.00, NULL, NULL, NULL, '0', '0', '0', '0', '0', '0', '[\"uploads/auction-docs/1773638161003-703.jpg\"]', '0', NULL, '0', '0', '0', '0', '0', '0', '0', '0', NULL, '4to6', 'yes', 'never', 0, NULL, NULL, NULL, NULL, NULL, '{\"borrower_id_card\":true}', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '{\"borrower_id_card\":true}'),
+(33, 'LDD0004', NULL, NULL, 'apartment', 'no', NULL, NULL, '', 'ระยอง', 'เมืองระยอง', 'ห้วยโป่ง', NULL, 'หมู่ 1', NULL, 'https://www.google.com/maps/@13.821750543803752,100.73635911151486,16z', '115566', 'chanote', NULL, '1 ไร่ 2 งาน 88 ตร.ว.', 'yes', 'none', NULL, NULL, 'mortgage', 700000.00, 0.00, 12, '[\"uploads/id-cards/1773719841119-762.jpg\"]', NULL, 'นางภิรญา แสงศิริมล', '0955635331', NULL, NULL, NULL, 'phone', '', NULL, NULL, NULL, NULL, 1.50, '2000', 'พนักงานบริษัท ชัยรัชการ(กรุงเทพ) จำกัด', NULL, 'กู้ให้แม่', '7', '4000', 'paid', '2026-02-12', '2026-02-28 04:16:00', '2026-03-23 08:04:45', NULL, '[\"uploads/appraisal-properties/1772446290094-263.jpg\",\"uploads/appraisal-properties/1772446305289-701.jpg\",\"uploads/appraisal-properties/1772446305291-572.jpg\",\"uploads/appraisal-properties/1772446305294-90.jpg\",\"uploads/appraisal-properties/1772446321072-194.jpg\",\"uploads/appraisal-properties/1772446321073-578.jpg\"]', 'outside', 'passed', '2026-02-12', 2888.00, 'uploads/slips/1773305706983-213.jpg', 'uploads/appraisal-books/1772446405711-558.jpg', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1200000.00, NULL, '2026-03-21 08:28:33', 'married_reg', NULL, NULL, NULL, '[\"uploads/id-cards/1773997527259-840.jpg\"]', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'line', NULL, 'male', NULL, NULL, NULL, NULL, NULL, '[\"uploads/auction-docs/1773803024158-625.jpg\"]', '0', '[\"uploads/auction-docs/1773997728562-59.jpg\"]', '0', '0', '0', '[\"uploads/auction-docs/1773295735058-802.jpg\",\"uploads/auction-docs/1773295756010-779.jpg\"]', '[]', NULL, '0', '0', '0', '0', '0', '0', '0', '0', NULL, 'gt6', 'yes', 'never', 0, NULL, 'eligible', 1, NULL, '2026-03-17 16:27:42', '{\"maps_url\":false,\"deed_copy\":true,\"building_permit\":false,\"house_reg_prop\":true,\"sale_contract\":false,\"debt_free_cert\":false,\"property_photos\":true,\"land_tax_receipt\":false,\"blueprint\":false}', NULL, 'uploads/payment-schedules/1773374381071-38.png', NULL, NULL, NULL, NULL, NULL, 8, NULL, 50, 3999.00, NULL, '{\"house_reg_book\":true,\"borrower_id_card\":true}');
 
 -- --------------------------------------------------------
 
@@ -1467,7 +1483,9 @@ INSERT INTO `notifications` (`id`, `type`, `loan_request_id`, `case_id`, `from_d
 (144, 'internal', 29, 8, NULL, 'all', NULL, NULL, NULL, NULL, 'เตรียมเอกสาร', 'เคส LDD0002 (นายธีระวุฒิ ทองไพฑูรย์) อยู่ระหว่างเตรียมเอกสารนิติกรรม', NULL, 'preparing_docs', 0, 0, NULL, NULL, '/issuing/edit/8', 1, '2026-03-21 09:34:33'),
 (145, 'internal', 29, 8, NULL, 'all', NULL, NULL, NULL, NULL, 'ออกสัญญาเรียบร้อย', 'เคส LDD0002 (นายธีระวุฒิ ทองไพฑูรย์) ออกสัญญาเรียบร้อยแล้ว', NULL, 'issuing_sent', 0, 0, NULL, NULL, '/issuing/edit/8', 1, '2026-03-21 09:35:08'),
 (146, 'internal', 29, 8, NULL, 'all', NULL, NULL, NULL, NULL, 'เตรียมเอกสาร', 'เคส LDD0002 (นายธีระวุฒิ ทองไพฑูรย์) อยู่ระหว่างเตรียมเอกสารนิติกรรม', NULL, 'preparing_docs', 0, 0, NULL, NULL, '/issuing/edit/8', 1, '2026-03-21 09:35:08'),
-(147, 'internal', 30, 9, NULL, 'all', NULL, NULL, NULL, NULL, 'นิติกรรมเสร็จสิ้น', 'เคส LDD0003 (ภัทร) ทำธุรกรรมเรียบร้อยแล้ว', NULL, 'legal_completed', 0, 0, NULL, NULL, '/legal/edit/9', 1, '2026-03-23 08:38:58');
+(147, 'internal', 30, 9, NULL, 'all', NULL, NULL, NULL, NULL, 'นิติกรรมเสร็จสิ้น', 'เคส LDD0003 (ภัทร) ทำธุรกรรมเรียบร้อยแล้ว', NULL, 'legal_completed', 0, 0, NULL, NULL, '/legal/edit/9', 1, '2026-03-23 08:38:58'),
+(148, 'internal', 30, 9, NULL, 'all', NULL, NULL, NULL, NULL, 'นิติกรรมเสร็จสิ้น', 'เคส LDD0003 (ภัทร) ทำธุรกรรมเรียบร้อยแล้ว', NULL, 'legal_completed', 0, 0, NULL, NULL, '/legal/edit/9', 1, '2026-03-23 15:51:50'),
+(149, 'internal', 30, 9, NULL, 'all', NULL, NULL, NULL, NULL, 'นิติกรรมเสร็จสิ้น', 'เคส LDD0003 (ภัทร) ทำธุรกรรมเรียบร้อยแล้ว', NULL, 'legal_completed', 0, 0, NULL, NULL, '/legal/edit/9', 1, '2026-03-23 15:52:03');
 
 -- --------------------------------------------------------
 
@@ -1630,7 +1648,14 @@ INSERT INTO `notification_reads` (`notification_id`, `user_id`, `read_at`) VALUE
 (139, 1, '2026-03-21 09:26:12'),
 (140, 1, '2026-03-21 09:26:12'),
 (141, 1, '2026-03-21 09:26:12'),
-(142, 1, '2026-03-21 09:26:12');
+(142, 1, '2026-03-21 09:26:12'),
+(143, 1, '2026-03-23 10:37:08'),
+(144, 1, '2026-03-23 10:37:08'),
+(145, 1, '2026-03-23 10:37:08'),
+(146, 1, '2026-03-23 10:37:08'),
+(147, 1, '2026-03-23 10:37:08'),
+(148, 1, '2026-03-24 09:00:36'),
+(149, 1, '2026-03-24 09:00:36');
 
 -- --------------------------------------------------------
 
@@ -1673,62 +1698,6 @@ INSERT INTO `provinces` (`id`, `name`, `slug`, `region`, `is_popular`, `sort_ord
 (17, 'ประจวบคีรีขันธ์', 'prachuapkhirikhan', 'ภาคตะวันตก', 1, 17, 1, '2026-02-16 03:33:06'),
 (18, 'เพชรบุรี', 'phetchaburi', 'ภาคตะวันตก', 1, 18, 1, '2026-02-16 03:33:06'),
 (19, 'อื่นๆ', 'others', 'อื่นๆ', 1, 99, 1, '2026-02-16 03:33:06');
-
--- --------------------------------------------------------
-
---
--- Table structure for table `sales_scripts`
---
-
-CREATE TABLE `sales_scripts` (
-  `id` int(11) NOT NULL,
-  `script_name` varchar(200) NOT NULL COMMENT 'ชื่อสคริปต์',
-  `stage` varchar(50) DEFAULT NULL COMMENT 'ใช้ในขั้นตอนไหน: chat, call, followup',
-  `content` text NOT NULL COMMENT 'เนื้อหาสคริปต์',
-  `sort_order` int(11) DEFAULT 0,
-  `is_active` tinyint(1) DEFAULT 1,
-  `created_by` int(11) DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='สคริปต์/เช็คลิสสำหรับเซลล์ใช้คุยกับลูกค้า';
-
---
--- Dumping data for table `sales_scripts`
---
-
-INSERT INTO `sales_scripts` (`id`, `script_name`, `stage`, `content`, `sort_order`, `is_active`, `created_by`, `created_at`, `updated_at`) VALUES
-(1, 'สคริปต์คุยลูกค้าใหม่ (First Contact)', 'chat', 'สคริปต์สำหรับคุยกับลูกค้าที่ทักเข้ามาครั้งแรก', 1, 1, NULL, '2026-03-11 02:47:14', '2026-03-11 02:47:14');
-
--- --------------------------------------------------------
-
---
--- Table structure for table `sales_script_items`
---
-
-CREATE TABLE `sales_script_items` (
-  `id` int(11) NOT NULL,
-  `script_id` int(11) NOT NULL COMMENT 'FK → sales_scripts.id',
-  `question` varchar(500) NOT NULL COMMENT 'คำถาม/สิ่งที่ต้องถาม',
-  `field_mapping` varchar(100) DEFAULT NULL COMMENT 'map กับ field ไหนใน CRM เช่น contact_name, property_type',
-  `is_required` tinyint(1) DEFAULT 1,
-  `sort_order` int(11) DEFAULT 0,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='รายการคำถามในแต่ละสคริปต์';
-
---
--- Dumping data for table `sales_script_items`
---
-
-INSERT INTO `sales_script_items` (`id`, `script_id`, `question`, `field_mapping`, `is_required`, `sort_order`, `created_at`) VALUES
-(1, 1, 'คุณพี่ชื่ออะไรคะ', 'contact_name', 1, 1, '2026-03-11 02:47:14'),
-(2, 1, 'เบอร์โทรติดต่อ', 'contact_phone', 1, 2, '2026-03-11 02:47:14'),
-(3, 1, 'ประเภททรัพย์ (บ้าน/คอนโด/ทาวน์เฮ้าส์/ตึกแถว/ที่ดินเปล่า)', 'property_type', 1, 3, '2026-03-11 02:47:14'),
-(4, 1, 'โลเคชั่นอยู่ที่ไหน (จังหวัด/อำเภอ)', 'location_hint', 1, 4, '2026-03-11 02:47:14'),
-(5, 1, 'ต้องการใช้เงินเท่าไหร่', 'desired_amount', 1, 5, '2026-03-11 02:47:14'),
-(6, 1, 'บ้านพี่ซื้อมาเท่าไหร่ (มูลค่าเบื้องต้น)', 'estimated_value', 1, 6, '2026-03-11 02:47:14'),
-(7, 1, 'มีภาระติดจำนองไหม / ติดอยู่ที่ไหน / เท่าไหร่', 'has_obligation', 1, 7, '2026-03-11 02:47:14'),
-(8, 1, 'สนใจขายฝากหรือจำนอง (แจ้ง LTV 50%/30%)', 'loan_type_detail', 1, 8, '2026-03-11 02:47:14'),
-(9, 1, 'ทำสัญญากี่ปี', 'contract_years', 1, 9, '2026-03-11 02:47:14');
 
 --
 -- Indexes for dumped tables
@@ -1879,19 +1848,20 @@ ALTER TABLE `chat_tags`
   ADD KEY `idx_sort` (`sort_order`);
 
 --
+-- Indexes for table `contract_expiry_logs`
+--
+ALTER TABLE `contract_expiry_logs`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `unique_case_days` (`case_id`,`days_before`) COMMENT 'ป้องกันส่งซ้ำ',
+  ADD KEY `idx_case_id` (`case_id`);
+
+--
 -- Indexes for table `customer_blacklists`
 --
 ALTER TABLE `customer_blacklists`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `uk_phone` (`phone`),
   ADD KEY `idx_is_active` (`is_active`);
-
---
--- Indexes for table `dead_lead_reasons`
---
-ALTER TABLE `dead_lead_reasons`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uk_reason_code` (`reason_code`);
 
 --
 -- Indexes for table `debtor_accounting`
@@ -1901,27 +1871,6 @@ ALTER TABLE `debtor_accounting`
   ADD UNIQUE KEY `uk_case` (`case_id`),
   ADD KEY `loan_request_id` (`loan_request_id`),
   ADD KEY `idx_case_id` (`case_id`);
-
---
--- Indexes for table `document_checklist_items`
---
-ALTER TABLE `document_checklist_items`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_template` (`template_id`);
-
---
--- Indexes for table `document_checklist_templates`
---
-ALTER TABLE `document_checklist_templates`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_option_code` (`option_code`);
-
---
--- Indexes for table `document_templates`
---
-ALTER TABLE `document_templates`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `template_code` (`template_code`);
 
 --
 -- Indexes for table `investors`
@@ -2017,19 +1966,6 @@ ALTER TABLE `notification_reads`
 --
 ALTER TABLE `provinces`
   ADD PRIMARY KEY (`id`);
-
---
--- Indexes for table `sales_scripts`
---
-ALTER TABLE `sales_scripts`
-  ADD PRIMARY KEY (`id`);
-
---
--- Indexes for table `sales_script_items`
---
-ALTER TABLE `sales_script_items`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_script` (`script_id`);
 
 --
 -- AUTO_INCREMENT for dumped tables
@@ -2138,40 +2074,22 @@ ALTER TABLE `chat_tags`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
+-- AUTO_INCREMENT for table `contract_expiry_logs`
+--
+ALTER TABLE `contract_expiry_logs`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `customer_blacklists`
 --
 ALTER TABLE `customer_blacklists`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT for table `dead_lead_reasons`
---
-ALTER TABLE `dead_lead_reasons`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=34;
-
---
 -- AUTO_INCREMENT for table `debtor_accounting`
 --
 ALTER TABLE `debtor_accounting`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
-
---
--- AUTO_INCREMENT for table `document_checklist_items`
---
-ALTER TABLE `document_checklist_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=27;
-
---
--- AUTO_INCREMENT for table `document_checklist_templates`
---
-ALTER TABLE `document_checklist_templates`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
-
---
--- AUTO_INCREMENT for table `document_templates`
---
-ALTER TABLE `document_templates`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `investors`
@@ -2225,25 +2143,13 @@ ALTER TABLE `loan_requests`
 -- AUTO_INCREMENT for table `notifications`
 --
 ALTER TABLE `notifications`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=148;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=150;
 
 --
 -- AUTO_INCREMENT for table `provinces`
 --
 ALTER TABLE `provinces`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
-
---
--- AUTO_INCREMENT for table `sales_scripts`
---
-ALTER TABLE `sales_scripts`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
-
---
--- AUTO_INCREMENT for table `sales_script_items`
---
-ALTER TABLE `sales_script_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- Constraints for dumped tables

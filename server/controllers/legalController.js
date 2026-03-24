@@ -12,9 +12,12 @@ const folderMap = {
   deed_extension: 'deed-extension',
   doc_redemption: 'doc-redemption',
   deed_redemption: 'deed-redemption',
-  transaction_slip: 'transaction-slip', // ★ สลิปค่าปากถุง (บันทึกลง cases)
-  advance_slip:    'advance-slip',     // ★ สลิปค่าหักล่วงหน้า (บันทึกลง cases)
-  tax_receipt:     'tax-receipt',      // ★ ใบเสร็จค่าธรรมเนียม/ภาษี
+  transaction_slip:   'transaction-slip',   // ★ สลิปค่าปากถุง (บันทึกลง cases)
+  advance_slip:       'advance-slip',        // ★ สลิปค่าหักล่วงหน้า (บันทึกลง cases)
+  tax_receipt:        'tax-receipt',         // ★ ใบเสร็จค่าธรรมเนียม/ภาษี
+  agent_bank_book:    'agent-bank-book',     // ★ สมุดบัญชีนายหน้า
+  debtor_bank_book:   'debtor-bank-book',    // ★ สมุดบัญชีลูกหนี้
+  investor_bank_book: 'investor-bank-book',  // ★ สมุดบัญชีนายทุน
 }
 
 // ========== สถิติฝ่ายนิติกรรม ==========
@@ -144,6 +147,17 @@ function fetchLegalDetail(caseId, res) {
       lt.note, lt.created_at AS legal_created_at, lt.updated_at AS legal_updated_at,
       lt.net_payout, lt.payment_method, lt.actual_transfer_fee, lt.actual_stamp_duty,
       lt.agent_bank_name, lt.agent_bank_account_no, lt.agent_bank_account_name,
+      lt.agent_payment_slip, lt.agent_bank_book,
+      -- ★ บัญชีลูกหนี้
+      lr.bank_name AS debtor_bank_name, lr.bank_account_number AS debtor_bank_account_no,
+      NULL AS debtor_bank_account_name, lr.bank_book_file AS debtor_bank_book,
+      -- ★ บัญชีนายทุน per-case (จาก auction_transactions)
+      auc.bank_name AS investor_bank_name, auc.bank_account_no AS investor_bank_account_no,
+      auc.bank_account_name AS investor_bank_account_name, auc.bank_book_file AS investor_bank_book,
+      -- ★ บัญชีนายทุน profile (จาก investors)
+      inv.bank_name AS investor_bank_name_profile,
+      inv.bank_account_number AS investor_bank_account_no_profile,
+      inv.bank_account_name AS investor_bank_account_name_profile,
       lt.doc_checklist_json,
       c.broker_contract_file AS issuing_broker_contract,
       c.broker_id_file AS issuing_broker_id,
@@ -158,11 +172,15 @@ function fetchLegalDetail(caseId, res) {
       a.id_card_image AS agent_id_card_image,
       a.house_registration_image AS agent_house_registration_image,
       a.contract_file AS agent_contract_file_profile,
-      -- ★ Investor info from auction (for contract)
+      a.bank_name AS agent_bank_name_profile,
+      a.bank_account_number AS agent_bank_account_no_profile,
+      a.bank_account_name AS agent_bank_account_name_profile,
+      a.payment_slip AS agent_payment_slip_profile,
+      -- ★ Investor info (จาก auction_transactions)
       auc.investor_name, auc.investor_code, auc.investor_phone,
       auc.property_value AS auction_property_value,
       auc.house_reg_book_legal, auc.spouse_consent_doc, auc.spouse_name_change_doc,
-      -- ★ Investor profile (full personal data for legal docs)
+      -- ★ Investor profile (จาก investors)
       inv.full_name AS investor_full_name,
       inv.national_id AS investor_national_id,
       inv.national_id_expiry AS investor_national_id_expiry,
@@ -191,11 +209,30 @@ function fetchLegalDetail(caseId, res) {
     LEFT JOIN legal_transactions lt ON lt.case_id = c.id
     LEFT JOIN approval_transactions at2 ON at2.loan_request_id = c.loan_request_id
     LEFT JOIN agents a ON a.id = c.agent_id
-    LEFT JOIN auction_transactions auc ON auc.case_id = c.id AND auc.is_cancelled = 0
+    LEFT JOIN auction_transactions auc ON auc.case_id = c.id
     LEFT JOIN investors inv ON inv.id = auc.investor_id
     WHERE c.id = ?
   `
+  const isTableError = (e) => e && (
+    e.code === 'ER_NO_SUCH_TABLE' || e.code === 'ER_BAD_FIELD_ERROR' || e.errno === 1932
+  )
   db.query(sql, [caseId], (err, results) => {
+    if (isTableError(err)) {
+      // Fallback: ตัด auction_transactions + investors ออก
+      const sqlSafe = sql
+        .replace('LEFT JOIN auction_transactions auc ON auc.case_id = c.id', '')
+        .replace('LEFT JOIN investors inv ON inv.id = auc.investor_id', '')
+        .replace(/auc\.\w+(\s+AS\s+\w+)?/g, 'NULL$1')
+        .replace(/inv\.\w+(\s+AS\s+\w+)?/g, 'NULL$1')
+      return db.query(sqlSafe, [caseId], (err2, results2) => {
+        if (err2) {
+          console.error('fetchLegalDetail fallback error:', err2)
+          return res.status(500).json({ success: false, message: 'Server Error' })
+        }
+        if (results2.length === 0) return res.status(404).json({ success: false, message: 'ไม่พบข้อมูลเคส' })
+        res.json({ success: true, caseData: results2[0] })
+      })
+    }
     if (err) {
       console.error('fetchLegalDetail error:', err)
       return res.status(500).json({ success: false, message: 'Server Error' })
@@ -213,6 +250,8 @@ exports.updateLegal = (req, res) => {
     officer_name, visit_date, land_office, time_slot, team, legal_status, note,
     net_payout, payment_method, actual_transfer_fee, actual_stamp_duty,  // ★ Financial Protocol
     agent_bank_name, agent_bank_account_no, agent_bank_account_name,     // ★ บัญชีนายหน้า
+    debtor_bank_name, debtor_bank_account_no, debtor_bank_account_name,  // ★ บัญชีลูกหนี้
+    investor_bank_name, investor_bank_account_no, investor_bank_account_name, // ★ บัญชีนายทุน
     investor_marital_status,                                              // ★ สถานะภาพนายทุน (SOP 2.3.3)
     doc_checklist_json,                                                   // ★ SOP Document Checklist tick state
     contract_start_date, contract_end_date,                               // ★ วันทำสัญญา + วันหมดอายุ
@@ -282,6 +321,105 @@ exports.updateLegal = (req, res) => {
       const advPath = `uploads/legal/advance-slip/${files['advance_slip'][0].filename}`
       db.query('UPDATE cases SET advance_slip=? WHERE id=?', [advPath, caseId], (errAdv) => {
         if (errAdv) console.error('[legalController] update advance_slip error:', errAdv)
+      })
+    }
+
+    // ★ agent_bank_book — สมุดบัญชีนายหน้า (OCR ทาง client, เก็บไฟล์ใน legal_transactions)
+    if (files['agent_bank_book'] && files['agent_bank_book'].length > 0) {
+      const bookPath = `uploads/legal/agent-bank-book/${files['agent_bank_book'][0].filename}`
+      fields.push('agent_bank_book=?')
+      values.push(bookPath)
+      // sync กลับ agents table (bank_book_file)
+      db.query('SELECT lr.agent_id FROM cases c JOIN loan_requests lr ON lr.id=c.loan_request_id WHERE c.id=?', [caseId], (errBk, bkRows) => {
+        if (!errBk && bkRows.length && bkRows[0].agent_id) {
+          db.query('UPDATE agents SET bank_book_file=? WHERE id=?', [bookPath, bkRows[0].agent_id], () => {})
+        }
+      })
+    }
+
+    // ★ agent_payment_slip — เก็บใน legal_transactions + sync กลับ agents table
+    if (files['agent_payment_slip'] && files['agent_payment_slip'].length > 0) {
+      const slipPath = `uploads/legal/agent-payment-slip/${files['agent_payment_slip'][0].filename}`
+      fields.push('agent_payment_slip=?')
+      values.push(slipPath)
+      // sync กลับ agents table
+      db.query('SELECT lr.agent_id FROM cases c JOIN loan_requests lr ON lr.id=c.loan_request_id WHERE c.id=?', [caseId], (errA, agentRows) => {
+        if (!errA && agentRows.length && agentRows[0].agent_id) {
+          db.query('UPDATE agents SET payment_slip=? WHERE id=?', [slipPath, agentRows[0].agent_id], (errSync) => {
+            if (errSync) console.error('[legal] sync agent payment_slip error:', errSync)
+          })
+        }
+      })
+    }
+
+    // ★ sync agent bank fields กลับ agents table (เมื่อฝ่ายนิติกรอก)
+    if (agent_bank_name !== undefined || agent_bank_account_no !== undefined || agent_bank_account_name !== undefined) {
+      const syncFields = []
+      const syncVals = []
+      if (agent_bank_name !== undefined) { syncFields.push('bank_name=?'); syncVals.push(agent_bank_name || null) }
+      if (agent_bank_account_no !== undefined) { syncFields.push('bank_account_number=?'); syncVals.push(agent_bank_account_no || null) }
+      if (agent_bank_account_name !== undefined) { syncFields.push('bank_account_name=?'); syncVals.push(agent_bank_account_name || null) }
+      if (syncFields.length > 0) {
+        db.query('SELECT lr.agent_id FROM cases c JOIN loan_requests lr ON lr.id=c.loan_request_id WHERE c.id=?', [caseId], (errA2, rows2) => {
+          if (!errA2 && rows2.length && rows2[0].agent_id) {
+            syncVals.push(rows2[0].agent_id)
+            db.query(`UPDATE agents SET ${syncFields.join(', ')} WHERE id=?`, syncVals, (errSync2) => {
+              if (errSync2) console.error('[legal] sync agent bank error:', errSync2)
+            })
+          }
+        })
+      }
+    }
+
+    // ★ บัญชีลูกหนี้ — เก็บใน loan_requests
+    if (debtor_bank_name !== undefined || debtor_bank_account_no !== undefined || debtor_bank_account_name !== undefined) {
+      db.query('SELECT loan_request_id FROM cases WHERE id=?', [caseId], (errDlr, dlrRows) => {
+        if (!errDlr && dlrRows.length && dlrRows[0].loan_request_id) {
+          const dFields = []; const dVals = []
+          if (debtor_bank_name !== undefined) { dFields.push('bank_name=?'); dVals.push(debtor_bank_name || null) }
+          if (debtor_bank_account_no !== undefined) { dFields.push('bank_account_number=?'); dVals.push(debtor_bank_account_no || null) }
+          if (debtor_bank_account_name !== undefined) { dFields.push('bank_account_name=?'); dVals.push(debtor_bank_account_name || null) }
+          if (dFields.length) {
+            dVals.push(dlrRows[0].loan_request_id)
+            db.query(`UPDATE loan_requests SET ${dFields.join(', ')} WHERE id=?`, dVals, (errD) => {
+              if (errD) console.error('[legal] update debtor bank error:', errD)
+            })
+          }
+        }
+      })
+    }
+
+    // ★ สมุดบัญชีลูกหนี้ — อัพโหลดและเก็บใน loan_requests.bank_book_file
+    if (files['debtor_bank_book'] && files['debtor_bank_book'].length > 0) {
+      const bookPath = `uploads/legal/debtor-bank-book/${files['debtor_bank_book'][0].filename}`
+      db.query('SELECT loan_request_id FROM cases WHERE id=?', [caseId], (errDlr2, dlrRows2) => {
+        if (!errDlr2 && dlrRows2.length && dlrRows2[0].loan_request_id) {
+          db.query('UPDATE loan_requests SET bank_book_file=? WHERE id=?', [bookPath, dlrRows2[0].loan_request_id], (errDB) => {
+            if (errDB) console.error('[legal] update debtor bank_book_file error:', errDB)
+          })
+        }
+      })
+    }
+
+    // ★ บัญชีนายทุน — เก็บใน auction_transactions
+    if (investor_bank_name !== undefined || investor_bank_account_no !== undefined || investor_bank_account_name !== undefined) {
+      const iFields = []; const iVals = []
+      if (investor_bank_name !== undefined) { iFields.push('bank_name=?'); iVals.push(investor_bank_name || null) }
+      if (investor_bank_account_no !== undefined) { iFields.push('bank_account_no=?'); iVals.push(investor_bank_account_no || null) }
+      if (investor_bank_account_name !== undefined) { iFields.push('bank_account_name=?'); iVals.push(investor_bank_account_name || null) }
+      if (iFields.length) {
+        iVals.push(caseId)
+        db.query(`UPDATE auction_transactions SET ${iFields.join(', ')} WHERE case_id=? AND is_cancelled=0`, iVals, (errI) => {
+          if (errI) console.error('[legal] update investor bank error:', errI)
+        })
+      }
+    }
+
+    // ★ สมุดบัญชีนายทุน — อัพโหลดและเก็บใน auction_transactions.bank_book_file
+    if (files['investor_bank_book'] && files['investor_bank_book'].length > 0) {
+      const bookPath = `uploads/legal/investor-bank-book/${files['investor_bank_book'][0].filename}`
+      db.query('UPDATE auction_transactions SET bank_book_file=? WHERE case_id=? AND is_cancelled=0', [bookPath, caseId], (errIB) => {
+        if (errIB) console.error('[legal] update investor bank_book_file error:', errIB)
       })
     }
 

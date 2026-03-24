@@ -530,6 +530,14 @@ export default function LegalEditPage() {
     agent_bank_name: '',
     agent_bank_account_no: '',
     agent_bank_account_name: '',
+    // ★ บัญชีลูกหนี้ (สำหรับรับเงิน)
+    debtor_bank_name: '',
+    debtor_bank_account_no: '',
+    debtor_bank_account_name: '',
+    // ★ บัญชีนายทุน (สำหรับสัญญา)
+    investor_bank_name: '',
+    investor_bank_account_no: '',
+    investor_bank_account_name: '',
     // ★ สถานะภาพนายทุน (SOP ฝ่ายนิติกรรม 2.3.3)
     investor_marital_status: '',
     // ★ Checklist ก่อนนัดกรมที่ดิน
@@ -551,6 +559,20 @@ export default function LegalEditPage() {
   const advanceSlipRef = useRef(null)           // ★ สลิปค่าหักล่วงหน้า
   const taxReceiptRef = useRef(null)            // ★ ใบเสร็จค่าธรรมเนียม/ภาษี
   const borrowerIdCardLegalRef = useRef(null)   // ★ บัตรประชาชนเจ้าของทรัพย์
+  const agentPaymentSlipRef = useRef(null)      // ★ สลิปค่านายหน้า (ฝ่ายนิติอัพโหลด)
+  const agentBankBookRef = useRef(null)         // ★ หน้าสมุดบัญชีนายหน้า (OCR โดยฝ่ายนิติ)
+  const debtorBankBookRef = useRef(null)        // ★ หน้าสมุดบัญชีลูกหนี้ (OCR โดยฝ่ายนิติ)
+  const investorBankBookRef = useRef(null)      // ★ หน้าสมุดบัญชีนายทุน (OCR โดยฝ่ายนิติ)
+
+  // ★ Passbook OCR state — นายหน้า
+  const [passbookOcrLoading, setPassbookOcrLoading] = useState(false)
+  const [passbookOcrMsg, setPassbookOcrMsg] = useState('')
+  // ★ Passbook OCR state — ลูกหนี้
+  const [debtorPassbookOcrLoading, setDebtorPassbookOcrLoading] = useState(false)
+  const [debtorPassbookOcrMsg, setDebtorPassbookOcrMsg] = useState('')
+  // ★ Passbook OCR state — นายทุน
+  const [investorPassbookOcrLoading, setInvestorPassbookOcrLoading] = useState(false)
+  const [investorPassbookOcrMsg, setInvestorPassbookOcrMsg] = useState('')
 
   const [fileNames, setFileNames] = useState({
     attachment: '', doc_selling_pledge: '', deed_selling_pledge: '',
@@ -606,10 +628,16 @@ export default function LegalEditPage() {
             payment_method: c.payment_method || '',
             actual_transfer_fee: c.actual_transfer_fee || '',
             actual_stamp_duty: c.actual_stamp_duty || '',
-            // ★ บัญชีนายหน้า
-            agent_bank_name: c.agent_bank_name || '',
-            agent_bank_account_no: c.agent_bank_account_no || '',
-            agent_bank_account_name: c.agent_bank_account_name || '',
+            // ★ บัญชีนายหน้า (lt มีค่า fallback จาก agent profile)
+            agent_bank_name: c.agent_bank_name || c.agent_bank_name_profile || '',
+            agent_bank_account_no: c.agent_bank_account_no || c.agent_bank_account_no_profile || '',
+            agent_bank_account_name: c.agent_bank_account_name || c.agent_bank_account_name_profile || '',
+            debtor_bank_name: c.debtor_bank_name || '',
+            debtor_bank_account_no: c.debtor_bank_account_no || '',
+            debtor_bank_account_name: c.debtor_bank_account_name || '',
+            investor_bank_name: c.investor_bank_name || c.investor_bank_name_profile || '',
+            investor_bank_account_no: c.investor_bank_account_no || c.investor_bank_account_no_profile || '',
+            investor_bank_account_name: c.investor_bank_account_name || c.investor_bank_account_name_profile || '',
             // ★ สถานะภาพนายทุน
             investor_marital_status: c.investor_marital_status || '',
             // ★ Checklist ก่อนนัดกรมที่ดิน
@@ -686,6 +714,117 @@ export default function LegalEditPage() {
     } catch { alert('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้') }
   }
 
+  // ★ Passbook OCR — อ่านสมุดบัญชีนายหน้า → auto-fill ข้อมูลธนาคาร
+  const handlePassbookOcr = async (file) => {
+    if (!file) return
+    setPassbookOcrLoading(true)
+    setPassbookOcrMsg('')
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('doc_type', 'passbook')
+      const res = await fetch('/api/admin/ocr/extract', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token()}` },
+        body: fd,
+      })
+      const data = await res.json()
+      if (data.success && data.extracted) {
+        const ex = data.extracted
+        const updates = {}
+        if (ex.bank_name)      updates.agent_bank_name = ex.bank_name
+        if (ex.account_number) updates.agent_bank_account_no = ex.account_number
+        if (ex.account_name)   updates.agent_bank_account_name = ex.account_name
+        if (Object.keys(updates).length > 0) {
+          setLegalForm(prev => ({ ...prev, ...updates }))
+          setPassbookOcrMsg('✅ OCR สำเร็จ — ตรวจสอบข้อมูลธนาคารด้วยนะคะ')
+        } else {
+          setPassbookOcrMsg('⚠️ OCR อ่านไม่ได้ — กรอกเองได้เลยค่ะ')
+        }
+      } else {
+        setPassbookOcrMsg('⚠️ OCR อ่านไม่ได้ — กรอกเองได้เลยค่ะ')
+      }
+    } catch {
+      setPassbookOcrMsg('⚠️ OCR ล้มเหลว')
+    } finally {
+      setPassbookOcrLoading(false)
+    }
+  }
+
+  // ★ Passbook OCR — ลูกหนี้
+  const handleDebtorPassbookOcr = async (file) => {
+    if (!file) return
+    setDebtorPassbookOcrLoading(true)
+    setDebtorPassbookOcrMsg('')
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('doc_type', 'passbook')
+      const res = await fetch('/api/admin/ocr/extract', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token()}` },
+        body: fd,
+      })
+      const data = await res.json()
+      if (data.success && data.extracted) {
+        const ex = data.extracted
+        const updates = {}
+        if (ex.bank_name)      updates.debtor_bank_name = ex.bank_name
+        if (ex.account_number) updates.debtor_bank_account_no = ex.account_number
+        if (ex.account_name)   updates.debtor_bank_account_name = ex.account_name
+        if (Object.keys(updates).length > 0) {
+          setLegalForm(prev => ({ ...prev, ...updates }))
+          setDebtorPassbookOcrMsg('✅ OCR สำเร็จ — ตรวจสอบข้อมูลธนาคารด้วยนะคะ')
+        } else {
+          setDebtorPassbookOcrMsg('⚠️ OCR อ่านไม่ได้ — กรอกเองได้เลยค่ะ')
+        }
+      } else {
+        setDebtorPassbookOcrMsg('⚠️ OCR อ่านไม่ได้ — กรอกเองได้เลยค่ะ')
+      }
+    } catch {
+      setDebtorPassbookOcrMsg('⚠️ OCR ล้มเหลว')
+    } finally {
+      setDebtorPassbookOcrLoading(false)
+    }
+  }
+
+  // ★ Passbook OCR — นายทุน
+  const handleInvestorPassbookOcr = async (file) => {
+    if (!file) return
+    setInvestorPassbookOcrLoading(true)
+    setInvestorPassbookOcrMsg('')
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('doc_type', 'passbook')
+      const res = await fetch('/api/admin/ocr/extract', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token()}` },
+        body: fd,
+      })
+      const data = await res.json()
+      if (data.success && data.extracted) {
+        const ex = data.extracted
+        const updates = {}
+        if (ex.bank_name)      updates.investor_bank_name = ex.bank_name
+        if (ex.account_number) updates.investor_bank_account_no = ex.account_number
+        if (ex.account_name)   updates.investor_bank_account_name = ex.account_name
+        if (Object.keys(updates).length > 0) {
+          setLegalForm(prev => ({ ...prev, ...updates }))
+          setInvestorPassbookOcrMsg('✅ OCR สำเร็จ — ตรวจสอบข้อมูลธนาคารด้วยนะคะ')
+        } else {
+          setInvestorPassbookOcrMsg('⚠️ OCR อ่านไม่ได้ — กรอกเองได้เลยค่ะ')
+        }
+      } else {
+        setInvestorPassbookOcrMsg('⚠️ OCR อ่านไม่ได้ — กรอกเองได้เลยค่ะ')
+      }
+    } catch {
+      setInvestorPassbookOcrMsg('⚠️ OCR ล้มเหลว')
+    } finally {
+      setInvestorPassbookOcrLoading(false)
+    }
+  }
+
   // บันทึกข้อมูลฝ่ายนิติกรรม
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -705,6 +844,10 @@ export default function LegalEditPage() {
         advance_slip: advanceSlipRef,
         tax_receipt: taxReceiptRef,
         borrower_id_card_legal: borrowerIdCardLegalRef,
+        agent_payment_slip: agentPaymentSlipRef,
+        agent_bank_book: agentBankBookRef,
+        debtor_bank_book: debtorBankBookRef,
+        investor_bank_book: investorBankBookRef,
       }
       Object.entries(docRefs).forEach(([k, ref]) => { if (ref.current?.files[0]) fd.append(k, ref.current.files[0]) })
       // เพิ่ม notify_types
@@ -943,6 +1086,165 @@ export default function LegalEditPage() {
                   )}
                 </div>
               )}
+
+              {/* ★ บัญชีธนาคารนายหน้า + สมุดบัญชี + สลิปค่านายหน้า */}
+              {caseData.agent_name && <div style={{ marginTop: 16, padding: '16px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+                  <label style={{ fontSize: 13, fontWeight: 700, color: '#92400e', margin: 0 }}>
+                    <i className="fas fa-university" style={{ marginRight: 6 }}></i>บัญชีธนาคารนายหน้า
+                  </label>
+                  <span style={{ fontSize: 11, background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 20, padding: '2px 10px', color: '#92400e', fontWeight: 600, fontFamily: 'monospace' }}>
+                    {caseData.agent_code || caseData.agent_name}
+                  </span>
+                  <span style={{ fontSize: 10, color: '#9ca3af', fontWeight: 400 }}>กรอกเองหรืออัพโหลดสมุดบัญชีให้ OCR อัตโนมัติ</span>
+                </div>
+
+                {/* หน้าสมุดบัญชี + OCR */}
+                <div style={{ marginBottom: 14, padding: '10px 12px', background: '#fff', border: '1.5px dashed #fcd34d', borderRadius: 8 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#92400e', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <i className="fas fa-book"></i> หน้าสมุดบัญชี (Book Bank)
+                    {passbookOcrLoading && <span style={{ color: '#1565c0', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 4 }}><i className="fas fa-spinner fa-spin"></i> OCR...</span>}
+                    <span style={{ fontSize: 10, color: '#9ca3af', fontWeight: 400 }}>อัพโหลดแล้ว OCR จะ auto-fill ข้อมูลธนาคาร</span>
+                  </div>
+                  {caseData.agent_bank_book && (
+                    <div style={{ marginBottom: 6 }}>
+                      <a href={caseData.agent_bank_book.startsWith('/') ? caseData.agent_bank_book : `/${caseData.agent_bank_book}`}
+                        target="_blank" rel="noreferrer"
+                        style={{ fontSize: 11, color: '#b45309', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <i className="fas fa-book-open"></i> ดูสมุดบัญชีปัจจุบัน
+                      </a>
+                    </div>
+                  )}
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 12, color: '#78350f' }}>
+                    <i className="fas fa-upload" style={{ color: '#f59e0b' }}></i>
+                    <span id="agentBookLabel">{caseData.agent_bank_book ? 'เปลี่ยนสมุดบัญชี' : 'อัพโหลดหน้าสมุดบัญชี'}</span>
+                    <input ref={agentBankBookRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }}
+                      onChange={e => {
+                        const f = e.target.files[0]
+                        const lbl = document.getElementById('agentBookLabel')
+                        if (lbl) lbl.textContent = f ? `✓ ${f.name}` : (caseData.agent_bank_book ? 'เปลี่ยนสมุดบัญชี' : 'อัพโหลดหน้าสมุดบัญชี')
+                        if (f) handlePassbookOcr(f)
+                      }} />
+                  </label>
+                  {passbookOcrMsg && (
+                    <div style={{ marginTop: 6, fontSize: 11, padding: '4px 8px', borderRadius: 6,
+                      background: passbookOcrMsg.startsWith('✅') ? '#ecfdf5' : '#fffbeb',
+                      color: passbookOcrMsg.startsWith('✅') ? '#065f46' : '#92400e', fontWeight: 600 }}>
+                      {passbookOcrMsg}
+                    </div>
+                  )}
+                </div>
+
+                {/* ข้อมูลธนาคาร (กรอกเองหรือ auto จาก OCR) */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label style={{ fontSize: 12, color: '#92400e', fontWeight: 600 }}>ธนาคาร</label>
+                    <input type="text" value={legalForm.agent_bank_name} onChange={e => setL('agent_bank_name', e.target.value)}
+                      placeholder="เช่น กสิกรไทย, กรุงไทย" style={{ fontSize: 13 }} />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label style={{ fontSize: 12, color: '#92400e', fontWeight: 600 }}>เลขบัญชี</label>
+                    <input type="text" value={legalForm.agent_bank_account_no} onChange={e => setL('agent_bank_account_no', e.target.value)}
+                      placeholder="xxx-x-xxxxx-x" style={{ fontSize: 13, fontFamily: 'monospace' }} />
+                  </div>
+                </div>
+                <div className="form-group" style={{ margin: '0 0 12px' }}>
+                  <label style={{ fontSize: 12, color: '#92400e', fontWeight: 600 }}>ชื่อบัญชี</label>
+                  <input type="text" value={legalForm.agent_bank_account_name} onChange={e => setL('agent_bank_account_name', e.target.value)}
+                    placeholder="ชื่อเจ้าของบัญชี" style={{ fontSize: 13 }} />
+                </div>
+
+                {/* สลิปค่านายหน้า */}
+                <label style={{ fontSize: 12, color: '#92400e', fontWeight: 600, display: 'block', marginBottom: 6 }}>
+                  <i className="fas fa-receipt" style={{ marginRight: 4 }}></i>สลิปค่านายหน้า
+                </label>
+                {caseData.agent_payment_slip && (
+                  <div style={{ marginBottom: 6 }}>
+                    <a href={caseData.agent_payment_slip.startsWith('/') ? caseData.agent_payment_slip : `/${caseData.agent_payment_slip}`}
+                      target="_blank" rel="noreferrer"
+                      style={{ fontSize: 11, color: '#b45309', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <i className="fas fa-file-alt"></i> ดูสลิปปัจจุบัน
+                    </a>
+                  </div>
+                )}
+                <label style={{
+                  display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px',
+                  background: '#fff', border: '1.5px dashed #fbbf24', borderRadius: 8, cursor: 'pointer',
+                  fontSize: 13, color: '#92400e', fontWeight: 500
+                }}>
+                  <i className="fas fa-upload" style={{ color: '#f59e0b' }}></i>
+                  <span id="agentSlipLabel">{caseData.agent_payment_slip ? 'เปลี่ยนสลิปค่านายหน้า' : 'อัพโหลดสลิปค่านายหน้า'}</span>
+                  <input ref={agentPaymentSlipRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }}
+                    onChange={e => {
+                      const lbl = document.getElementById('agentSlipLabel')
+                      if (lbl) lbl.textContent = e.target.files[0] ? `✓ ${e.target.files[0].name}` : (caseData.agent_payment_slip ? 'เปลี่ยนสลิปค่านายหน้า' : 'อัพโหลดสลิปค่านายหน้า')
+                    }} />
+                </label>
+              </div>}
+
+              {/* ★ บัญชีธนาคารลูกหนี้ + สมุดบัญชี */}
+              <div style={{ marginTop: 16, padding: '16px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10 }}>
+                <label style={{ fontSize: 13, fontWeight: 700, color: '#1e40af', display: 'block', marginBottom: 12 }}>
+                  <i className="fas fa-university" style={{ marginRight: 6 }}></i>บัญชีธนาคารลูกหนี้
+                  <span style={{ fontSize: 10, color: '#9ca3af', fontWeight: 400, marginLeft: 8 }}>กรอกเองหรืออัพโหลดสมุดบัญชีให้ OCR อัตโนมัติ</span>
+                </label>
+
+                {/* หน้าสมุดบัญชีลูกหนี้ + OCR */}
+                <div style={{ marginBottom: 14, padding: '10px 12px', background: '#fff', border: '1.5px dashed #93c5fd', borderRadius: 8 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#1e40af', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <i className="fas fa-book"></i> หน้าสมุดบัญชี (Book Bank)
+                    {debtorPassbookOcrLoading && <span style={{ color: '#1565c0', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 4 }}><i className="fas fa-spinner fa-spin"></i> OCR...</span>}
+                    <span style={{ fontSize: 10, color: '#9ca3af', fontWeight: 400 }}>อัพโหลดแล้ว OCR จะ auto-fill ข้อมูลธนาคาร</span>
+                  </div>
+                  {caseData.debtor_bank_book && (
+                    <div style={{ marginBottom: 6 }}>
+                      <a href={caseData.debtor_bank_book.startsWith('/') ? caseData.debtor_bank_book : `/${caseData.debtor_bank_book}`}
+                        target="_blank" rel="noreferrer"
+                        style={{ fontSize: 11, color: '#1e40af', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <i className="fas fa-book-open"></i> ดูสมุดบัญชีปัจจุบัน
+                      </a>
+                    </div>
+                  )}
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 12, color: '#1e3a8a' }}>
+                    <i className="fas fa-upload" style={{ color: '#3b82f6' }}></i>
+                    <span id="debtorBookLabel">{caseData.debtor_bank_book ? 'เปลี่ยนสมุดบัญชี' : 'อัพโหลดหน้าสมุดบัญชี'}</span>
+                    <input ref={debtorBankBookRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }}
+                      onChange={e => {
+                        const f = e.target.files[0]
+                        const lbl = document.getElementById('debtorBookLabel')
+                        if (lbl) lbl.textContent = f ? `✓ ${f.name}` : (caseData.debtor_bank_book ? 'เปลี่ยนสมุดบัญชี' : 'อัพโหลดหน้าสมุดบัญชี')
+                        if (f) handleDebtorPassbookOcr(f)
+                      }} />
+                  </label>
+                  {debtorPassbookOcrMsg && (
+                    <div style={{ marginTop: 6, fontSize: 11, padding: '4px 8px', borderRadius: 6,
+                      background: debtorPassbookOcrMsg.startsWith('✅') ? '#ecfdf5' : '#fffbeb',
+                      color: debtorPassbookOcrMsg.startsWith('✅') ? '#065f46' : '#92400e', fontWeight: 600 }}>
+                      {debtorPassbookOcrMsg}
+                    </div>
+                  )}
+                </div>
+
+                {/* ข้อมูลธนาคารลูกหนี้ */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label style={{ fontSize: 12, color: '#1e40af', fontWeight: 600 }}>ธนาคาร</label>
+                    <input type="text" value={legalForm.debtor_bank_name} onChange={e => setL('debtor_bank_name', e.target.value)}
+                      placeholder="เช่น กสิกรไทย, กรุงไทย" style={{ fontSize: 13 }} />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label style={{ fontSize: 12, color: '#1e40af', fontWeight: 600 }}>เลขบัญชี</label>
+                    <input type="text" value={legalForm.debtor_bank_account_no} onChange={e => setL('debtor_bank_account_no', e.target.value)}
+                      placeholder="xxx-x-xxxxx-x" style={{ fontSize: 13, fontFamily: 'monospace' }} />
+                  </div>
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: 12, color: '#1e40af', fontWeight: 600 }}>ชื่อบัญชี</label>
+                  <input type="text" value={legalForm.debtor_bank_account_name} onChange={e => setL('debtor_bank_account_name', e.target.value)}
+                    placeholder="ชื่อเจ้าของบัญชี" style={{ fontSize: 13 }} />
+                </div>
+              </div>
+
               {images.filter(img => img.includes('id-cards')).length > 0 && (
                 <div style={{ marginTop: 12 }}>
                   <label style={{ fontSize: 13, fontWeight: 600 }}>รูปหน้าบัตรประชาชน</label>
@@ -1391,6 +1693,74 @@ export default function LegalEditPage() {
                       )}
                     </div>
                   )}
+
+              {/* ★ บัญชีธนาคารนายทุน + สมุดบัญชี */}
+              {caseData.investor_name && <div style={{ marginTop: 12, padding: '16px', background: '#fdf4ff', border: '1px solid #e9d5ff', borderRadius: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+                  <label style={{ fontSize: 13, fontWeight: 700, color: '#6d28d9', margin: 0 }}>
+                    <i className="fas fa-university" style={{ marginRight: 6 }}></i>บัญชีธนาคารนายทุน
+                  </label>
+                  <span style={{ fontSize: 11, background: '#ede9fe', border: '1px solid #c4b5fd', borderRadius: 20, padding: '2px 10px', color: '#5b21b6', fontWeight: 600, fontFamily: 'monospace' }}>
+                    {caseData.investor_code || caseData.investor_name}
+                  </span>
+                  <span style={{ fontSize: 10, color: '#9ca3af', fontWeight: 400 }}>กรอกเองหรืออัพโหลดสมุดบัญชีให้ OCR อัตโนมัติ</span>
+                </div>
+
+                {/* หน้าสมุดบัญชีนายทุน + OCR */}
+                <div style={{ marginBottom: 14, padding: '10px 12px', background: '#fff', border: '1.5px dashed #d8b4fe', borderRadius: 8 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#6d28d9', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <i className="fas fa-book"></i> หน้าสมุดบัญชี (Book Bank)
+                    {investorPassbookOcrLoading && <span style={{ color: '#1565c0', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 4 }}><i className="fas fa-spinner fa-spin"></i> OCR...</span>}
+                    <span style={{ fontSize: 10, color: '#9ca3af', fontWeight: 400 }}>อัพโหลดแล้ว OCR จะ auto-fill ข้อมูลธนาคาร</span>
+                  </div>
+                  {caseData.investor_bank_book && (
+                    <div style={{ marginBottom: 6 }}>
+                      <a href={caseData.investor_bank_book.startsWith('/') ? caseData.investor_bank_book : `/${caseData.investor_bank_book}`}
+                        target="_blank" rel="noreferrer"
+                        style={{ fontSize: 11, color: '#6d28d9', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <i className="fas fa-book-open"></i> ดูสมุดบัญชีปัจจุบัน
+                      </a>
+                    </div>
+                  )}
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 12, color: '#4c1d95' }}>
+                    <i className="fas fa-upload" style={{ color: '#a855f7' }}></i>
+                    <span id="investorBookLabel">{caseData.investor_bank_book ? 'เปลี่ยนสมุดบัญชี' : 'อัพโหลดหน้าสมุดบัญชี'}</span>
+                    <input ref={investorBankBookRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }}
+                      onChange={e => {
+                        const f = e.target.files[0]
+                        const lbl = document.getElementById('investorBookLabel')
+                        if (lbl) lbl.textContent = f ? `✓ ${f.name}` : (caseData.investor_bank_book ? 'เปลี่ยนสมุดบัญชี' : 'อัพโหลดหน้าสมุดบัญชี')
+                        if (f) handleInvestorPassbookOcr(f)
+                      }} />
+                  </label>
+                  {investorPassbookOcrMsg && (
+                    <div style={{ marginTop: 6, fontSize: 11, padding: '4px 8px', borderRadius: 6,
+                      background: investorPassbookOcrMsg.startsWith('✅') ? '#ecfdf5' : '#fffbeb',
+                      color: investorPassbookOcrMsg.startsWith('✅') ? '#065f46' : '#92400e', fontWeight: 600 }}>
+                      {investorPassbookOcrMsg}
+                    </div>
+                  )}
+                </div>
+
+                {/* ข้อมูลธนาคารนายทุน */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label style={{ fontSize: 12, color: '#6d28d9', fontWeight: 600 }}>ธนาคาร</label>
+                    <input type="text" value={legalForm.investor_bank_name} onChange={e => setL('investor_bank_name', e.target.value)}
+                      placeholder="เช่น กสิกรไทย, กรุงไทย" style={{ fontSize: 13 }} />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label style={{ fontSize: 12, color: '#6d28d9', fontWeight: 600 }}>เลขบัญชี</label>
+                    <input type="text" value={legalForm.investor_bank_account_no} onChange={e => setL('investor_bank_account_no', e.target.value)}
+                      placeholder="xxx-x-xxxxx-x" style={{ fontSize: 13, fontFamily: 'monospace' }} />
+                  </div>
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: 12, color: '#6d28d9', fontWeight: 600 }}>ชื่อบัญชี</label>
+                  <input type="text" value={legalForm.investor_bank_account_name} onChange={e => setL('investor_bank_account_name', e.target.value)}
+                    placeholder="ชื่อเจ้าของบัญชี" style={{ fontSize: 13 }} />
+                </div>
+              </div>}
             </div>
 
             {/* ---- เอกสารนิติกรรม ---- */}

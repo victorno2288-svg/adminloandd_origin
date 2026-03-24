@@ -20,7 +20,11 @@ const folderMap = {
   tax_receipt:       'tax-receipt',     // ★ ใบเสร็จค่าธรรมเนียม/ภาษี
   borrower_id_card_legal: 'borrower-id-card',  // ★ บัตรประชาชนเจ้าของทรัพย์
   checklist_file:    'checklist',       // ★ อัพโหลดต่อ item ใน SOP checklist
-  legal_doc_pdf:     'legal-docs',      // ★ PDF รวมเอกสารทั้งหมด (ใหม่)
+  legal_doc_pdf:        'legal-docs',           // ★ PDF รวมเอกสารทั้งหมด (ใหม่)
+  agent_payment_slip:   'agent-payment-slip',   // ★ สลิปค่านายหน้า (ฝ่ายนิติอัพโหลด)
+  agent_bank_book:      'agent-bank-book',       // ★ หน้าสมุดบัญชีนายหน้า (OCR โดยฝ่ายนิติ)
+  debtor_bank_book:     'debtor-bank-book',      // ★ หน้าสมุดบัญชีลูกหนี้ (OCR โดยฝ่ายนิติ)
+  investor_bank_book:   'investor-bank-book',    // ★ หน้าสมุดบัญชีนายทุน (OCR โดยฝ่ายนิติ)
 }
 
 const storage = multer.diskStorage({

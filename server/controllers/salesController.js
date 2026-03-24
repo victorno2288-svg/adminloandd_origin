@@ -528,7 +528,7 @@ exports.createAgent = (req, res) => {
   const {
     full_name, nickname, phone, email, line_id, facebook, national_id, commission_rate,
     date_of_birth, national_id_expiry, address,
-    bank_name, bank_account_number, bank_account_name, area, contract_date,
+    area, contract_date,
     debtor_mode, debtor_id,
     contact_name, contact_phone, property_type,
     has_obligation, obligation_count,
@@ -576,15 +576,14 @@ exports.createAgent = (req, res) => {
     const agentSql = `
       INSERT INTO agents (agent_code, full_name, nickname, phone, email, line_id, facebook, national_id, commission_rate,
                           date_of_birth, national_id_expiry, address,
-                          bank_name, bank_account_number, bank_account_name, area, contract_file, contract_date, id_card_image, house_registration_image, payment_slip)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                          area, contract_file, contract_date, id_card_image, house_registration_image, payment_slip)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
     db.query(agentSql, [
       agent_code, full_name || null, nickname || null, phone || null,
       email || null, line_id || null, facebook || null, national_id || null,
       commission_rate || 0,
       date_of_birth || null, national_id_expiry || null, address || null,
-      bank_name || null, bank_account_number || null, bank_account_name || null,
       area || null, contractFilePath, contract_date || null,
       idCardPath, houseRegPath, paymentSlipPath
     ], (err2, agentResult) => {
@@ -698,7 +697,7 @@ exports.updateAgent = (req, res) => {
   const {
     full_name, nickname, phone, email, line_id, facebook, national_id, commission_rate, status,
     date_of_birth, national_id_expiry, address,
-    bank_name, bank_account_number, bank_account_name, area, contract_date,
+    area, contract_date,
     remove_id_card, remove_house_registration
   } = req.body
 
@@ -706,13 +705,12 @@ exports.updateAgent = (req, res) => {
     'full_name=?', 'nickname=?', 'phone=?', 'email=?', 'line_id=?', 'facebook=?',
     'national_id=?', 'commission_rate=?', 'status=?',
     'date_of_birth=?', 'national_id_expiry=?', 'address=?',
-    'bank_name=?', 'bank_account_number=?', 'bank_account_name=?', 'area=?', 'contract_date=?'
+    'area=?', 'contract_date=?'
   ]
   const values = [
     full_name || null, nickname || null, phone || null, email || null,
     line_id || null, facebook || null, national_id || null, commission_rate || 0, status || 'active',
     date_of_birth || null, national_id_expiry || null, address || null,
-    bank_name || null, bank_account_number || null, bank_account_name || null,
     area || null, contract_date || null
   ]
 
@@ -906,7 +904,27 @@ exports.getCaseById = (req, res) => {
     LEFT JOIN issuing_transactions it ON it.case_id = c.id
     WHERE c.id = ?
   `
+  const isAucTableError = (e) => e && (
+    e.code === 'ER_NO_SUCH_TABLE' || e.code === 'ER_BAD_FIELD_ERROR' || e.errno === 1932
+  )
   db.query(sql, [id], (err, results) => {
+    if (isAucTableError(err)) {
+      // Fallback: auction_transactions หาย → NULL AS แทน auc.* ทั้งหมด
+      const sqlFallback = sql
+        .replace('auc.house_reg_book AS auc_house_reg_book, auc.house_reg_book_legal,', 'NULL AS auc_house_reg_book, NULL AS house_reg_book_legal,')
+        .replace('auc.name_change_doc, auc.divorce_doc AS auc_divorce_doc,', 'NULL AS name_change_doc, NULL AS auc_divorce_doc,')
+        .replace('auc.spouse_consent_doc, auc.spouse_id_card AS auc_spouse_id_card, auc.spouse_reg_copy AS auc_spouse_reg_copy,', 'NULL AS spouse_consent_doc, NULL AS auc_spouse_id_card, NULL AS auc_spouse_reg_copy,')
+        .replace('auc.marriage_cert AS auc_marriage_cert, auc.spouse_name_change_doc,', 'NULL AS auc_marriage_cert, NULL AS spouse_name_change_doc,')
+        .replace('LEFT JOIN auction_transactions auc ON auc.case_id = c.id', '')
+      return db.query(sqlFallback, [id], (err2, results2) => {
+        if (err2) {
+          console.error('getCaseById fallback error:', err2)
+          return res.status(500).json({ success: false, message: 'Server Error' })
+        }
+        if (results2.length === 0) return res.status(404).json({ success: false, message: 'ไม่พบข้อมูลเคส' })
+        res.json({ success: true, caseData: results2[0] })
+      })
+    }
     if (err) {
       console.error('getCaseById error:', err)
       return res.status(500).json({ success: false, message: 'Server Error' })

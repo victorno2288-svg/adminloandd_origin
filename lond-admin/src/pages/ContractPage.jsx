@@ -489,7 +489,7 @@ function EditField({ k, form, set, bold, ph }) {
       />
       {isLandOffice && (
         <datalist id="contract-land-office-list">
-          {LAND_OFFICES.map(name => <option key={name} value={name} />)}
+          {LAND_OFFICES.map((name, i) => <option key={`${name}-${i}`} value={name} />)}
         </datalist>
       )}
     </>

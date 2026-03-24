@@ -17,10 +17,14 @@ const legalUpload = upload.fields([
   { name: 'deed_extension', maxCount: 1 },
   { name: 'doc_redemption', maxCount: 1 },
   { name: 'deed_redemption', maxCount: 1 },
-  { name: 'commission_slip', maxCount: 1 },          // ★ สลิปค่าคอมมิชชั่น
-  { name: 'house_reg_prop_legal',   maxCount: 1 },   // ★ ทะเบียนบ้านทรัพย์
-  { name: 'borrower_id_card_legal', maxCount: 1 },   // ★ บัตรประชาชนเจ้าของทรัพย์
-  { name: 'broker_id',              maxCount: 1 },   // ★ บัตรประชาชนนายหน้า
+  { name: 'commission_slip',       maxCount: 1 },   // ★ สลิปค่าคอมมิชชั่น
+  { name: 'house_reg_prop_legal',  maxCount: 1 },   // ★ ทะเบียนบ้านทรัพย์
+  { name: 'borrower_id_card_legal',maxCount: 1 },   // ★ บัตรประชาชนเจ้าของทรัพย์
+  { name: 'broker_id',             maxCount: 1 },   // ★ บัตรประชาชนนายหน้า
+  { name: 'agent_payment_slip',    maxCount: 1 },   // ★ สลิปค่านายหน้า (ฝ่ายนิติอัพโหลด)
+  { name: 'agent_bank_book',       maxCount: 1 },   // ★ หน้าสมุดบัญชีนายหน้า (ฝ่ายนิติ OCR)
+  { name: 'debtor_bank_book',      maxCount: 1 },   // ★ หน้าสมุดบัญชีลูกหนี้ (ฝ่ายนิติ OCR)
+  { name: 'investor_bank_book',    maxCount: 1 },   // ★ หน้าสมุดบัญชีนายทุน (ฝ่ายนิติ OCR)
 ])
 router.put('/cases/:caseId', legalUpload, legalController.updateLegal)
 

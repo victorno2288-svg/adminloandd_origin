@@ -127,7 +127,6 @@ export default function AgentFormPage() {
     status: 'active', id_card_files: null,
     date_of_birth: '', national_id_expiry: '',
     area: '', address: '',
-    bank_name: '', bank_account_number: '', bank_account_name: '',
   })
 
   const [existingIdCard, setExistingIdCard] = useState(null)
@@ -137,13 +136,11 @@ export default function AgentFormPage() {
   const [houseRegFile, setHouseRegFile] = useState(null)
   const [houseOcrLoading, setHouseOcrLoading] = useState(false)
   const [houseOcrMsg, setHouseOcrMsg] = useState('')
-  const [passbookFile, setPassbookFile] = useState(null)
-  const [passbookOcrLoading, setPassbookOcrLoading] = useState(false)
-  const [passbookOcrMsg, setPassbookOcrMsg] = useState('')
-  const [paymentSlipFile, setPaymentSlipFile] = useState(null)
-  const [existingPaymentSlip, setExistingPaymentSlip] = useState(null)
   const [agentOcrLoading, setAgentOcrLoading] = useState(false)
   const [agentOcrFilled, setAgentOcrFilled] = useState(null)
+  const [passbookOcrLoading, setPassbookOcrLoading] = useState(false)
+  const [passbookOcrMsg, setPassbookOcrMsg] = useState('')
+  const [passbookFile, setPassbookFile] = useState(null)
   const [linkedDebtors, setLinkedDebtors] = useState([])
   const [existingDebtors, setExistingDebtors] = useState([])
   const [showLinkPanel, setShowLinkPanel] = useState(false)
@@ -203,12 +200,10 @@ export default function AgentFormPage() {
             status: a.status || 'active', id_card_files: null,
             date_of_birth: toDate(a.date_of_birth), national_id_expiry: toDate(a.national_id_expiry),
             area: a.area || '', address: a.address || '',
-            bank_name: a.bank_name || '', bank_account_number: a.bank_account_number || '', bank_account_name: a.bank_account_name || '',
           })
           setAgentCode(a.agent_code || '')
           setExistingIdCard(a.id_card_image || null)
           setExistingHouseReg(a.house_registration_image || null)
-          setExistingPaymentSlip(a.payment_slip || null)
         }
         if (d.linked_debtors) setLinkedDebtors(d.linked_debtors)
       })
@@ -221,6 +216,13 @@ export default function AgentFormPage() {
 
   const isDeedOk = (v) => v && ['chanote', 'ns4k'].includes(v)
   const isDeedBlacklisted = (v) => v && ['ns3', 'ns3k', 'spk'].includes(v)
+
+  // ── Passbook (Book Bank) OCR — เก็บไฟล์ + preview ──
+  const handleAgentPassbookOcr = (file) => {
+    if (!file) { setPassbookFile(null); setPassbookOcrMsg(''); return }
+    setPassbookFile(file)
+    setPassbookOcrMsg('✅ อัพโหลดหน้าสมุดบัญชีแล้ว')
+  }
 
   // ── Deed OCR ──
   const handleDeedOcr = async (files, storeFile = true) => {
@@ -366,44 +368,6 @@ export default function AgentFormPage() {
     }
   }
 
-  // ── Passbook OCR (Agent) ──
-  const handleAgentPassbookOcr = async (file) => {
-    setPassbookFile(file)
-    setPassbookOcrMsg('')
-    if (!file) return
-    setPassbookOcrLoading(true)
-    try {
-      const fd = new FormData()
-      fd.append('file', file)
-      fd.append('doc_type', 'passbook')
-      const res = await fetch('/api/admin/ocr/extract', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token()}` },
-        body: fd,
-      })
-      const data = await res.json()
-      if (data.success && data.extracted) {
-        const ex = data.extracted
-        const updates = {}
-        if (ex.bank_name)      updates.bank_name = ex.bank_name
-        if (ex.account_number) updates.bank_account_number = ex.account_number
-        if (ex.account_name)   updates.bank_account_name = ex.account_name
-        if (Object.keys(updates).length > 0) {
-          setAgent(prev => ({ ...prev, ...updates }))
-          setPassbookOcrMsg('✅ OCR สำเร็จ — ตรวจสอบข้อมูลธนาคารด้วยนะคะ')
-        } else {
-          setPassbookOcrMsg('⚠️ OCR อ่านไม่ได้ — กรอกเอง')
-        }
-      } else {
-        setPassbookOcrMsg('⚠️ OCR อ่านไม่ได้ — กรอกเอง')
-      }
-    } catch {
-      setPassbookOcrMsg('⚠️ OCR ล้มเหลว')
-    } finally {
-      setPassbookOcrLoading(false)
-    }
-  }
-
   // ── Link debtor (edit mode) ──
   const handleLinkDebtor = async (debtorId) => {
     setLinkingId(debtorId)
@@ -487,13 +451,9 @@ export default function AgentFormPage() {
         if (agent.national_id_expiry) fd.append('national_id_expiry', agent.national_id_expiry)
         if (agent.address)          fd.append('address', agent.address)
         if (agent.area)             fd.append('area', agent.area)
-        if (agent.bank_name)           fd.append('bank_name', agent.bank_name)
-        if (agent.bank_account_number) fd.append('bank_account_number', agent.bank_account_number)
-        if (agent.bank_account_name)   fd.append('bank_account_name', agent.bank_account_name)
         fd.append('status', agent.status)
         if (agent.id_card_files)  { for (const f of agent.id_card_files)  fd.append('id_card_image', f) }
         if (houseRegFile)              fd.append('house_registration_image', houseRegFile)
-        if (paymentSlipFile)           fd.append('payment_slip', paymentSlipFile)
 
         const res = await fetch(`${API}/agents`, {
           method: 'POST',
@@ -539,15 +499,11 @@ export default function AgentFormPage() {
         if (agent.national_id_expiry) fd.append('national_id_expiry', agent.national_id_expiry)
         if (agent.address)            fd.append('address', agent.address)
         if (agent.area)               fd.append('area', agent.area)
-        if (agent.bank_name)           fd.append('bank_name', agent.bank_name)
-        if (agent.bank_account_number) fd.append('bank_account_number', agent.bank_account_number)
-        if (agent.bank_account_name)   fd.append('bank_account_name', agent.bank_account_name)
         fd.append('status', agent.status)
         if (agent.id_card_files)   { for (const f of agent.id_card_files) fd.append('id_card_image', f) }
         if (removeIdCard)          fd.append('remove_id_card', '1')
         if (houseRegFile)           fd.append('house_registration_image', houseRegFile)
         if (removeHouseReg)        fd.append('remove_house_registration', '1')
-        if (paymentSlipFile)       fd.append('payment_slip', paymentSlipFile)
 
         const res = await fetch(`${API}/agents/${id}`, {
           method: 'PUT',
@@ -775,33 +731,6 @@ export default function AgentFormPage() {
                     style={{ width: '100%', resize: 'vertical', fontSize: 13 }} />
                 </div>
 
-                {/* ─── ข้อมูลธนาคาร ─── */}
-                <div style={{ borderTop: '1px solid #eee', paddingTop: 14, marginTop: 4 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#1565c0', marginBottom: 10 }}>
-                    <i className="fas fa-university" style={{ marginRight: 6 }}></i>ข้อมูลบัญชีธนาคาร
-                    <span style={{ fontSize: 10, fontWeight: 400, color: '#999', marginLeft: 6 }}>(OCR อัตโนมัติจากสมุดบัญชี)</span>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label style={{ fontSize: 12 }}>ธนาคาร</label>
-                      <input type="text" placeholder="ชื่อธนาคาร"
-                        value={agent.bank_name} onChange={e => setA('bank_name', e.target.value)}
-                        style={{ fontSize: 13 }} />
-                    </div>
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label style={{ fontSize: 12 }}>เลขบัญชี</label>
-                      <input type="text" placeholder="xxx-x-xxxxx-x"
-                        value={agent.bank_account_number} onChange={e => setA('bank_account_number', e.target.value)}
-                        style={{ fontSize: 13 }} />
-                    </div>
-                  </div>
-                  <div className="form-group" style={{ marginTop: 10, marginBottom: 0 }}>
-                    <label style={{ fontSize: 12 }}>ชื่อบัญชี</label>
-                    <input type="text" placeholder="ชื่อ-นามสกุล เจ้าของบัญชี"
-                      value={agent.bank_account_name} onChange={e => setA('bank_account_name', e.target.value)}
-                      style={{ fontSize: 13 }} />
-                  </div>
-                </div>
               </div>
 
               {/* ปุ่มบันทึก (create) */}
@@ -943,45 +872,6 @@ export default function AgentFormPage() {
                   </label>
                 </div>
 
-                <div className="form-group" style={{ marginBottom: 0, marginTop: 14, borderTop: '1px solid #e3f2fd', paddingTop: 12 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, fontWeight: 700 }}>
-                    <span>หน้าสมุดบัญชี (Book Bank)</span>
-                    {passbookOcrLoading && <span style={{ fontSize: 11, color: '#1565c0', display: 'inline-flex', alignItems: 'center', gap: 4 }}><i className="fas fa-spinner fa-spin"></i> OCR...</span>}
-                  </label>
-                  <input type="file" accept="image/*,.pdf"
-                    onChange={e => handleAgentPassbookOcr(e.target.files[0] || null)}
-                    style={{ fontSize: 12 }} />
-                  {passbookOcrMsg && (
-                    <div style={{ marginTop: 6, fontSize: 11, padding: '4px 8px', borderRadius: 6,
-                      background: passbookOcrMsg.startsWith('✅') ? '#e8f5e9' : '#fff3e0',
-                      color: passbookOcrMsg.startsWith('✅') ? '#2e7d32' : '#e65100' }}>
-                      {passbookOcrMsg}
-                    </div>
-                  )}
-                  {passbookFile && (
-                    <div style={{ position: 'relative', display: 'inline-block', border: '1px solid #ddd', borderRadius: 8, padding: 4, background: '#fff', marginTop: 6 }}>
-                      <img src={URL.createObjectURL(passbookFile)} alt="preview" style={{ maxHeight: 120, maxWidth: '100%', objectFit: 'contain', borderRadius: 6, display: 'block' }} />
-                      <button type="button" onClick={() => { setPassbookFile(null); setPassbookOcrMsg('') }}
-                        style={{ ...xBtnStyle, position: 'absolute', top: -8, right: -8, width: 22, height: 22, fontSize: 11, background: '#ff5252' }}>
-                        <i className="fas fa-times"></i>
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* ── สลิปค่านายหน้า (create mode) ── */}
-                <div className="form-group" style={{ marginBottom: 0, marginTop: 14, borderTop: '1px solid #ffe0b2', paddingTop: 12 }}>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: '#e65100', display: 'block', marginBottom: 4 }}>
-                    <i className="fas fa-receipt" style={{ marginRight: 5 }}></i>สลิปค่านายหน้า (Payment Slip)
-                  </label>
-                  <input type="file" accept=".jpg,.jpeg,.png,.pdf" style={{ fontSize: 12 }}
-                    onChange={e => setPaymentSlipFile(e.target.files[0] || null)} />
-                  {paymentSlipFile && (
-                    <div style={{ marginTop: 6, fontSize: 11, color: '#e65100' }}>
-                      <i className="fas fa-paperclip" style={{ marginRight: 3 }}></i>{paymentSlipFile.name}
-                    </div>
-                  )}
-                </div>
               </div>
 
               {/* คำแนะนำ */}
@@ -1130,33 +1020,6 @@ export default function AgentFormPage() {
                     style={{ width: '100%', resize: 'vertical', fontSize: 13 }} />
                 </div>
 
-                {/* ─── ข้อมูลธนาคาร ─── */}
-                <div style={{ borderTop: '1px solid #eee', paddingTop: 14, marginTop: 4 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#1565c0', marginBottom: 10 }}>
-                    <i className="fas fa-university" style={{ marginRight: 6 }}></i>ข้อมูลบัญชีธนาคาร
-                    <span style={{ fontSize: 10, fontWeight: 400, color: '#999', marginLeft: 6 }}>(OCR อัตโนมัติจากสมุดบัญชี)</span>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label style={{ fontSize: 12 }}>ธนาคาร</label>
-                      <input type="text" placeholder="ชื่อธนาคาร"
-                        value={agent.bank_name} onChange={e => setA('bank_name', e.target.value)}
-                        style={{ fontSize: 13 }} />
-                    </div>
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label style={{ fontSize: 12 }}>เลขบัญชี</label>
-                      <input type="text" placeholder="xxx-x-xxxxx-x"
-                        value={agent.bank_account_number} onChange={e => setA('bank_account_number', e.target.value)}
-                        style={{ fontSize: 13 }} />
-                    </div>
-                  </div>
-                  <div className="form-group" style={{ marginTop: 10, marginBottom: 0 }}>
-                    <label style={{ fontSize: 12 }}>ชื่อบัญชี</label>
-                    <input type="text" placeholder="ชื่อ-นามสกุล เจ้าของบัญชี"
-                      value={agent.bank_account_name} onChange={e => setA('bank_account_name', e.target.value)}
-                      style={{ fontSize: 13 }} />
-                  </div>
-                </div>
               </div>
 
               {/* ปุ่มบันทึก (edit) */}
@@ -1342,67 +1205,6 @@ export default function AgentFormPage() {
                   )}
                 </div>
 
-                {/* ── สลิปค่านายหน้า ── */}
-                <div className="form-group" style={{ marginBottom: 0, marginTop: 14, borderTop: '1px solid #ffe0b2', paddingTop: 12 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, fontWeight: 700, color: '#e65100' }}>
-                    <i className="fas fa-receipt" style={{ marginRight: 4 }}></i>
-                    <span>สลิปค่านายหน้า (Payment Slip)</span>
-                  </label>
-                  {existingPaymentSlip && !paymentSlipFile && (
-                    <div style={{ marginBottom: 8, marginTop: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <a href={existingPaymentSlip.startsWith('/') ? existingPaymentSlip : `/${existingPaymentSlip}`}
-                        target="_blank" rel="noreferrer"
-                        style={{ fontSize: 12, color: '#e65100', textDecoration: 'underline' }}>
-                        <i className="fas fa-paperclip" style={{ marginRight: 4 }}></i>ดูสลิปปัจจุบัน
-                      </a>
-                    </div>
-                  )}
-                  <label style={{
-                    display: 'block', cursor: 'pointer', marginTop: 4,
-                    background: paymentSlipFile ? '#fff8f3' : '#fff3e0',
-                    border: `2px dashed ${paymentSlipFile ? '#e65100' : '#ffb74d'}`,
-                    borderRadius: 10, padding: 10, transition: 'border-color 0.2s',
-                  }}>
-                    <input type="file" accept=".jpg,.jpeg,.png,.pdf" style={{ display: 'none' }}
-                      onChange={e => {
-                        const f = e.target.files[0] || null
-                        setPaymentSlipFile(f)
-                        e.target.value = ''
-                      }} />
-                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                      <div style={{
-                        width: 60, height: 60, flexShrink: 0, borderRadius: 8,
-                        background: '#ffe0b2', border: '1px solid #ffb74d',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
-                      }}>
-                        {paymentSlipFile && paymentSlipFile.type !== 'application/pdf'
-                          ? <img src={URL.createObjectURL(paymentSlipFile)} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6 }} />
-                          : paymentSlipFile
-                            ? <i className="fas fa-file-pdf" style={{ fontSize: 22, color: '#e65100' }}></i>
-                            : existingPaymentSlip
-                              ? <i className="fas fa-check-circle" style={{ fontSize: 22, color: '#16a34a' }}></i>
-                              : <i className="fas fa-receipt" style={{ fontSize: 22, color: '#e65100' }}></i>
-                        }
-                        {paymentSlipFile && (
-                          <button type="button"
-                            onClick={e => { e.preventDefault(); e.stopPropagation(); setPaymentSlipFile(null) }}
-                            style={{ position: 'absolute', top: -5, right: -5, width: 18, height: 18, borderRadius: '50%', background: '#e53935', border: 'none', color: '#fff', fontSize: 9, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
-                          >✕</button>
-                        )}
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: '#e65100' }}>
-                          {paymentSlipFile ? 'เปลี่ยนสลิป' : existingPaymentSlip ? 'เปลี่ยนสลิป' : 'อัพโหลดสลิปค่านายหน้า'}
-                        </div>
-                        <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>
-                          {paymentSlipFile
-                            ? <><span style={{ color: '#16a34a', fontWeight: 600 }}>✓ {paymentSlipFile.name}</span></>
-                            : 'JPG / PNG / PDF'}
-                        </div>
-                      </div>
-                    </div>
-                  </label>
-                </div>
               </div>
 
 

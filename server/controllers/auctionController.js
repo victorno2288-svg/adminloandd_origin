@@ -48,6 +48,14 @@ exports.getStats = (req, res) => {
   `
   db.query(sql, (err, results) => {
     if (err) {
+      // ถ้า auction_transactions ไม่มี → ใช้ query แบบไม่มี auction table
+      if (err.code === 'ER_NO_SUCH_TABLE' || err.errno === 1146 || err.errno === 1932) {
+        const fallbackSql = `SELECT (SELECT COUNT(*) FROM cases) AS total_count`
+        return db.query(fallbackSql, (err2, rows2) => {
+          const total = (!err2 && rows2 && rows2[0]) ? rows2[0].total_count : 0
+          return res.json({ success: true, stats: { pending_count: total, auctioned_count: 0, cancelled_count: 0, total_count: total } })
+        })
+      }
       console.error('getStats error:', err)
       return res.json({ success: true, stats: { pending_count: 0, auctioned_count: 0, cancelled_count: 0, total_count: 0 } })
     }
@@ -104,10 +112,13 @@ exports.getAuctionCases = (req, res) => {
 
   sql += ' ORDER BY c.id DESC'
 
+  const isAucTableError = (e) => e && (
+    e.code === 'ER_BAD_FIELD_ERROR' || e.code === 'ER_NO_SUCH_TABLE' || e.errno === 1932
+  )
   db.query(sql, params, (err, results) => {
-    if (err && (err.code === 'ER_BAD_FIELD_ERROR' || err.code === 'ER_NO_SUCH_TABLE')) {
-      // Fallback: ตัด columns ใหม่ที่อาจยังไม่มีใน DB ออก
-      let sqlFb = `
+    if (isAucTableError(err)) {
+      // Fallback สุดท้าย: ตัด auction_transactions ออกทั้งหมด — แสดง cases โดยไม่มีข้อมูลนายทุน
+      const sqlMinimal = `
         SELECT
           c.id AS case_id, c.case_code, c.status AS case_status,
           lr.appraisal_result, lr.appraisal_type, lr.appraisal_book_image,
@@ -116,24 +127,26 @@ exports.getAuctionCases = (req, res) => {
           lr.province, lr.district, lr.property_address, lr.location_url,
           lr.images, lr.appraisal_images, lr.deed_images,
           a.full_name AS agent_name, a.phone AS agent_phone, a.agent_code,
-          auc.id AS auction_id, auc.investor_id, auc.investor_name, auc.investor_code,
-          auc.investor_phone, auc.auction_status,
-          auc.created_at AS auction_created_at, auc.updated_at AS auction_updated_at
+          NULL AS auction_id, NULL AS investor_id, NULL AS investor_name, NULL AS investor_code,
+          NULL AS investor_phone, NULL AS auction_status,
+          NULL AS auction_created_at, NULL AS auction_updated_at,
+          lr.marital_status,
+          lr.borrower_id_card, lr.house_reg_book, lr.name_change_doc, lr.divorce_doc,
+          lr.spouse_id_card, lr.spouse_reg_copy, lr.marriage_cert,
+          lr.single_cert, lr.death_cert, lr.will_court_doc, lr.testator_house_reg,
+          lr.deed_copy, lr.building_permit, lr.house_reg_prop, lr.sale_contract,
+          lr.debt_free_cert, lr.blueprint, lr.property_photos, lr.land_tax_receipt,
+          lr.condo_title_deed, lr.condo_location_map, lr.common_fee_receipt, lr.floor_plan,
+          lr.location_sketch_map, lr.land_use_cert, lr.rental_contract, lr.business_reg,
+          lr.property_type
         FROM cases c
         LEFT JOIN loan_requests lr ON lr.id = c.loan_request_id
         LEFT JOIN agents a ON a.id = c.agent_id
-        LEFT JOIN auction_transactions auc ON auc.case_id = c.id
         WHERE 1=1
-      `
-      if (status) {
-        if (status === 'pending') { sqlFb += ' AND (auc.auction_status = ? OR auc.id IS NULL)' }
-        else { sqlFb += ' AND auc.auction_status = ?' }
-      }
-      if (date) { sqlFb += ' AND (DATE(auc.updated_at) = ? OR DATE(c.created_at) = ?)' }
-      sqlFb += ' ORDER BY c.id DESC'
-      return db.query(sqlFb, params, (err2, results2) => {
+        ORDER BY c.id DESC`
+      return db.query(sqlMinimal, [], (err2, results2) => {
         if (err2) {
-          console.error('getAuctionCases fallback error:', err2)
+          console.error('getAuctionCases minimal fallback error:', err2)
           return res.status(500).json({ success: false, message: 'Server Error' })
         }
         res.json({ success: true, data: results2 })
@@ -150,8 +163,15 @@ exports.getAuctionCases = (req, res) => {
 // ========== ดึงข้อมูลเคสเดี่ยว (หน้าแก้ไข) ==========
 exports.getAuctionDetail = (req, res) => {
   const { caseId } = req.params
+  const isAucTableError = (e) => e && (
+    e.code === 'ER_BAD_FIELD_ERROR' || e.code === 'ER_NO_SUCH_TABLE' || e.errno === 1932
+  )
 
   db.query('SELECT id FROM auction_transactions WHERE case_id = ?', [caseId], (err0, existing) => {
+    if (err0 && isAucTableError(err0)) {
+      // auction_transactions engine error → ข้าม INSERT แล้ว fetch ตรง (จะได้ NULL ทุก auc.*)
+      return fetchAuctionDetail(caseId, res)
+    }
     if (err0) {
       console.error('getAuctionDetail check error:', err0)
       return res.status(500).json({ success: false, message: 'Server Error' })
@@ -162,6 +182,9 @@ exports.getAuctionDetail = (req, res) => {
         'INSERT INTO auction_transactions (case_id, auction_status, created_at, updated_at) VALUES (?, ?, NOW(), NOW())',
         [caseId, 'pending'],
         (errInsert) => {
+          if (errInsert && isAucTableError(errInsert)) {
+            return fetchAuctionDetail(caseId, res)
+          }
           if (errInsert) {
             console.error('getAuctionDetail insert error:', errInsert)
             return res.status(500).json({ success: false, message: 'Server Error' })
@@ -192,8 +215,8 @@ function fetchAuctionDetail(caseId, res) {
       auc.selling_pledge_amount, auc.interest_rate,
       auc.auction_land_area, auc.contract_years,
       auc.is_cancelled, auc.auction_status,
-      NULL AS sale_type,
-      NULL AS bank_name, NULL AS bank_account_no, NULL AS bank_account_name, NULL AS transfer_slip,
+      auc.sale_type,
+      auc.bank_name, auc.bank_account_no, auc.bank_account_name, auc.transfer_slip,
       auc.recorded_by, auc.recorded_at,
       auc.created_at AS auction_created_at, auc.updated_at AS auction_updated_at,
       auc.house_reg_book_legal,
@@ -220,10 +243,13 @@ function fetchAuctionDetail(caseId, res) {
     LEFT JOIN legal_transactions lt ON lt.case_id = c.id
     WHERE c.id = ?
   `
+  const isAucTableError = (e) => e && (
+    e.code === 'ER_BAD_FIELD_ERROR' || e.code === 'ER_NO_SUCH_TABLE' || e.errno === 1932
+  )
   db.query(sql, [caseId], (err, results) => {
-    if (err && (err.code === 'ER_BAD_FIELD_ERROR' || err.code === 'ER_NO_SUCH_TABLE')) {
-      // Fallback: ตัด columns ใหม่ (property checklist + auction doc columns) ที่อาจยังไม่มีใน DB
-      const sqlFallback = `
+    if (isAucTableError(err)) {
+      // Fallback สุดท้าย: ตัด auction_transactions ออก → auc.* ทั้งหมดเป็น NULL
+      const sqlMinimal = `
         SELECT
           c.*,
           lr.debtor_code, lr.contact_name, lr.contact_phone, lr.contact_line,
@@ -231,26 +257,36 @@ function fetchAuctionDetail(caseId, res) {
           lr.property_address, lr.location_url,
           lr.deed_number, lr.land_area, lr.has_obligation, lr.obligation_count,
           lr.images, lr.appraisal_images, lr.deed_images,
+          lr.loan_type_detail, lr.check_price_value, lr.appraisal_book_image, lr.appraisal_result,
           lr.borrower_id_card, lr.house_reg_book, lr.name_change_doc, lr.divorce_doc,
           lr.spouse_id_card, lr.spouse_reg_copy, lr.marriage_cert,
+          lr.single_cert, lr.death_cert, lr.will_court_doc, lr.testator_house_reg,
           lr.marital_status,
+          lr.deed_copy, lr.building_permit, lr.house_reg_prop, lr.sale_contract, lr.debt_free_cert,
+          lr.blueprint, lr.property_photos, lr.land_tax_receipt, lr.maps_url,
+          lr.condo_title_deed, lr.condo_location_map, lr.common_fee_receipt, lr.floor_plan,
+          lr.location_sketch_map, lr.land_use_cert, lr.rental_contract, lr.business_reg,
           a.full_name AS agent_name, a.phone AS agent_phone, a.agent_code,
-          auc.id AS auction_id,
-          auc.investor_id, auc.investor_name, auc.investor_code, auc.investor_phone,
-          auc.investor_type, auc.property_value,
-          auc.selling_pledge_amount, auc.interest_rate,
-          auc.auction_land_area, auc.contract_years,
-          auc.is_cancelled, auc.auction_status,
-          auc.created_at AS auction_created_at, auc.updated_at AS auction_updated_at
+          lt.officer_name AS lt_officer_name, lt.visit_date AS lt_visit_date,
+          lt.land_office AS lt_land_office, lt.time_slot AS lt_time_slot, lt.legal_status AS lt_legal_status,
+          NULL AS auction_id, NULL AS investor_id, NULL AS investor_name, NULL AS investor_code,
+          NULL AS investor_phone, NULL AS investor_type, NULL AS property_value,
+          NULL AS selling_pledge_amount, NULL AS interest_rate,
+          NULL AS auction_land_area, NULL AS contract_years,
+          NULL AS is_cancelled, NULL AS auction_status, NULL AS sale_type,
+          NULL AS bank_name, NULL AS bank_account_no, NULL AS bank_account_name, NULL AS transfer_slip,
+          NULL AS recorded_by, NULL AS recorded_at,
+          NULL AS auction_created_at, NULL AS auction_updated_at,
+          NULL AS house_reg_book_legal, NULL AS spouse_consent_doc, NULL AS spouse_name_change_doc
         FROM cases c
         LEFT JOIN loan_requests lr ON lr.id = c.loan_request_id
         LEFT JOIN agents a ON a.id = c.agent_id
-        LEFT JOIN auction_transactions auc ON auc.case_id = c.id
+        LEFT JOIN legal_transactions lt ON lt.case_id = c.id
         WHERE c.id = ?
       `
-      return db.query(sqlFallback, [caseId], (err2, results2) => {
+      return db.query(sqlMinimal, [caseId], (err2, results2) => {
         if (err2) {
-          console.error('fetchAuctionDetail fallback error:', err2)
+          console.error('fetchAuctionDetail minimal fallback error:', err2)
           return res.status(500).json({ success: false, message: 'Server Error' })
         }
         if (!results2.length) return res.status(404).json({ success: false, message: 'ไม่พบข้อมูลเคส' })

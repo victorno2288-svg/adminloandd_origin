@@ -174,7 +174,7 @@ function InfoRow({ label, value, mono, link }) {
 function CaseModal({ caseRow, onClose }) {
   const [docs, setDocs] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [bankForm, setBankForm] = useState({ bank_account_number: '', bank_name: '' })
+  const [bankForm, setBankForm] = useState({ bank_account_number: '', bank_name: '', bank_account_name: '' })
   const [bankSaving, setBankSaving] = useState(false)
   const [bankMsg, setBankMsg] = useState('')
   const [bookFile, setBookFile] = useState(null)
@@ -192,7 +192,7 @@ function CaseModal({ caseRow, onClose }) {
       .then(r => r.json()).then(d => {
         if (d.success) {
         setDocs(d.data)
-        setBankForm({ bank_account_number: d.data.bank_account_number || '', bank_name: d.data.bank_name || '' })
+        setBankForm({ bank_account_number: d.data.bank_account_number || '', bank_name: d.data.bank_name || '', bank_account_name: d.data.bank_account_name || '' })
         setContractForm({
           investor_amount: d.data.investor_amount || '',
           contract_start_date: d.data.contract_start_date ? d.data.contract_start_date.slice(0, 10) : '',
@@ -384,51 +384,44 @@ function CaseModal({ caseRow, onClose }) {
                   )}
 
                   {/* 3. บัญชีธนาคาร */}
-                  <SectionCard title="บัญชีธนาคาร" icon="fa-university" color="#2e7d32">
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-                      <div>
-                        <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 4 }}>เลขบัญชี</label>
-                        <input type="text" value={bankForm.bank_account_number}
-                          onChange={e => setBankForm(p => ({ ...p, bank_account_number: e.target.value }))}
-                          placeholder="xxx-x-xxxxx-x"
-                          style={{ width: '100%', padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 14, boxSizing: 'border-box', fontFamily: 'monospace' }} />
-                      </div>
-                      <div>
-                        <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b', display: 'block', marginBottom: 4 }}>ธนาคาร</label>
-                        <select value={bankForm.bank_name} onChange={e => setBankForm(p => ({ ...p, bank_name: e.target.value }))}
-                          style={{ width: '100%', padding: '8px 10px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 14 }}>
-                          <option value="">-- เลือกธนาคาร --</option>
-                          {BANKS.map(b => <option key={b} value={b}>{b}</option>)}
-                        </select>
-                      </div>
+                  <SectionCard title="บัญชีธนาคารลูกหนี้" icon="fa-university" color="#2e7d32">
+                    <div style={{ fontSize: 11, color: '#64748b', marginBottom: 10, fontStyle: 'italic' }}>
+                      <i className="fas fa-info-circle" style={{ marginRight: 4, color: '#7c3aed' }}></i>
+                      ข้อมูลบัญชีกรอกโดยฝ่ายนิติกรรม (อ่านอย่างเดียว)
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                      <button onClick={saveBankInfo} disabled={bankSaving}
-                        style={{ padding: '8px 18px', background: bankSaving ? '#94a3b8' : '#2e7d32', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: bankSaving ? 'not-allowed' : 'pointer' }}>
-                        {bankSaving ? <><i className="fas fa-spinner fa-spin"></i> บันทึก...</> : <><i className="fas fa-save"></i> บันทึก</>}
-                      </button>
-                      {bankMsg && <span style={{ fontSize: 12, fontWeight: 600, color: bankMsg.includes('สำเร็จ') ? '#2e7d32' : '#dc2626' }}>{bankMsg}</span>}
-                    </div>
-                    <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 12 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: '#00695c', marginBottom: 8 }}><i className="fas fa-book" style={{ marginRight: 5 }}></i>สมุดบัญชีธนาคาร</div>
-                      {docs.bank_book_file && (
-                        <div style={{ marginBottom: 10, padding: '8px 10px', background: '#e0f2f1', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <i className="fas fa-file" style={{ color: '#00695c' }}></i>
-                          <span style={{ fontSize: 12, color: '#004d40', flex: 1, wordBreak: 'break-all' }}>{docs.bank_book_file.split('/').pop()}</span>
-                          <button onClick={() => setPreview(docs.bank_book_file)} style={{ padding: '4px 10px', background: '#00695c', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>
-                            <i className="fas fa-eye"></i> ดู
-                          </button>
+                    {(docs.bank_account_number || docs.bank_name || docs.bank_account_name) ? (
+                      <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 13 }}>
+                          <div>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: '#166534', textTransform: 'uppercase', marginBottom: 2 }}>ธนาคาร</div>
+                            <div style={{ fontWeight: 700, color: '#15803d' }}>{docs.bank_name || '-'}</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: '#166534', textTransform: 'uppercase', marginBottom: 2 }}>เลขบัญชี</div>
+                            <div style={{ fontFamily: 'monospace', fontWeight: 700, color: '#15803d' }}>{docs.bank_account_number || '-'}</div>
+                          </div>
+                          {docs.bank_account_name && (
+                            <div style={{ gridColumn: '1 / -1' }}>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: '#166534', textTransform: 'uppercase', marginBottom: 2 }}>ชื่อบัญชี</div>
+                              <div style={{ fontWeight: 600, color: '#166534' }}>{docs.bank_account_name}</div>
+                            </div>
+                          )}
                         </div>
-                      )}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                        <input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={e => { setBookFile(e.target.files[0] || null); setBookMsg('') }} style={{ fontSize: 13 }} />
-                        <button onClick={uploadBook} disabled={!bookFile || bookUploading}
-                          style={{ padding: '7px 14px', background: (!bookFile || bookUploading) ? '#94a3b8' : '#00695c', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: (!bookFile || bookUploading) ? 'not-allowed' : 'pointer' }}>
-                          {bookUploading ? <><i className="fas fa-spinner fa-spin"></i> อัพโหลด...</> : <><i className="fas fa-upload"></i> อัพโหลด</>}
-                        </button>
-                        {bookMsg && <span style={{ fontSize: 12, fontWeight: 600, color: bookMsg.includes('สำเร็จ') ? '#2e7d32' : '#dc2626' }}>{bookMsg}</span>}
                       </div>
-                    </div>
+                    ) : (
+                      <div style={{ color: '#9ca3af', fontSize: 13, padding: '10px 0', fontStyle: 'italic' }}>
+                        <i className="fas fa-exclamation-circle" style={{ marginRight: 4 }}></i>ยังไม่มีข้อมูลบัญชี — ฝ่ายนิติกรรมจะกรอก
+                      </div>
+                    )}
+                    {docs.bank_book_file && (
+                      <div style={{ marginTop: 4, padding: '8px 10px', background: '#e0f2f1', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <i className="fas fa-book" style={{ color: '#00695c' }}></i>
+                        <span style={{ fontSize: 12, color: '#004d40', flex: 1 }}>สมุดบัญชีลูกหนี้ (อัพโหลดโดยนิติ)</span>
+                        <button onClick={() => setPreview(docs.bank_book_file)} style={{ padding: '4px 10px', background: '#00695c', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>
+                          <i className="fas fa-eye"></i> ดู
+                        </button>
+                      </div>
+                    )}
                   </SectionCard>
 
                   {/* 4. นายหน้า */}
@@ -456,11 +449,41 @@ function CaseModal({ caseRow, onClose }) {
                       )}
                       <DocGroup title="บัตรประชาชนนายหน้า" icon="fa-id-card" color="#1b5e20"
                         docs={[{ label: 'บัตร ปชช. นายหน้า', src: docs.agent_id_card }]} onPreview={setPreview} />
-                      <DocGroup title="สลิปค่าคอมมิชชั่น" icon="fa-receipt" color="#2e7d32"
+                      <DocGroup title="เอกสารนายหน้า" icon="fa-receipt" color="#2e7d32"
                         docs={[
-                      { label: 'สลิปค่าคอม (บัญชีนายหน้า)', src: docs.agent_commission_slip },
+                          { label: 'สมุดบัญชีนายหน้า (ยืนยันโดยฝ่ายนิติ)', src: docs.legal_agent_bank_book },
+                          { label: 'สลิปค่านายหน้า (ฝ่ายนิติ)', src: docs.legal_agent_payment_slip },
+                          { label: 'สลิปค่าคอม (บัญชีนายหน้า)', src: docs.agent_commission_slip },
                           { label: 'สลิปค่าคอม (ฝ่ายนิติ)', src: docs.commission_slip },
                         ]} onPreview={setPreview} />
+                      {/* ★ บัญชีธนาคารนายหน้า (กรอกโดยฝ่ายนิติกรรม) */}
+                      {(docs.agent_bank_name || docs.agent_bank_account_no || docs.agent_bank_account_name) && (
+                        <div style={{ marginTop: 12, padding: '10px 14px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10 }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#92400e', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <i className="fas fa-university"></i> บัญชีธนาคารนายหน้า (สำหรับโอนค่าคอมมิชชั่น)
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>
+                            {docs.agent_bank_name && (
+                              <div>
+                                <div style={{ fontSize: 10, color: '#92400e', fontWeight: 600, marginBottom: 2 }}>ธนาคาร</div>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: '#78350f' }}>{docs.agent_bank_name}</div>
+                              </div>
+                            )}
+                            {docs.agent_bank_account_no && (
+                              <div>
+                                <div style={{ fontSize: 10, color: '#92400e', fontWeight: 600, marginBottom: 2 }}>เลขบัญชี</div>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: '#78350f', fontFamily: 'monospace' }}>{docs.agent_bank_account_no}</div>
+                              </div>
+                            )}
+                            {docs.agent_bank_account_name && (
+                              <div>
+                                <div style={{ fontSize: 10, color: '#92400e', fontWeight: 600, marginBottom: 2 }}>ชื่อบัญชี</div>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: '#78350f' }}>{docs.agent_bank_account_name}</div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </SectionCard>
                   )}
 
@@ -525,20 +548,50 @@ function CaseModal({ caseRow, onClose }) {
                       <DocGroup title="สลิปถอนเงินนายทุน" icon="fa-money-bill-wave" color="#2e7d32"
                         docs={investorSlips.map((src, i) => ({ label: `สลิปนายทุน #${i + 1}`, src }))} onPreview={setPreview} />
                       {docs.transfer_slip && (
-                        <div style={{ marginTop: 12 }}>
-                          <DocGroup title="สลิปโอนเงิน (กรมที่ดิน)" icon="fa-receipt" color="#1565c0"
-                            docs={[{ label: 'สลิปโอนเงินหลังนัดโอน', src: docs.transfer_slip }]} onPreview={setPreview} />
-                          {(docs.auc_bank_name || docs.auc_bank_account_no) && (
-                            <div style={{ marginTop: 8, padding: '8px 12px', background: '#e3f2fd', borderRadius: 8, fontSize: 12, color: '#1565c0', borderLeft: '3px solid #1565c0' }}>
-                              <i className="fas fa-university" style={{ marginRight: 6 }}></i>
-                              <strong>บัญชีรับโอน:</strong>{' '}
-                              {docs.auc_bank_name && <span>{docs.auc_bank_name} </span>}
-                              {docs.auc_bank_account_no && <span>เลขที่ {docs.auc_bank_account_no} </span>}
-                              {docs.auc_bank_account_name && <span>ชื่อ {docs.auc_bank_account_name}</span>}
-                            </div>
-                          )}
-                        </div>
+                        <DocGroup title="สลิปโอนเงิน (กรมที่ดิน)" icon="fa-receipt" color="#1565c0"
+                          docs={[{ label: 'สลิปโอนเงินหลังนัดโอน', src: docs.transfer_slip }]} onPreview={setPreview} />
                       )}
+                      {/* ★ บัญชีธนาคารนายทุน (กรอกโดยฝ่ายประมูล) */}
+                      <div style={{ marginTop: 12, padding: '10px 14px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: '#1e40af', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <i className="fas fa-university"></i> บัญชีธนาคารนายทุน (กรอกโดยฝ่ายนิติกรรม)
+                        </div>
+                        {(docs.auc_bank_name || docs.auc_bank_account_no || docs.auc_bank_account_name) ? (
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>
+                            {docs.auc_bank_name && (
+                              <div>
+                                <div style={{ fontSize: 10, color: '#1e40af', fontWeight: 600, marginBottom: 2 }}>ธนาคาร</div>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: '#1e3a8a' }}>{docs.auc_bank_name}</div>
+                              </div>
+                            )}
+                            {docs.auc_bank_account_no && (
+                              <div>
+                                <div style={{ fontSize: 10, color: '#1e40af', fontWeight: 600, marginBottom: 2 }}>เลขบัญชี</div>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: '#1e3a8a', fontFamily: 'monospace' }}>{docs.auc_bank_account_no}</div>
+                              </div>
+                            )}
+                            {docs.auc_bank_account_name && (
+                              <div>
+                                <div style={{ fontSize: 10, color: '#1e40af', fontWeight: 600, marginBottom: 2 }}>ชื่อบัญชี</div>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: '#1e3a8a' }}>{docs.auc_bank_account_name}</div>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div style={{ color: '#9ca3af', fontSize: 12, fontStyle: 'italic' }}>
+                            <i className="fas fa-exclamation-circle" style={{ marginRight: 4 }}></i>ยังไม่มีข้อมูลบัญชี — ฝ่ายนิติกรรมจะกรอก
+                          </div>
+                        )}
+                        {docs.auc_bank_book_file && (
+                          <div style={{ marginTop: 8, padding: '6px 10px', background: '#dbeafe', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <i className="fas fa-book" style={{ color: '#1e40af' }}></i>
+                            <span style={{ fontSize: 12, color: '#1e3a8a', flex: 1 }}>สมุดบัญชีนายทุน (อัพโหลดโดยนิติ)</span>
+                            <button onClick={() => setPreview(docs.auc_bank_book_file)} style={{ padding: '4px 10px', background: '#1e40af', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>
+                              <i className="fas fa-eye"></i> ดู
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </SectionCard>
                   )}
 

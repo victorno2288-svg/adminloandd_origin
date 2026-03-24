@@ -615,7 +615,7 @@ exports.getCaseDocsList = (req, res) => {
   let sql = `
     SELECT
       lr.id AS loan_request_id, lr.debtor_code, lr.contact_name AS debtor_name,
-      lr.contact_phone AS debtor_phone, lr.bank_account_number, lr.bank_name, lr.bank_book_file,
+      lr.contact_phone AS debtor_phone, lr.bank_account_number, lr.bank_name, NULL AS bank_account_name, lr.bank_book_file,
       lr.updated_at,
       c.id AS case_id, c.case_code, c.status AS case_status,
       a.full_name AS agent_name,
@@ -654,7 +654,7 @@ exports.getCaseDocsList = (req, res) => {
         SELECT
           lr.id AS loan_request_id, lr.debtor_code, lr.contact_name AS debtor_name,
           lr.contact_phone AS debtor_phone,
-          NULL AS bank_account_number, NULL AS bank_name, NULL AS bank_book_file,
+          NULL AS bank_account_number, NULL AS bank_name, NULL AS bank_account_name, NULL AS bank_book_file,
           lr.updated_at,
           c.id AS case_id, c.case_code, c.status AS case_status,
           a.full_name AS agent_name,
@@ -722,6 +722,9 @@ exports.getCaseDocs = (req, res) => {
       da.redemption_slip, da.property_forfeited_slip,
       it.commission_slip AS issuing_commission_slip,
       lt.commission_slip AS legal_commission_slip,
+      lt.agent_bank_name, lt.agent_bank_account_no, lt.agent_bank_account_name,
+      lt.agent_payment_slip AS legal_agent_payment_slip,
+      lt.agent_bank_book AS legal_agent_bank_book,
       lt.attachment AS legal_attachment,
       lt.doc_selling_pledge, lt.deed_selling_pledge,
       lt.doc_extension, lt.deed_extension,
@@ -729,19 +732,19 @@ exports.getCaseDocs = (req, res) => {
       auc.spouse_consent_doc, auc.spouse_id_card, auc.spouse_reg_copy,
       auc.marriage_cert, auc.spouse_name_change_doc,
       auc.bank_name AS auc_bank_name, auc.bank_account_no AS auc_bank_account_no,
-      auc.bank_account_name AS auc_bank_account_name, auc.transfer_slip,
+      auc.bank_account_name AS auc_bank_account_name, auc.bank_book_file AS auc_bank_book_file, auc.transfer_slip,
       GROUP_CONCAT(DISTINCT iw.slip_path ORDER BY iw.id SEPARATOR '|') AS investor_slips,
       (SELECT CONCAT(COALESCE(i.investor_code,''), '|', COALESCE(i.full_name,''), '|', COALESCE(i.phone,''))
         FROM investors i
         JOIN investor_withdrawals iw3 ON iw3.investor_id = i.id
         WHERE iw3.case_id = c.id LIMIT 1) AS investor_info`
 
-  // otherFields ที่ปลอดภัย — แทน auc.* columns ใหม่ด้วย NULL
+  // otherFields ที่ปลอดภัย — แทน auc.* columns ใหม่ด้วย NULL (ใช้เมื่อ auction_transactions มีปัญหา)
   const otherFieldsSafe = `
       c.id AS case_id, c.case_code, c.status AS case_status,
       c.slip_image AS case_slip_image,
-      NULL AS investor_amount, NULL AS contract_start_date, NULL AS contract_end_date,
-      NULL AS days_remaining,
+      c.investor_amount, c.contract_start_date, c.contract_end_date,
+      DATEDIFF(c.contract_end_date, CURDATE()) AS days_remaining,
       a.id AS agent_db_id, a.full_name AS agent_name,
       a.phone AS agent_phone, a.id_card_image AS agent_id_card,
       NULL AS agent_commission_amount,
@@ -752,31 +755,41 @@ exports.getCaseDocs = (req, res) => {
       NULL AS appraisal_slip, NULL AS bag_fee_slip, NULL AS contract_sale_slip,
       NULL AS redemption_slip, NULL AS property_forfeited_slip,
       NULL AS issuing_commission_slip,
-      NULL AS legal_commission_slip,
-      NULL AS legal_attachment,
-      NULL AS doc_selling_pledge, NULL AS deed_selling_pledge,
-      NULL AS doc_extension, NULL AS deed_extension,
-      NULL AS doc_redemption, NULL AS deed_redemption,
+      lt.commission_slip AS legal_commission_slip,
+      lt.agent_bank_name, lt.agent_bank_account_no, lt.agent_bank_account_name,
+      lt.agent_payment_slip AS legal_agent_payment_slip,
+      lt.agent_bank_book AS legal_agent_bank_book,
+      lt.attachment AS legal_attachment,
+      lt.doc_selling_pledge, lt.deed_selling_pledge,
+      lt.doc_extension, lt.deed_extension,
+      lt.doc_redemption, lt.deed_redemption,
       NULL AS spouse_consent_doc, NULL AS spouse_id_card, NULL AS spouse_reg_copy,
       NULL AS marriage_cert, NULL AS spouse_name_change_doc,
       NULL AS auc_bank_name, NULL AS auc_bank_account_no,
-      NULL AS auc_bank_account_name, NULL AS transfer_slip,
+      NULL AS auc_bank_account_name, NULL AS auc_bank_book_file, NULL AS transfer_slip,
       NULL AS investor_slips, NULL AS investor_info`
+  // joinsSafe — ไม่มี auction_transactions (ปลอดภัยเมื่อ table นั้นเสีย) แต่มี legal_transactions
   const joinsSafe = `
     FROM loan_requests lr
     LEFT JOIN cases c ON c.loan_request_id = lr.id
     LEFT JOIN agents a ON a.id = lr.agent_id
+    LEFT JOIN legal_transactions lt ON lt.case_id = c.id
     WHERE lr.id = ? GROUP BY lr.id LIMIT 1`
 
-  const sqlFull = `SELECT ${coreFields} lr.bank_account_number, lr.bank_name, lr.bank_book_file, ${otherFields} ${joins}`
-  const sqlBasic = `SELECT ${coreFields} NULL AS bank_account_number, NULL AS bank_name, NULL AS bank_book_file, ${otherFieldsSafe} ${joins}`
-  const sqlMinimal = `SELECT ${coreFields} NULL AS bank_account_number, NULL AS bank_name, NULL AS bank_book_file, ${otherFieldsSafe} ${joinsSafe}`
+  const sqlFull = `SELECT ${coreFields} lr.bank_account_number, lr.bank_name, NULL AS bank_account_name, lr.bank_book_file, ${otherFields} ${joins}`
+  const sqlBasic = `SELECT ${coreFields} NULL AS bank_account_number, NULL AS bank_name, NULL AS bank_account_name, NULL AS bank_book_file, ${otherFieldsSafe} ${joins}`
+  const sqlMinimal = `SELECT ${coreFields} lr.bank_account_number, lr.bank_name, NULL AS bank_account_name, lr.bank_book_file, ${otherFieldsSafe} ${joinsSafe}`
 
+  const isTableError = (e) => e && (
+    e.code === 'ER_BAD_FIELD_ERROR' ||
+    e.code === 'ER_NO_SUCH_TABLE' ||
+    e.errno === 1932  // InnoDB: table doesn't exist in engine (.ibd missing)
+  )
   db.query(sqlFull, [loanRequestId], (err, results) => {
-    if (err && (err.code === 'ER_BAD_FIELD_ERROR' || err.code === 'ER_NO_SUCH_TABLE')) {
+    if (isTableError(err)) {
       // Fallback 1: ตัด lr.bank_* → NULL
       return db.query(sqlBasic, [loanRequestId], (err2, results2) => {
-        if (err2 && (err2.code === 'ER_BAD_FIELD_ERROR' || err2.code === 'ER_NO_SUCH_TABLE')) {
+        if (isTableError(err2)) {
           // Fallback 2: ตัด auc.* และ joined table columns ทั้งหมด → NULL
           return db.query(sqlMinimal, [loanRequestId], (err3, results3) => {
             if (err3) { console.error('getCaseDocs minimal fallback error:', err3); return res.status(500).json({ success: false, message: 'Server Error' }) }
@@ -795,13 +808,13 @@ exports.getCaseDocs = (req, res) => {
   })
 }
 
-// PUT /case-bank-info/:loanRequestId — บันทึกเลขบัญชี + ชื่อธนาคาร
+// PUT /case-bank-info/:loanRequestId — บันทึกเลขบัญชี + ชื่อธนาคาร + ชื่อบัญชี
 exports.saveBankInfo = (req, res) => {
   const { loanRequestId } = req.params
-  const { bank_account_number, bank_name } = req.body
+  const { bank_account_number, bank_name, bank_account_name } = req.body
   db.query(
-    'UPDATE loan_requests SET bank_account_number=?, bank_name=?, updated_at=NOW() WHERE id=?',
-    [bank_account_number || null, bank_name || null, loanRequestId],
+    'UPDATE loan_requests SET bank_account_number=?, bank_name=?, bank_account_name=?, updated_at=NOW() WHERE id=?',
+    [bank_account_number || null, bank_name || null, bank_account_name || null, loanRequestId],
     (err) => {
       if (err) {
         console.error('saveBankInfo error:', err)
