@@ -159,6 +159,7 @@ export default function AppraisalEditPage() {
   }, [id])
 
   // ===== โหลด checklist video docs =====
+  // id (URL param) = loan_request_id — ตรงกับ sharedChecklistRoutes /:lrId
   useEffect(() => {
     if (!id) return
     fetch(`/api/admin/debtors/${id}/checklist-docs`, {
@@ -181,7 +182,8 @@ export default function AppraisalEditPage() {
         body: formData
       })
       const data = await res.json()
-      if (data.success && data.docs?.property_video) setVideoFiles(data.docs.property_video)
+      // uploadChecklistDoc returns { success, field, paths } — not docs
+      if (data.success && data.paths) setVideoFiles(data.paths)
     } catch { /* silent */ }
     setUploadingVideo(false)
   }
@@ -194,7 +196,7 @@ export default function AppraisalEditPage() {
         body: JSON.stringify({ field: 'property_video', file_path: filePath })
       })
       const data = await res.json()
-      if (data.success && data.docs?.property_video !== undefined) setVideoFiles(data.docs.property_video)
+      if (data.success && data.paths !== undefined) setVideoFiles(data.paths)
       else setVideoFiles(prev => prev.filter(p => p !== filePath))
     } catch { /* silent */ }
   }
