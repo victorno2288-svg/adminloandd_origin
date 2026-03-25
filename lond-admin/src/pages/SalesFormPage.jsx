@@ -665,6 +665,26 @@ export default function SalesFormPage() {
         land_area:   uf.land_area   || dd.land_area,
         deed_type:   uf.deed_type   || null,
       })
+
+      // ★ Auto-geocode หลัง OCR โฉนด (socket path) — ถ้ายังไม่มี location_url
+      const prov = uf.province    || dd.province
+      const dist = uf.district    || dd.amphoe
+      const sub  = uf.subdistrict || dd.tambon
+      if (prov || dist) {
+        setTimeout(async () => {
+          // อ่านค่า location_url ปัจจุบัน (ป้องกัน stale closure)
+          let hasLocation = false
+          setForm(prev => { hasLocation = !!prev.location_url; return prev })
+          if (hasLocation) return
+
+          const coords = await geocodeAddress(prov, dist, sub)
+          if (coords) {
+            set('location_url', `https://www.google.com/maps/@${coords.lat},${coords.lng},16z`)
+            setOcrMsg({ type: 'success', text: `📍 OCR โฉนด: ${[sub, dist, prov].filter(Boolean).join(' › ')} — เติมพิกัดอัตโนมัติแล้ว` })
+            setTimeout(() => setOcrMsg(null), 6000)
+          }
+        }, 600)
+      }
     })
 
     // ── เอกสารทั่วไป (บัตรประชาชน, สลิป, ทะเบียนบ้าน ฯลฯ) ──
@@ -2736,7 +2756,7 @@ export default function SalesFormPage() {
                   )}
                 </label>
                 <input type="url" placeholder="https://maps.app.goo.gl/..." value={form.location_url} onChange={e => set('location_url', e.target.value)} />
-                <MapPreview url={form.location_url} label="โลเคชั่นทรัพย์" />
+                <MapPreview url={form.location_url} label="โลเคชั่นทรัพย์" province={form.province || null} onRefreshRequest={generateMapsUrl} />
 
                 {/* ★ Copy panel สำหรับกรอก landsmaps */}
                 <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 5 }}>
