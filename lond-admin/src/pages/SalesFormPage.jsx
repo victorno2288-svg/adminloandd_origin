@@ -4,6 +4,8 @@ import { io } from 'socket.io-client'
 import '../styles/sales.css'
 import CancelCaseButton from '../components/CancelCaseButton'
 import MapPreview from '../components/MapPreview'
+import { useSlipVerify } from '../components/SlipVerifyBadge'
+import SlipVerifyBadge from '../components/SlipVerifyBadge'
 
 const token = () => localStorage.getItem('loandd_admin')
 const API = '/api/admin/sales'
@@ -391,13 +393,15 @@ export default function SalesFormPage() {
   const [newAppt, setNewAppt] = useState({ appt_type: 'valuation', appt_date: '', appt_time: '', location: '', notes: '' })
   const [savingAppt, setSavingAppt] = useState(false)
 
-  // ★ คัดทรัพย์อัตโนมัติ
-  const [screeningConfirmed, setScreeningConfirmed] = useState(false)
-  const [savingScreening, setSavingScreening] = useState(false)
-  const [screeningMsg, setScreeningMsg] = useState('')
+  // ★ คัดทรัพย์ inline (dropdown)
+  const [screeningExpanded,  setScreeningExpanded]  = useState(false)
+  const [manualFailChecks,   setManualFailChecks]   = useState({})
+  const [savingScreening,    setSavingScreening]    = useState(false)
+  const [screeningMsg,       setScreeningMsg]       = useState('')
 
   // ★ สลิปค่าประเมิน
   const [slipFiles, setSlipFiles] = useState([])
+  const slipVerify = useSlipVerify({ apiBase: '/api/admin', token: token() })   // ★ ตรวจ QR + เช็ค duplicate ref
   const slipFile = slipFiles[0] || null  // compat
   const [uploadingSlip, setUploadingSlip] = useState(false)
   const [slipMsg, setSlipMsg] = useState('')
@@ -561,74 +565,29 @@ export default function SalesFormPage() {
     : null
   const ltvPass = actualLtvPct !== null && actualLtvPct <= ltvMax
 
-  // ★ ระบบคัดกรองทรัพย์อัตโนมัติ (Auto Property Screening)
+  // ★ เกณฑ์คัดทรัพย์ — บางเกณฑ์คำนวณอัตโนมัติ บางเกณฑ์ฝ่ายขายติ๊กเอง
   const AGRI_TYPES = ['agri', 'farm', 'rice_field', 'orchard', 'swamp']
   const propTypeVal = form.property_type === 'other' ? form.property_type_other : form.property_type
-  const screenChecks = [
-    {
-      key: 'deed',
-      label: 'ประเภทโฉนด',
-      pass: form.deed_type ? isDeedOk(form.deed_type) : null,
-      failMsg: 'โฉนดประเภทนี้ไม่รับพิจารณา (ต้องเป็น โฉนดที่ดิน หรือ น.ส.4ก. เท่านั้น)',
-      passMsg: 'โฉนดผ่านเกณฑ์',
-    },
-    {
-      key: 'property_type',
-      label: 'ประเภทอสังหาฯ',
-      pass: propTypeVal ? !AGRI_TYPES.includes(propTypeVal) : null,
-      failMsg: 'ที่ดินเกษตร/สวน/ไร่/นา — ไม่รับพิจารณา',
-      passMsg: 'ประเภททรัพย์ผ่านเกณฑ์',
-    },
-    {
-      key: 'road',
-      label: 'ทางเข้าออกถนน',
-      pass: form.road_access ? form.road_access === 'yes' : null,
-      failMsg: 'ที่ดินตาบอด (ไม่มีทางเข้าออก) — ไม่รับพิจารณา',
-      passMsg: 'มีทางเข้าออกถนน',
-    },
-    {
-      key: 'road_width',
-      label: 'ความกว้างถนน',
-      pass: form.road_width ? form.road_width !== 'lt4' : null,
-      failMsg: 'ถนนกว้างน้อยกว่า 4 เมตร — รถบรรทุกเข้าไม่ได้ ไม่รับพิจารณา',
-      passMsg: form.road_width === 'gt6' ? 'ถนนกว้าง > 6 เมตร — ดีมาก' : 'ถนนกว้าง 4–6 เมตร — ผ่านเกณฑ์',
-    },
-    {
-      key: 'utility',
-      label: 'สาธารณูปโภค',
-      pass: form.utility_access ? form.utility_access !== 'no' : null,
-      failMsg: 'ไม่มีไฟฟ้า/ประปา — ลดมูลค่าทรัพย์อย่างมาก',
-      passMsg: form.utility_access === 'yes' ? 'ครบทุกอย่าง ✓' : 'มีบางส่วน (รับได้)',
-    },
-    {
-      key: 'flood',
-      label: 'ความเสี่ยงน้ำท่วม',
-      pass: form.flood_risk ? form.flood_risk !== 'often' : null,
-      failMsg: 'น้ำท่วมบ่อย — ลดมูลค่าทรัพย์ ไม่รับพิจารณา',
-      passMsg: form.flood_risk === 'never' ? 'ไม่เคยท่วม ✓' : 'ท่วมนานๆ ครั้ง (รับได้)',
-    },
-    {
-      key: 'seizure',
-      label: 'สถานะการอายัด',
-      pass: form.seizure_status ? form.seizure_status !== 'seized' : null,
-      failMsg: 'ทรัพย์ถูกอายัด — ไม่รับพิจารณา',
-      passMsg: form.seizure_status === 'mortgaged' ? 'ติดจำนอง (รับได้ถ้า LTV ผ่าน)' : 'ไม่ถูกอายัด',
-    },
-    {
-      key: 'ltv',
-      label: `LTV (สัดส่วนกู้/ประเมิน ≤${ltvMax}%)`,
-      pass: actualLtvPct !== null ? ltvPass : null,
-      failMsg: `LTV ${actualLtvPct}% เกินเกณฑ์ ${ltvMax}% — วงเงินสูงเกินไป`,
-      passMsg: `LTV ${actualLtvPct}% ผ่านเกณฑ์`,
-    },
+  const SCREEN_CRITERIA = [
+    { key: 'deed',          label: 'ประเภทโฉนด',                     hint: 'รับเฉพาะ โฉนดที่ดิน (น.ส.4จ.) และ น.ส.4ก. เท่านั้น' },
+    { key: 'property_type', label: 'ประเภทอสังหาฯ',                  hint: 'ไม่รับที่ดินเกษตร สวน ไร่ หรือนา' },
+    { key: 'road',          label: 'ทางเข้าออกถนน',                  hint: 'ต้องมีทางเข้าออกถนนสาธารณะ — ไม่รับที่ดินตาบอด' },
+    { key: 'road_width',    label: 'ความกว้างถนน',                   hint: 'ถนนต้องกว้างอย่างน้อย 4 เมตร เพื่อให้รถบรรทุกผ่านได้' },
+    { key: 'utility',       label: 'สาธารณูปโภค',                    hint: 'ต้องมีไฟฟ้าและ/หรือประปาเข้าถึงพื้นที่' },
+    { key: 'flood',         label: 'ความเสี่ยงน้ำท่วม',              hint: 'ไม่รับพื้นที่ที่ถูกน้ำท่วมซ้ำซากเป็นประจำทุกปี' },
+    { key: 'seizure',       label: 'สถานะการอายัด',                  hint: 'ทรัพย์ต้องไม่ถูกอายัดหรืออยู่ในกระบวนการบังคับคดี' },
+    { key: 'ltv',           label: 'LTV (สัดส่วนกู้/ประเมิน ≤40%)', hint: `วงเงินกู้ต้องไม่เกิน ${ltvMax}% ของราคาประเมินทรัพย์` },
   ]
-  const filledChecks = screenChecks.filter(c => c.pass !== null)
-  const failedChecks = filledChecks.filter(c => c.pass === false)
-  const passedChecks = filledChecks.filter(c => c.pass === true)
-  const screenOverall = filledChecks.length === 0 ? null
-    : failedChecks.length > 0 ? 'fail'
-    : filledChecks.length === screenChecks.length ? 'pass'
-    : 'partial'
+  // Auto-detection สำหรับเกณฑ์ที่คำนวณได้จากข้อมูลในฟอร์ม
+  const autoFails = {
+    deed:          form.deed_type       ? !isDeedOk(form.deed_type)        : null,
+    property_type: propTypeVal          ? AGRI_TYPES.includes(propTypeVal) : null,
+    ltv:           actualLtvPct !== null ? !ltvPass                        : null,
+  }
+  // ค่า effective: manual override ก่อน ถ้าไม่มีใช้ auto ถ้าไม่มีทั้งคู่ = false
+  const getCheck = (key) => key in manualFailChecks ? manualFailChecks[key] : (autoFails[key] ?? false)
+  const failedChecks = SCREEN_CRITERIA.filter(c => getCheck(c.key))
+  const screenOverall = failedChecks.length > 0 ? 'fail' : null
 
   // โหลดรายการนายหน้า
   useEffect(() => {
@@ -637,6 +596,24 @@ export default function SalesFormPage() {
       .then(d => { if (d.success) setAgents(d.agents) })
       .catch(() => { })
   }, [])
+
+  // ★ Auto-tick screening checkboxes เมื่อข้อมูลที่คำนวณได้เปลี่ยน
+  useEffect(() => {
+    setManualFailChecks(prev => {
+      const next = { ...prev }
+      // โฉนด
+      if (form.deed_type) next.deed = !isDeedOk(form.deed_type)
+      // ประเภทอสังหาฯ
+      const ptv = form.property_type === 'other' ? form.property_type_other : form.property_type
+      if (ptv) next.property_type = ['agri','farm','rice_field','orchard','swamp'].includes(ptv)
+      // LTV
+      const estN = parseFloat(String(form.estimated_value).replace(/,/g,'')) || 0
+      const desN = parseFloat(String(form.desired_amount).replace(/,/g,'')) || 0
+      const maxL = form.loan_type_detail === 'selling_pledge' ? 60 : 40
+      if (estN > 0 && desN > 0) next.ltv = Math.round((desN/estN)*1000)/10 > maxL
+      return next
+    })
+  }, [form.deed_type, form.property_type, form.property_type_other, form.estimated_value, form.desired_amount, form.loan_type_detail])
 
   // ★ Socket.io — รับ deed_ocr_result แล้วอัพเดทฟิลด์ทรัพย์อัตโนมัติ
   useEffect(() => {
@@ -952,8 +929,14 @@ export default function SalesFormPage() {
           try { setExistingImages(JSON.parse(debtor.images) || []) } catch { setExistingImages([]) }
           try { setExistingDeedImages(JSON.parse(debtor.deed_images) || []) } catch { setExistingDeedImages([]) }
           // โหลดผลคัดทรัพย์เดิม (ถ้าเคยบันทึกไว้แล้ว)
-          if (debtor.screening_status) {
-            setScreeningConfirmed(true)
+          if (debtor.ineligible_reason) {
+            const savedReasons = debtor.ineligible_reason.split(', ')
+            const checks = {}
+            ;['deed','property_type','road','road_width','utility','flood','seizure','ltv'].forEach((key, i) => {
+              const labels = ['ประเภทโฉนด','ประเภทอสังหาฯ','ทางเข้าออกถนน','ความกว้างถนน','สาธารณูปโภค','ความเสี่ยงน้ำท่วม','สถานะการอายัด','LTV (สัดส่วนกู้/ประเมิน ≤40%)']
+              if (savedReasons.includes(labels[i])) checks[key] = true
+            })
+            setManualFailChecks(checks)
           }
 
           // ★ แสดงข้อมูลนายหน้าที่ผูกอยู่ (จาก API response)
@@ -1388,6 +1371,19 @@ export default function SalesFormPage() {
         }
       }
       setSlipMsg(`✅ อัพโหลดสลิปสำเร็จ ${slipFiles.length > 1 ? `(${slipFiles.length} ไฟล์)` : ''}`)
+      // ★ บันทึก ref สลิปลงฐานข้อมูล (ป้องกัน duplicate)
+      if (slipVerify.verifyResult?.qrData?.ref) {
+        fetch('/api/admin/slip/record-ref', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+          body: JSON.stringify({
+            ref:        slipVerify.verifyResult.qrData.ref,
+            amount:     slipVerify.verifyResult.qrData.amount,
+            case_id:    caseInfo?.case_id || null,
+            field_name: 'appraisal_slip',
+          }),
+        }).catch(() => {})
+      }
       setSlipFiles([])
       // ★ Auto-set payment_status = 'paid' เมื่ออัพโหลดสลิปสำเร็จ
       if (caseInfo?.payment_status !== 'paid') {
@@ -1465,6 +1461,69 @@ export default function SalesFormPage() {
     } finally {
       setUploadingBrokerContract(false)
     }
+  }
+
+  // ★ บันทึกผลคัดทรัพย์ → PATCH /debtors/:id/screening
+  const handleSaveScreening = async (debtorId) => {
+    const targetId = debtorId || id
+    if (!targetId) return
+    const isIneligible = screenOverall === 'fail'
+    const screening_status = screenOverall === 'fail' ? 'ineligible' : 'eligible'
+    const ineligible_reason = failedChecks.map(c => c.label).join(', ')
+    setSavingScreening(true)
+    try {
+      const res = await fetch(`${API}/debtors/${targetId}/screening`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ineligible_property: isIneligible ? 1 : 0,
+          ineligible_reason: isIneligible ? ineligible_reason : null,
+          screening_status,
+        })
+      })
+      const data = await res.json()
+      if (data.success) {
+        // screeningConfirmed removed
+        setScreeningMsg(screening_status === 'eligible'
+          ? '✅ ทรัพย์ผ่านเกณฑ์ — บันทึกแล้ว'
+          : screening_status === 'ineligible'
+            ? '⚠️ ทรัพย์ไม่ผ่านเกณฑ์ — บันทึกแล้ว'
+            : '📋 บันทึกผลคัดทรัพย์แล้ว')
+      }
+    } catch (_) {}
+    setSavingScreening(false)
+  }
+
+  // ★ ทรัพย์ไม่เข้าเกณฑ์ → บันทึก ineligible + ส่งคำขอยกเลิกเคสอัตโนมัติ
+  const handleMarkIneligibleAndCancel = async () => {
+    if (!id) return
+    setSavingScreening(true)
+    const ineligible_reason = failedChecks.map(c => c.label).join(', ')
+    // 1. บันทึก screening ineligible
+    try {
+      await fetch(`${API}/debtors/${id}/screening`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ineligible_property: 1, ineligible_reason, screening_status: 'ineligible' }),
+      })
+    } catch (_) {}
+    // 2. ส่งคำขอยกเลิกเคส (ถ้ามีเคส)
+    if (caseInfo?.id) {
+      try {
+        const lsUser = JSON.parse(localStorage.getItem('loandd_admin_user') || '{}')
+        await fetch('/api/admin/cancellations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+          body: JSON.stringify({
+            case_id: caseInfo.id,
+            requested_by: lsUser.id,
+            reason: `ทรัพย์ไม่เข้าเกณฑ์: ${ineligible_reason}`,
+          }),
+        })
+      } catch (_) {}
+    }
+    setSavingScreening(false)
+    navigate('/sales')
   }
 
   // ★ ส่งสัญญาทางอีเมล (อัพเดท loan_requests.broker_contract_sent_at)
@@ -1636,6 +1695,10 @@ export default function SalesFormPage() {
       const res = await fetch(url, { method, headers: { Authorization: `Bearer ${token()}` }, body: formData })
       const data = await res.json()
       if (data.success) {
+        // ★ ถ้าเคยเปิด popup คัดทรัพย์ (มีการตรวจสอบ) → บันทึกผลอัตโนมัติหลัง create
+        if (!isEdit && data.id && screenOverall !== null) {
+          await handleSaveScreening(data.id)
+        }
         setSuccess(true)
         setTimeout(() => navigate(-1), 800)
       } else setErrors({ submit: data.message || 'เกิดข้อผิดพลาด' })
@@ -1868,7 +1931,7 @@ export default function SalesFormPage() {
                                   padding: '2px 10px', borderRadius: 5, fontSize: 11, fontWeight: 600,
                                   background: isUploading ? '#e5e7eb' : '#eff6ff', color: isUploading ? '#9ca3af' : '#2563eb',
                                   border: '1px solid #bfdbfe', whiteSpace: 'nowrap' }}>
-                                  {isUploading ? <><i className="fas fa-spinner fa-spin"></i>&nbsp;อัพโหลด...</> : <><i className="fas fa-upload"></i>&nbsp;อัพโหลด</>}
+                                  {isUploading ? <><i className="fas fa-spinner fa-spin"></i>&nbsp;อัพโหลด...</> : <><i className="fas fa-upload"></i>&nbsp;อัพโหลด<span style={{ fontSize: 10, opacity: 0.8, marginLeft: 3 }}>(หลายไฟล์ได้)</span></>}
                                   <input type="file" accept="image/*,.pdf" multiple style={{ display: 'none' }} disabled={isUploading}
                                     onChange={e => { if (e.target.files?.length) handleChecklistUpload(item.field, Array.from(e.target.files)); e.target.value = '' }} />
                                 </label>
@@ -2607,7 +2670,8 @@ export default function SalesFormPage() {
                   <i className="fas fa-map-marker-alt" style={{ color: 'var(--primary)', marginRight: 8 }}></i>
                   ข้อมูลทรัพย์
                 </span>
-                {ocrFlash && (
+
+{ocrFlash && (
                   <span style={{
                     background: 'linear-gradient(135deg, #059669, #10b981)',
                     color: '#fff', fontSize: 11, fontWeight: 700,
@@ -2764,6 +2828,128 @@ export default function SalesFormPage() {
 
             </div>
 
+            {/* ===== ★ คัดทรัพย์ (SOP Auto Screening) — Dropdown ===== */}
+            <div style={{ marginBottom: 20 }}>
+              {/* Dropdown trigger bar */}
+              <button type="button"
+                onClick={() => setScreeningExpanded(v => !v)}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '10px 16px', borderRadius: screeningExpanded ? '10px 10px 0 0' : 10,
+                  border: screenOverall === 'fail' ? '1.5px solid #fecaca' : '1.5px solid #e5e7eb',
+                  background: screenOverall === 'fail' ? '#fef2f2' : '#f9fafb',
+                  cursor: 'pointer',
+                }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <i className="fas fa-shield-alt" style={{ color: '#dc2626', fontSize: 13 }}></i>
+                  <span style={{ fontWeight: 700, fontSize: 13, color: '#374151' }}>คัดทรัพย์</span>
+                  {failedChecks.length > 0
+                    ? <span style={{ background: '#dc2626', color: '#fff', borderRadius: 20, padding: '1px 10px', fontSize: 11, fontWeight: 700 }}>✗ ไม่ผ่าน {failedChecks.length} เกณฑ์</span>
+                    : <span style={{ fontSize: 11, color: '#9ca3af' }}>ติ๊กเกณฑ์ที่ไม่ผ่าน</span>}
+                </div>
+                <i className={`fas fa-chevron-${screeningExpanded ? 'up' : 'down'}`} style={{ color: '#9ca3af', fontSize: 12 }}></i>
+              </button>
+
+              {/* Expanded panel */}
+              {screeningExpanded && (
+                <div style={{
+                  border: screenOverall === 'fail' ? '1.5px solid #fecaca' : '1.5px solid #e5e7eb',
+                  borderTop: 'none', borderRadius: '0 0 10px 10px',
+                  padding: '14px 16px', background: '#fff',
+                }}>
+                  {/* เกณฑ์ — ติ๊กถ้าไม่ผ่าน (บางเกณฑ์คำนวณอัตโนมัติ) */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 12 }}>
+                    {SCREEN_CRITERIA.map(c => {
+                      const checked = getCheck(c.key)
+                      const isAutoKey = c.key in autoFails
+                      const autoVal = autoFails[c.key]
+                      const hasAutoData = isAutoKey && autoVal !== null
+                      // สร้าง description ที่แสดงสถานะปัจจุบัน
+                      let statusText = c.hint
+                      if (c.key === 'deed' && form.deed_type) {
+                        const deedLabel = { chanote: 'โฉนดที่ดิน (น.ส.4จ.)', ns4k: 'น.ส.4ก.', ns3: 'น.ส.3', ns3k: 'น.ส.3ก.', ns3g: 'น.ส.3ข.', sor_por_kor: 'สปก.4-01', other: 'อื่นๆ' }
+                        const dl = deedLabel[form.deed_type] || form.deed_type
+                        statusText = isDeedOk(form.deed_type) ? `${dl} — ผ่านเกณฑ์ ✓` : `${dl} — ไม่รับพิจารณา ✗`
+                      } else if (c.key === 'property_type' && propTypeVal) {
+                        statusText = !AGRI_TYPES.includes(propTypeVal) ? `${propTypeVal} — ผ่านเกณฑ์ ✓` : `ที่ดินประเภทนี้ไม่รับพิจารณา ✗`
+                      } else if (c.key === 'ltv' && actualLtvPct !== null) {
+                        statusText = ltvPass ? `LTV ${actualLtvPct}% — ผ่านเกณฑ์ ✓` : `LTV ${actualLtvPct}% เกินเกณฑ์ ${ltvMax}% ✗`
+                      }
+                      return (
+                        <label key={c.key} style={{
+                          display: 'flex', alignItems: 'flex-start', gap: 9, cursor: 'pointer',
+                          padding: '9px 12px', borderRadius: 8,
+                          background: checked ? '#fef2f2' : '#f9fafb',
+                          border: `1px solid ${checked ? '#fecaca' : '#e5e7eb'}`,
+                        }}>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={e => setManualFailChecks(prev => ({ ...prev, [c.key]: e.target.checked }))}
+                            style={{ width: 15, height: 15, cursor: 'pointer', accentColor: '#dc2626', marginTop: 2, flexShrink: 0 }}
+                          />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: 12, fontWeight: 700, color: checked ? '#dc2626' : '#374151' }}>
+                                {c.label}
+                              </span>
+                              {hasAutoData && (
+                                <span style={{ fontSize: 10, background: '#eff6ff', color: '#3b82f6', borderRadius: 20, padding: '0 7px', fontWeight: 600, lineHeight: '18px' }}>
+                                  อัตโนมัติ
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ fontSize: 11, color: checked ? '#b91c1c' : '#6b7280', marginTop: 2, lineHeight: 1.4 }}>
+                              {statusText}
+                            </div>
+                          </div>
+                        </label>
+                      )
+                    })}
+                  </div>
+
+                  {/* Action buttons */}
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {screenOverall === 'fail' && (
+                      <button type="button"
+                        onClick={handleMarkIneligibleAndCancel}
+                        disabled={savingScreening}
+                        style={{
+                          flex: 1, padding: '9px 0', borderRadius: 8, border: 'none',
+                          background: '#dc2626', color: '#fff', fontSize: 13, fontWeight: 700,
+                          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                        }}>
+                        {savingScreening
+                          ? <><i className="fas fa-spinner fa-spin"></i> กำลังบันทึก...</>
+                          : <><i className="fas fa-times-circle"></i> ทรัพย์ไม่เข้าเกณฑ์</>}
+                      </button>
+                    )}
+                    {screenOverall === null && isEdit && (
+                      <button type="button"
+                        onClick={() => handleSaveScreening()}
+                        disabled={screenOverall === null || savingScreening}
+                        style={{
+                          flex: 1, padding: '9px 0', borderRadius: 8, border: 'none',
+                          background: '#16a34a', color: '#fff', fontSize: 13, fontWeight: 700,
+                          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                        }}>
+                        {savingScreening
+                          ? <><i className="fas fa-spinner fa-spin"></i> กำลังบันทึก...</>
+                          : <><i className="fas fa-check-circle"></i> บันทึก — ผ่านเกณฑ์</>}
+                      </button>
+                    )}
+                  </div>
+
+                  {screeningMsg && (
+                    <div style={{ marginTop: 8, fontSize: 12, fontWeight: 600, textAlign: 'center',
+                      color: screeningMsg.includes('⚠️') ? '#b45309' : '#15803d' }}>
+                      {screeningMsg}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* ===== ★ นัดประเมิน ===== */}
             <div className="card" style={{ padding: 24, marginBottom: 20 }}>
               {/* ===== ★ นัดประเมิน (ฝ่ายขายดีลให้) ===== */}
@@ -2897,7 +3083,11 @@ export default function SalesFormPage() {
                       borderRadius: 10, padding: 10, transition: 'border-color 0.2s',
                     }}>
                       <input type="file" accept="image/*,.pdf" id="create-slip-file-input" style={{ display: 'none' }}
-                        onChange={e => { if (e.target.files[0]) setSlipFiles([e.target.files[0]]); e.target.value = '' }} />
+                        onChange={e => {
+                          const f = e.target.files[0]
+                          if (f) { setSlipFiles([f]); slipVerify.runVerify(f) }
+                          e.target.value = ''
+                        }} />
                       <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                         <div style={{
                           width: 56, height: 56, flexShrink: 0, borderRadius: 8, overflow: 'hidden',
@@ -2931,6 +3121,8 @@ export default function SalesFormPage() {
                         </div>
                       </div>
                     </label>
+                    {/* ★ ผลตรวจสลิป QR */}
+                    <SlipVerifyBadge result={slipVerify.verifyResult} verifying={slipVerify.verifying} />
                     {/* วันที่ชำระ */}
                     <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                       <label style={{ fontSize: 12, fontWeight: 700, color: '#e65100', whiteSpace: 'nowrap' }}>
@@ -2982,7 +3174,13 @@ export default function SalesFormPage() {
                     }}>
                       <input type="file" accept="image/*,.pdf" multiple id="slip-file-input" style={{ display: 'none' }}
                         disabled={uploadingSlip}
-                        onChange={e => { setSlipFiles(Array.from(e.target.files)); setSlipMsg(''); e.target.value = '' }} />
+                        onChange={e => {
+                          const files = Array.from(e.target.files)
+                          setSlipFiles(files)
+                          setSlipMsg('')
+                          if (files[0]) slipVerify.runVerify(files[0])
+                          e.target.value = ''
+                        }} />
                       <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                         <div style={{
                           width: 56, height: 56, flexShrink: 0, borderRadius: 8, overflow: 'hidden',
@@ -3021,6 +3219,8 @@ export default function SalesFormPage() {
                         </div>
                       </div>
                     </label>
+                    {/* ★ ผลตรวจสลิป QR */}
+                    <SlipVerifyBadge result={slipVerify.verifyResult} verifying={slipVerify.verifying} />
                     <button onClick={handleUploadSlip} disabled={!slipFiles.length || uploadingSlip}
                       style={{ padding: '6px 14px', background: slipFiles.length ? '#f57f17' : '#bdbdbd', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: slipFiles.length ? 'pointer' : 'not-allowed', opacity: slipFiles.length ? 1 : 0.6 }}>
                       {uploadingSlip ? <><i className="fas fa-spinner fa-spin"></i> กำลังอัพโหลด...</> : <><i className="fas fa-upload" style={{ marginRight: 4 }}></i>อัพโหลด</>}
@@ -3160,7 +3360,7 @@ export default function SalesFormPage() {
                                 }}>
                                   {isUploading
                                     ? <><i className="fas fa-spinner fa-spin" /> กำลังอัพ...</>
-                                    : <><i className="fas fa-upload" /> อัพโหลด</>
+                                    : <><i className="fas fa-upload" /> อัพโหลด<span style={{ fontSize: 10, opacity: 0.8, marginLeft: 3 }}>(หลายไฟล์ได้)</span></>
                                   }
                                   <input
                                     type="file"
@@ -3667,6 +3867,7 @@ export default function SalesFormPage() {
           100% { transform: rotate(0deg); }
         }
       `}</style>
+
     </div>
   )
 }

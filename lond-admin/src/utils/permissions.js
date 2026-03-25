@@ -87,6 +87,7 @@ export function getAllowedPaths(department) {
   return allowed
 }
 
+// แต่ละฝ่ายเข้าหน้า dashboard ของตัวเอง (route เดียวกัน, render ต่างกันตาม dept)
 export function getDefaultPage(department) {
   return '/dashboard'
 }

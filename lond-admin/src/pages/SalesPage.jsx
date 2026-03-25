@@ -614,6 +614,160 @@ function AddAgentModal({ show, onClose }) {
   )
 }
 
+// ==================== TAB: ทรัพย์ไม่เข้าเกณฑ์ ====================
+function IneligibleTab({ search, refreshKey }) {
+  const navigate = useNavigate()
+  const [data, setData]   = useState([])
+  const [page, setPage]   = useState(1)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    setLoading(true)
+    fetch(`${API}/debtors`, { headers: { Authorization: `Bearer ${token()}` } })
+      .then(r => r.json())
+      .then(d => {
+        if (d.success) {
+          // กรองเฉพาะทรัพย์ที่ไม่ผ่านเกณฑ์ หรือ screening_status = 'ineligible'
+          setData(d.debtors.filter(x => x.ineligible_property || x.screening_status === 'ineligible'))
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [refreshKey])
+
+  const filtered = data.filter(d => {
+    if (!search) return true
+    return d.contact_name?.includes(search) || d.contact_phone?.includes(search) || d.debtor_code?.includes(search) || d.agent_name?.includes(search)
+  })
+  const paged = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE)
+  useEffect(() => { setPage(1) }, [search])
+
+  if (loading) return (
+    <div style={{ textAlign: 'center', padding: 60, color: '#888' }}>
+      <i className="fas fa-spinner fa-spin" style={{ fontSize: 28 }}></i>
+      <p style={{ marginTop: 12 }}>กำลังโหลด...</p>
+    </div>
+  )
+
+  return (
+    <div>
+      {/* Summary banner */}
+      <div style={{
+        background: 'linear-gradient(135deg,#dc2626,#b91c1c)',
+        borderRadius: 12, padding: '14px 20px', marginBottom: 16,
+        display: 'flex', alignItems: 'center', gap: 14, color: '#fff',
+      }}>
+        <i className="fas fa-times-circle" style={{ fontSize: 28, opacity: 0.9 }}></i>
+        <div>
+          <div style={{ fontWeight: 800, fontSize: 16 }}>ทรัพย์ไม่เข้าเกณฑ์</div>
+          <div style={{ fontSize: 13, opacity: 0.85, marginTop: 2 }}>
+            พบ {data.length} รายการ — ทรัพย์เหล่านี้ไม่ผ่านการคัดกรองตาม SOP ฝ่ายขาย
+          </div>
+        </div>
+        <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
+          <div style={{ fontSize: 28, fontWeight: 900 }}>{data.length}</div>
+          <div style={{ fontSize: 11, opacity: 0.75 }}>รายการทั้งหมด</div>
+        </div>
+      </div>
+
+      <div className="table-responsive">
+        <table className="table-green">
+          <thead>
+            <tr>
+              <th>ลำดับ</th>
+              <th>ID ลูกหนี้</th>
+              <th>ชื่อ-นามสกุล</th>
+              <th>เบอร์โทร</th>
+              <th>นายหน้า</th>
+              <th>ประเภทโฉนด</th>
+              <th>ประเภทสัญญา</th>
+              <th>เหตุผลที่ไม่ผ่าน</th>
+              <th>วันที่สร้าง</th>
+              <th>จัดการ</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 ? (
+              <tr><td colSpan="10">
+                <div className="empty-state">
+                  <i className="fas fa-check-circle" style={{ color: '#27ae60', fontSize: 32 }}></i>
+                  <p style={{ color: '#27ae60', fontWeight: 700 }}>ไม่พบทรัพย์ที่ไม่เข้าเกณฑ์ 🎉</p>
+                </div>
+              </td></tr>
+            ) : paged.map((d, i) => (
+              <tr key={d.id} style={{ background: '#fff8f8' }}>
+                <td>{String((page - 1) * PER_PAGE + i + 1).padStart(2, '0')}</td>
+                <td><strong style={{ color: '#dc2626' }}>{d.debtor_code || '-'}</strong></td>
+                <td><strong>{d.contact_name}</strong></td>
+                <td>{d.contact_phone}</td>
+                <td>
+                  {d.agent_name
+                    ? <div><div style={{ fontSize: 13, fontWeight: 600 }}>{d.agent_name}</div>
+                        {d.agent_code && <div style={{ fontSize: 11, color: '#888' }}>{d.agent_code}</div>}
+                      </div>
+                    : <span style={{ color: '#ccc' }}>-</span>}
+                </td>
+                <td>
+                  <span style={{
+                    fontSize: 12, padding: '2px 8px', borderRadius: 8,
+                    background: ['chanote','ns4k'].includes(d.deed_type) ? '#f0fdf4' : '#fef2f2',
+                    color: ['chanote','ns4k'].includes(d.deed_type) ? '#15803d' : '#dc2626',
+                    border: `1px solid ${['chanote','ns4k'].includes(d.deed_type) ? '#bbf7d0' : '#fecaca'}`,
+                    fontWeight: 600,
+                  }}>
+                    {d.deed_type || '-'}
+                  </span>
+                </td>
+                <td>
+                  {d.loan_type_detail === 'mortgage'
+                    ? <span style={{ fontSize: 11, fontWeight: 700, color: '#1565c0', background: '#e3f2fd', padding: '2px 8px', borderRadius: 10 }}>จำนอง</span>
+                    : d.loan_type_detail === 'selling_pledge'
+                      ? <span style={{ fontSize: 11, fontWeight: 700, color: '#6a1b9a', background: '#f3e5f5', padding: '2px 8px', borderRadius: 10 }}>ขายฝาก</span>
+                      : <span style={{ color: '#bbb', fontSize: 11 }}>-</span>}
+                </td>
+                <td>
+                  {d.ineligible_reason ? (
+                    <div style={{ maxWidth: 200 }}>
+                      {d.ineligible_reason.split(',').map((r, idx) => (
+                        <div key={idx} style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 4, margin: '1px 3px 1px 0',
+                          padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600,
+                          background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca',
+                        }}>
+                          <i className="fas fa-times-circle" style={{ fontSize: 9 }}></i>
+                          {r.trim()}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <span style={{ color: '#bbb', fontSize: 12 }}>—</span>
+                  )}
+                </td>
+                <td style={{ fontSize: 12, color: '#666', whiteSpace: 'nowrap' }}>
+                  {d.created_at ? new Date(d.created_at).toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
+                </td>
+                <td>
+                  <button
+                    onClick={() => navigate(`/sales/edit${d.id}`)}
+                    style={{
+                      padding: '5px 10px', background: '#fff3cd', color: '#e65100',
+                      border: '1px solid #ffcc02', borderRadius: 6,
+                      fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                    }}>
+                    <i className="fas fa-edit"></i> แก้ไข
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <Pagination total={filtered.length} page={page} setPage={setPage} />
+    </div>
+  )
+}
+
 // ==================== MAIN SALES PAGE ====================
 export default function SalesPage() {
   const navigate = useNavigate()
@@ -635,9 +789,10 @@ export default function SalesPage() {
   useEffect(() => { fetch(`${API}/stats`, { headers: { Authorization: `Bearer ${token()}` } }).then(r => r.json()).then(d => { if (d.success) setStats(d.stats) }).catch(() => { }) }, [])
 
   const tabs = [
-    { key: 'debtors', label: 'ID ลูกหนี้', icon: 'fa-user-tag' },
-    { key: 'cases', label: 'ID เคส', icon: 'fa-id-card' },
-    { key: 'agents', label: 'ID นายหน้า', icon: 'fa-user-tie' },
+    { key: 'debtors',    label: 'ID ลูกหนี้',         icon: 'fa-user-tag' },
+    { key: 'cases',      label: 'ID เคส',              icon: 'fa-id-card' },
+    { key: 'agents',     label: 'ID นายหน้า',          icon: 'fa-user-tie' },
+    { key: 'ineligible', label: 'ทรัพย์ไม่เข้าเกณฑ์', icon: 'fa-times-circle', color: '#dc2626' },
   ]
 
   const handleAgentModalClose = (refresh) => { setShowAgentModal(false); if (refresh) reload() }
@@ -659,8 +814,9 @@ export default function SalesPage() {
         <div style={{ display: 'flex', gap: 0 }}>
           {tabs.map(tab => (
             <button key={tab.key} className={`sales-tab ${activeTab === tab.key ? 'active' : ''}`}
-              onClick={() => { setActiveTab(tab.key); setSearch(''); setSearchField('') }}>
-              <i className={`fas ${tab.icon}`}></i> {tab.label}
+              onClick={() => { setActiveTab(tab.key); setSearch(''); setSearchField('') }}
+              style={tab.color && activeTab !== tab.key ? { color: tab.color } : {}}>
+              <i className={`fas ${tab.icon}`} style={tab.color && activeTab !== tab.key ? { color: tab.color } : {}}></i> {tab.label}
             </button>
           ))}
         </div>
@@ -710,9 +866,10 @@ export default function SalesPage() {
       {/* OCR Modal */}
       <OcrSearchModal show={showOcrModal} onClose={() => setShowOcrModal(false)} navigate={navigate} />
 
-      {activeTab === 'debtors' && <DebtorsTab search={search} searchField={searchField} refreshKey={refreshKey} />}
-      {activeTab === 'cases' && <CasesTab search={search} searchField={searchField} refreshKey={refreshKey} onReload={reload} />}
-      {activeTab === 'agents' && <AgentsTab search={search} searchField={searchField} refreshKey={refreshKey} onReload={reload} />}
+      {activeTab === 'debtors'    && <DebtorsTab search={search} searchField={searchField} refreshKey={refreshKey} />}
+      {activeTab === 'cases'      && <CasesTab search={search} searchField={searchField} refreshKey={refreshKey} onReload={reload} />}
+      {activeTab === 'agents'     && <AgentsTab search={search} searchField={searchField} refreshKey={refreshKey} onReload={reload} />}
+      {activeTab === 'ineligible' && <IneligibleTab search={search} refreshKey={refreshKey} />}
 
       <AddAgentModal show={showAgentModal} onClose={handleAgentModalClose} />
     </div>

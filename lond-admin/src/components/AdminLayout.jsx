@@ -150,11 +150,21 @@ export default function AdminLayout() {
   }
 
 
+  // ─── label ของ Dashboard ตาม department ───
+  const DEPT_DASH_LABEL = {
+    sales: 'Dashboard ฝ่ายขาย', appraisal: 'Dashboard ฝ่ายประเมิน',
+    approval: 'Dashboard ฝ่ายอนุมัติ', legal: 'Dashboard ฝ่ายนิติกรรม',
+    issuing: 'Dashboard ฝ่ายออกสัญญา', accounting: 'Dashboard ฝ่ายบัญชี',
+    auction: 'Dashboard ฝ่ายประมูล',
+    super_admin: 'Dashboard ภาพรวม', manager: 'Dashboard ภาพรวม',
+  }
+  const dashLabel = DEPT_DASH_LABEL[department] || 'Dashboard'
+
   // ========== เมนูทั้งหมด (ก่อนกรอง) ==========
   const allMenuItems = [
     // — ภาพรวม —
     { type: 'section', label: 'ภาพรวม' },
-    { path: '/dashboard', icon: 'fas fa-chart-pie', label: 'Dashboard' },
+    { path: '/dashboard', icon: 'fas fa-chart-pie', label: dashLabel },
     { path: '/ceo-dashboard', icon: 'fas fa-crown', label: 'CEO Dashboard' },
     { path: '/calendar', icon: 'fas fa-calendar-alt', label: 'ปฏิทินนัดหมาย' },
     { path: '/weekly-report', icon: 'fas fa-calendar-week', label: 'รายงานประจำสัปดาห์' },
