@@ -355,7 +355,7 @@ function DebtorsTab({ search, searchField, refreshKey }) {
                 <td>
                   <span style={{ fontSize: 11, color: '#555', background: '#f0f4ff', padding: '2px 8px', borderRadius: 10, whiteSpace: 'nowrap' }}>
                     <i className="fas fa-user-edit" style={{ marginRight: 4, color: '#3498db' }}></i>
-                    {d.case_creator || '-'}
+                    {d.case_creator || d.created_by_name || '-'}
                   </span>
                 </td>
                 <td>{propertyTypeLabel[d.property_type] || d.property_type || '-'}</td>

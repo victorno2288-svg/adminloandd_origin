@@ -2913,6 +2913,60 @@ export default function SalesFormPage() {
                     })}
                   </div>
 
+                  {/* ★ Reject Category Checklist — แสดงเมื่อไม่ผ่านเกณฑ์ */}
+                  {screenOverall === 'fail' && (
+                    <div style={{ marginTop: 12, padding: '12px 14px', background: '#fff7ed', border: '1.5px solid #fed7aa', borderRadius: 10 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#92400e', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <i className="fas fa-exclamation-triangle" style={{ color: '#f59e0b' }}></i>
+                        ระบุเหตุผลที่ทรัพย์ไม่เข้าเกณฑ์ (เลือกได้หลายข้อ)
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                        {[
+                          { value: 'สปก.',                   icon: 'fa-tractor',        label: 'สปก. (ที่ดินเกษตร)' },
+                          { value: 'นส.3/นส.3ก.',            icon: 'fa-file-alt',       label: 'นส.3/นส.3ก.' },
+                          { value: 'ที่ดินตาบอด',             icon: 'fa-road',           label: 'ที่ตาบอด (ไม่มีถนน)' },
+                          { value: 'น้ำท่วมซ้ำซาก',          icon: 'fa-water',          label: 'น้ำท่วมซ้ำซาก' },
+                          { value: 'ถนนแคบ/เข้าถึงยาก',     icon: 'fa-car-crash',      label: 'ถนนแคบ/เข้าถึงยาก' },
+                          { value: 'ทำเลไกล/ห่างไกลชุมชน', icon: 'fa-map-marked-alt', label: 'ทำเลไกล/ห่างชุมชน' },
+                          { value: 'ราคาประเมินต่ำ',         icon: 'fa-chart-line',     label: 'ราคาประเมินต่ำกว่าเกณฑ์' },
+                          { value: 'LTV เกินเกณฑ์',          icon: 'fa-percentage',     label: 'LTV เกินเกณฑ์' },
+                          { value: 'อื่นๆ',                  icon: 'fa-ellipsis-h',     label: 'อื่นๆ' },
+                        ].map(opt => {
+                          const selected = (form.reject_category || '').split(',').map(s => s.trim()).filter(Boolean).includes(opt.value)
+                          return (
+                            <label key={opt.value} style={{
+                              display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer',
+                              padding: '7px 10px', borderRadius: 7,
+                              background: selected ? '#fef2f2' : '#fff',
+                              border: `1.5px solid ${selected ? '#fca5a5' : '#fed7aa'}`,
+                              transition: 'all 0.12s',
+                            }}>
+                              <input type="checkbox" checked={selected}
+                                onChange={e => {
+                                  const cur = (form.reject_category || '').split(',').map(s => s.trim()).filter(Boolean)
+                                  let next
+                                  if (e.target.checked) next = [...cur.filter(v => v !== opt.value), opt.value]
+                                  else next = cur.filter(v => v !== opt.value)
+                                  setForm(prev => ({ ...prev, reject_category: next.join(', ') }))
+                                }}
+                                style={{ width: 14, height: 14, accentColor: '#dc2626', cursor: 'pointer', flexShrink: 0 }} />
+                              <span style={{ fontSize: 12, fontWeight: selected ? 700 : 500, color: selected ? '#dc2626' : '#78350f', display: 'flex', alignItems: 'center', gap: 5 }}>
+                                <i className={`fas ${opt.icon}`} style={{ fontSize: 11, color: selected ? '#dc2626' : '#f59e0b' }}></i>
+                                {opt.label}
+                              </span>
+                            </label>
+                          )
+                        })}
+                      </div>
+                      {form.reject_category && (
+                        <div style={{ marginTop: 8, fontSize: 11, color: '#92400e', background: '#fef3c7', padding: '5px 10px', borderRadius: 6, lineHeight: 1.5 }}>
+                          <i className="fas fa-tag" style={{ marginRight: 5 }}></i>
+                          เหตุผลที่เลือก: <strong>{form.reject_category}</strong>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Action buttons */}
                   <div style={{ display: 'flex', gap: 8 }}>
                     {screenOverall === 'fail' && (

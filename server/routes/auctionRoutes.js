@@ -40,9 +40,19 @@ router.post('/cases/:caseId/checklist-docs/remove', auctionController.removeAuct
 // สลิปโอนเงิน (หลังนัดโอนที่กรมที่ดิน)
 router.post('/cases/:caseId/transfer-slip', auctionController.uploadTransferSlip)
 
-// ประวัติการเสนอราคา
+// ประวัติการเสนอราคา (พร้อมสลิปมัดจำ - ใช้ multipart/form-data)
 router.get('/cases/:caseId/bids', auctionController.getAuctionBids)
 router.post('/cases/:caseId/bids', auctionController.createAuctionBid)
 router.delete('/bids/:bidId', auctionController.deleteAuctionBid)
+
+// ผู้ชนะการประมูล
+router.put('/bids/:bidId/winner', auctionController.markBidWinner)
+
+// ลงทะเบียนนายทุนใหม่จากหน้าประมูล → สร้าง account ในระบบนายทุนอัตโนมัติ
+router.post('/register-investor', auctionController.registerInvestor)
+
+// ฝ่ายบัญชี: ดูสลิปมัดจำและบันทึกคืนเงิน
+router.get('/deposit-slips', auctionController.getDepositSlipsForAccounting)
+router.put('/bids/:bidId/refund', auctionController.markRefundDone)
 
 module.exports = router

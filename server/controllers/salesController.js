@@ -118,6 +118,11 @@ exports.createDebtor = (req, res) => {
     }
     const deedImagesJson = deedPaths.length > 0 ? JSON.stringify(deedPaths) : null
 
+    // ดึงข้อมูลเจ้าหน้าที่ผู้สร้างจาก session/JWT
+    const createdById   = (req.user && req.user.id)        ? req.user.id        : null
+    const createdByName = (req.user && req.user.full_name)  ? req.user.full_name
+                        : (req.user && req.user.username)   ? req.user.username  : null
+
     const sql = `
       INSERT INTO loan_requests
         (debtor_code, source, lead_source, dead_reason, reject_category, reject_alternative,
@@ -134,8 +139,9 @@ exports.createDebtor = (req, res) => {
          images, deed_images,
          admin_note, agent_id,
          bedrooms, bathrooms, floors, project_name, building_year, rental_rooms, rental_price_per_month,
+         created_by_id, created_by_name,
          status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
     `
     const params = [
       debtor_code,
@@ -197,7 +203,9 @@ exports.createDebtor = (req, res) => {
       project_name || null,
       building_year || null,
       rental_rooms || null,
-      rental_price_per_month || null
+      rental_price_per_month || null,
+      createdById,
+      createdByName
     ]
 
     db.query(sql, params, (err, result) => {
@@ -240,6 +248,7 @@ exports.getDebtors = (req, res) => {
       lr.property_type, lr.loan_type, lr.loan_type_detail, lr.province, lr.loan_amount,
       lr.status, lr.source, lr.lead_source, lr.reject_category, lr.reject_alternative, lr.dead_reason,
       lr.created_at, lr.agent_id AS lr_agent_id,
+      lr.created_by_id, lr.created_by_name,
       lr.images, lr.appraisal_images, lr.deed_images,
       lr.payment_status AS lr_payment_status,
       latest_case.case_id, latest_case.case_code, latest_case.case_status,
@@ -1746,30 +1755,47 @@ function deleteFiles(jsonStr) {
   }
 }
 
-// ========== ลบลูกหนี้ (พร้อมลบรูปที่อัพโหลด) ==========
+// ========== ลบลูกหนี้ (cascade: ลบเคสที่ผูกอยู่ทั้งหมดก่อน แล้วค่อยลบลูกหนี้) ==========
 exports.deleteDebtor = (req, res) => {
   const { id } = req.params
 
-  db.query('SELECT id FROM cases WHERE loan_request_id = ?', [id], (err, cases) => {
-    if (err) return res.status(500).json({ success: false, message: 'Server Error' })
-    if (cases.length > 0) {
-      return res.status(400).json({ success: false, message: 'ไม่สามารถลบได้ เนื่องจากมีเคสที่ผูกกับลูกหนี้นี้อยู่' })
-    }
+  // ดึง loan_request เพื่อเอา images + deed_images
+  db.query('SELECT images, deed_images FROM loan_requests WHERE id = ?', [id], (err0, rows) => {
+    if (err0) return res.status(500).json({ success: false, message: 'Server Error' })
+    if (rows.length === 0) return res.status(404).json({ success: false, message: 'ไม่พบข้อมูลลูกหนี้' })
 
-    db.query('SELECT images, deed_images FROM loan_requests WHERE id = ?', [id], (err1, rows) => {
+    const { images, deed_images } = rows[0]
+
+    // ดึง case id ทั้งหมดที่ผูกกับลูกหนี้นี้
+    db.query('SELECT id FROM cases WHERE loan_request_id = ?', [id], (err1, caseRows) => {
       if (err1) return res.status(500).json({ success: false, message: 'Server Error' })
-      if (rows.length === 0) return res.status(404).json({ success: false, message: 'ไม่พบข้อมูลลูกหนี้' })
 
-      const { images, deed_images } = rows[0]
+      const caseIds = caseRows.map(c => c.id)
 
-      db.query('DELETE FROM loan_requests WHERE id = ?', [id], (err2, result) => {
-        if (err2) return res.status(500).json({ success: false, message: 'Server Error' })
-        if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'ไม่พบข้อมูลลูกหนี้' })
+      const doDeleteDebtor = () => {
+        db.query('DELETE FROM loan_requests WHERE id = ?', [id], (err2, result) => {
+          if (err2) return res.status(500).json({ success: false, message: 'Server Error: ' + err2.message })
+          if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'ไม่พบข้อมูลลูกหนี้' })
+          deleteFiles(images)
+          deleteFiles(deed_images)
+          res.json({ success: true, message: 'ลบลูกหนี้และข้อมูลที่เกี่ยวข้องสำเร็จ' })
+        })
+      }
 
-        deleteFiles(images)
-        deleteFiles(deed_images)
+      if (caseIds.length === 0) {
+        // ไม่มีเคส → ลบลูกหนี้ได้เลย
+        return doDeleteDebtor()
+      }
 
-        res.json({ success: true, message: 'ลบลูกหนี้และไฟล์ที่เกี่ยวข้องสำเร็จ' })
+      // ลบ case_cancellations ของเคสทั้งหมดก่อน (FK ไม่มี CASCADE)
+      db.query('DELETE FROM case_cancellations WHERE case_id IN (?)', [caseIds], (errCC) => {
+        if (errCC) console.error('deleteDebtor: case_cancellations cleanup error:', errCC.message)
+
+        // ลบ cases ทั้งหมด (FK อื่นๆ ส่วนใหญ่มี ON DELETE CASCADE แล้ว)
+        db.query('DELETE FROM cases WHERE loan_request_id = ?', [id], (err3) => {
+          if (err3) return res.status(500).json({ success: false, message: 'ลบเคสที่ผูกอยู่ไม่สำเร็จ: ' + err3.message })
+          doDeleteDebtor()
+        })
       })
     })
   })
@@ -1785,24 +1811,29 @@ exports.deleteCase = (req, res) => {
 
     const { slip_image, appraisal_book_image, loan_request_id } = rows[0]
 
-    db.query('DELETE FROM cases WHERE id = ?', [id], (err1, result) => {
-      if (err1) return res.status(500).json({ success: false, message: 'Server Error' })
-      if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'ไม่พบข้อมูลเคส' })
+    // ลบ FK ที่ไม่มี ON DELETE CASCADE ก่อน เพื่อป้องกัน FK constraint error
+    db.query('DELETE FROM case_cancellations WHERE case_id = ?', [id], (errPre) => {
+      if (errPre) console.error('deleteCase: case_cancellations cleanup error:', errPre.message)
 
-      if (slip_image) {
-        const fullPath = path.join(__dirname, '..', slip_image)
-        if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath)
-      }
-      if (appraisal_book_image) {
-        const fullPath = path.join(__dirname, '..', appraisal_book_image)
-        if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath)
-      }
+      db.query('DELETE FROM cases WHERE id = ?', [id], (err1, result) => {
+        if (err1) return res.status(500).json({ success: false, message: 'Server Error: ' + err1.message })
+        if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'ไม่พบข้อมูลเคส' })
 
-      if (loan_request_id) {
-        db.query('UPDATE loan_requests SET status = ? WHERE id = ?', ['pending', loan_request_id])
-      }
+        if (slip_image) {
+          const fullPath = path.join(__dirname, '..', slip_image)
+          if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath)
+        }
+        if (appraisal_book_image) {
+          const fullPath = path.join(__dirname, '..', appraisal_book_image)
+          if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath)
+        }
 
-      res.json({ success: true, message: 'ลบเคสและไฟล์ที่เกี่ยวข้องสำเร็จ' })
+        if (loan_request_id) {
+          db.query('UPDATE loan_requests SET status = ? WHERE id = ?', ['pending', loan_request_id])
+        }
+
+        res.json({ success: true, message: 'ลบเคสและไฟล์ที่เกี่ยวข้องสำเร็จ' })
+      })
     })
   })
 }

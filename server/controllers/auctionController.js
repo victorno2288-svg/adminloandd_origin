@@ -24,6 +24,26 @@ const transferSlipMulter = multer({
   }
 }).single('transfer_slip')
 
+// Multer สำหรับอัพโหลดสลิปมัดจำของผู้เสนอราคา
+const depositSlipDir = path.join(__dirname, '..', 'uploads', 'deposit_slips')
+if (!fs.existsSync(depositSlipDir)) fs.mkdirSync(depositSlipDir, { recursive: true })
+const depositSlipMulter = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, depositSlipDir),
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname)
+      cb(null, `deposit_${req.params.caseId}_${Date.now()}${ext}`)
+    }
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['.jpg', '.jpeg', '.png', '.pdf', '.webp']
+    const ext = path.extname(file.originalname).toLowerCase()
+    if (allowed.includes(ext)) cb(null, true)
+    else cb(new Error('รองรับเฉพาะ JPG, PNG, PDF, WEBP'))
+  }
+}).single('deposit_slip')
+
 exports.uploadTransferSlip = (req, res) => {
   const { caseId } = req.params
   transferSlipMulter(req, res, (err) => {
@@ -206,7 +226,7 @@ function fetchAuctionDetail(caseId, res) {
       lr.property_type, lr.province, lr.district, lr.subdistrict,
       lr.property_address, lr.location_url,
       lr.deed_number, lr.land_area, lr.has_obligation, lr.obligation_count,
-      lr.images, lr.appraisal_images, lr.deed_images,
+      lr.images AS lr_images, lr.appraisal_images AS lr_appraisal_images, lr.deed_images AS lr_deed_images,
       lr.loan_type_detail, lr.check_price_value, lr.appraisal_book_image, lr.appraisal_result,
       a.full_name AS agent_name, a.phone AS agent_phone, a.agent_code,
       auc.id AS auction_id,
@@ -256,7 +276,7 @@ function fetchAuctionDetail(caseId, res) {
           lr.property_type, lr.province, lr.district, lr.subdistrict,
           lr.property_address, lr.location_url,
           lr.deed_number, lr.land_area, lr.has_obligation, lr.obligation_count,
-          lr.images, lr.appraisal_images, lr.deed_images,
+          lr.images AS lr_images, lr.appraisal_images AS lr_appraisal_images, lr.deed_images AS lr_deed_images,
           lr.loan_type_detail, lr.check_price_value, lr.appraisal_book_image, lr.appraisal_result,
           lr.borrower_id_card, lr.house_reg_book, lr.name_change_doc, lr.divorce_doc,
           lr.spouse_id_card, lr.spouse_reg_copy, lr.marriage_cert,
@@ -378,8 +398,10 @@ exports.updateAuction = (req, res) => {
       let newCaseStatus = null
       if (is_cancelled == 1 || is_cancelled === true) {
         newCaseStatus = 'cancelled'
+      } else if (auction_status === 'auction_completed') {
+        newCaseStatus = 'completed'       // โอนทรัพย์เสร็จสิ้น → เคสปิด
       } else if (auction_status === 'auctioned') {
-        newCaseStatus = 'auction_completed'
+        newCaseStatus = 'auction_completed'  // ประมูลเสร็จสิ้น → รอโอนทรัพย์
       } else if (auction_status === 'pending') {
         newCaseStatus = 'pending_auction'
       }
@@ -452,7 +474,7 @@ exports.updateAuction = (req, res) => {
           if (err2) console.error('sync cases.status error:', err2)
 
           // sync loan_requests.status ให้ตรงกับ cases.status
-          const statusMap = { 'cancelled': 'cancelled', 'auction_completed': 'matched', 'preparing_docs': 'matched', 'pending_auction': 'approved' }
+          const statusMap = { 'cancelled': 'cancelled', 'completed': 'matched', 'auction_completed': 'matched', 'preparing_docs': 'matched', 'pending_auction': 'approved' }
           const lrStatus = statusMap[newCaseStatus]
           if (lrStatus) {
             db.query('SELECT loan_request_id FROM cases WHERE id = ?', [caseId], (err3, rows) => {
@@ -668,22 +690,28 @@ exports.getAuctionBids = (req, res) => {
   })
 }
 
-// ========== เพิ่มการเสนอราคา ==========
+// ========== เพิ่มการเสนอราคา (พร้อมสลิปมัดจำ) ==========
 exports.createAuctionBid = (req, res) => {
   const { caseId } = req.params
-  const { bid_amount, investor_id, investor_name, investor_code, investor_phone, bid_date, note } = req.body
-  const recorded_by = req.user ? (req.user.full_name || req.user.username || 'ระบบ') : 'ระบบ'
-  db.query(
-    `INSERT INTO auction_bids
-      (case_id, bid_amount, investor_id, investor_name, investor_code, investor_phone, bid_date, note, recorded_by, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-    [caseId, bid_amount || null, investor_id || null, investor_name || null,
-     investor_code || null, investor_phone || null, bid_date || null, note || null, recorded_by],
-    (err, result) => {
-      if (err) return res.status(500).json({ success: false, message: 'Server Error' })
-      res.json({ success: true, bid_id: result.insertId })
-    }
-  )
+  depositSlipMulter(req, res, (err) => {
+    if (err) return res.status(400).json({ success: false, message: err.message || 'อัพโหลดไม่สำเร็จ' })
+    const { bid_amount, investor_id, investor_name, investor_code, investor_phone, bid_date, note, deposit_amount } = req.body
+    const recorded_by = req.user ? (req.user.full_name || req.user.username || 'ระบบ') : 'ระบบ'
+    const deposit_slip = req.file ? `/uploads/deposit_slips/${req.file.filename}` : null
+    db.query(
+      `INSERT INTO auction_bids
+        (case_id, bid_amount, investor_id, investor_name, investor_code, investor_phone, bid_date, note,
+         deposit_slip, deposit_amount, refund_status, recorded_by, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, NOW(), NOW())`,
+      [caseId, bid_amount || null, investor_id || null, investor_name || null,
+       investor_code || null, investor_phone || null, bid_date || null, note || null,
+       deposit_slip, deposit_amount || null, recorded_by],
+      (err2, result) => {
+        if (err2) return res.status(500).json({ success: false, message: 'Server Error' })
+        res.json({ success: true, bid_id: result.insertId, deposit_slip })
+      }
+    )
+  })
 }
 
 // ========== ลบการเสนอราคา ==========
@@ -693,4 +721,130 @@ exports.deleteAuctionBid = (req, res) => {
     if (err) return res.status(500).json({ success: false, message: 'Server Error' })
     res.json({ success: true })
   })
+}
+
+// ========== ดึงสลิปมัดจำทั้งหมดสำหรับฝ่ายบัญชี (เพื่อคืนเงินนายทุนที่ไม่ชนะ) ==========
+exports.getDepositSlipsForAccounting = (req, res) => {
+  const { refund_status } = req.query
+  let sql = `
+    SELECT
+      ab.id AS bid_id, ab.case_id, ab.investor_id, ab.investor_name, ab.investor_code, ab.investor_phone,
+      ab.bid_amount, ab.bid_date, ab.deposit_slip, ab.deposit_amount, ab.refund_status,
+      ab.note, ab.recorded_by, ab.created_at,
+      c.case_code,
+      lr.contact_name AS debtor_name, lr.contact_phone AS debtor_phone,
+      lr.province, lr.district
+    FROM auction_bids ab
+    LEFT JOIN cases c ON c.id = ab.case_id
+    LEFT JOIN loan_requests lr ON lr.id = c.loan_request_id
+    WHERE ab.deposit_slip IS NOT NULL
+  `
+  const params = []
+  if (refund_status) {
+    sql += ' AND ab.refund_status = ?'
+    params.push(refund_status)
+  }
+  sql += ' ORDER BY ab.created_at DESC'
+  db.query(sql, params, (err, results) => {
+    if (err) return res.status(500).json({ success: false, message: 'Server Error' })
+    res.json({ success: true, bids: results })
+  })
+}
+
+// ========== บันทึกการคืนเงินมัดจำ ==========
+exports.markRefundDone = (req, res) => {
+  const { bidId } = req.params
+  db.query(
+    'UPDATE auction_bids SET refund_status = "refunded", updated_at = NOW() WHERE id = ?',
+    [bidId],
+    (err) => {
+      if (err) return res.status(500).json({ success: false, message: 'Server Error' })
+      res.json({ success: true, message: 'บันทึกการคืนเงินสำเร็จ' })
+    }
+  )
+}
+
+// ========== ทำเครื่องหมายว่าเป็นผู้ชนะการประมูล ==========
+exports.markBidWinner = (req, res) => {
+  const { bidId } = req.params
+  const { caseId } = req.params
+  // ก่อนอื่นดึง case_id ของ bid นี้ก่อน
+  db.query('SELECT case_id FROM auction_bids WHERE id = ?', [bidId], (err, rows) => {
+    if (err || !rows.length) return res.status(404).json({ success: false, message: 'ไม่พบข้อมูล' })
+    const targetCaseId = rows[0].case_id
+    // รีเซ็ตทุก bid ในเคสนี้เป็น pending ก่อน
+    db.query(
+      'UPDATE auction_bids SET refund_status = "pending", updated_at = NOW() WHERE case_id = ?',
+      [targetCaseId],
+      (err2) => {
+        if (err2) return res.status(500).json({ success: false, message: 'Server Error' })
+        // แล้วตั้ง bid ที่ชนะเป็น winner
+        db.query(
+          'UPDATE auction_bids SET refund_status = "winner", updated_at = NOW() WHERE id = ?',
+          [bidId],
+          (err3) => {
+            if (err3) return res.status(500).json({ success: false, message: 'Server Error' })
+            res.json({ success: true, message: 'บันทึกผู้ชนะการประมูลสำเร็จ' })
+          }
+        )
+      }
+    )
+  })
+}
+// ========== ลงทะเบียนนายทุนใหม่จากหน้าประมูล (สร้าง account ในระบบนายทุนอัตโนมัติ) ==========
+exports.registerInvestor = (req, res) => {
+  const { full_name, phone, line_id, email, national_id } = req.body
+
+  if (!full_name || !full_name.trim()) {
+    return res.status(400).json({ success: false, message: 'กรุณาระบุชื่อนายทุน' })
+  }
+
+  // สร้าง investor_code ถัดไป (CAP0001, CAP0002, ...)
+  db.query(
+    'SELECT investor_code FROM investors WHERE investor_code IS NOT NULL AND investor_code LIKE "CAP%" ORDER BY investor_code DESC LIMIT 1',
+    (err, rows) => {
+      if (err) return res.status(500).json({ success: false, message: 'Server Error' })
+
+      let nextCode = 'CAP0001'
+      if (rows.length > 0) {
+        const last = rows[0].investor_code
+        const num = parseInt(last.replace('CAP', ''), 10)
+        if (!isNaN(num)) nextCode = 'CAP' + String(num + 1).padStart(4, '0')
+      }
+
+      // username = investor_code ตัวพิมพ์เล็ก + timestamp suffix เพื่อป้องกัน duplicate
+      const username = nextCode.toLowerCase() + '_' + Date.now().toString(36)
+      // default password = รหัส + 2025
+      const bcrypt = require('bcrypt')
+      const passwordHash = bcrypt.hashSync(nextCode + '2025', 10)
+
+      db.query(
+        `INSERT INTO investors (investor_code, username, full_name, phone, line_id, email, national_id, password_hash, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active')`,
+        [
+          nextCode,
+          username,
+          full_name.trim(),
+          phone || null,
+          line_id || null,
+          email || null,
+          national_id || null,
+          passwordHash
+        ],
+        (err2, result) => {
+          if (err2) {
+            console.error('registerInvestor error:', err2)
+            return res.status(500).json({ success: false, message: 'สร้างนายทุนไม่สำเร็จ: ' + err2.message })
+          }
+          res.json({
+            success: true,
+            message: 'ลงทะเบียนนายทุนสำเร็จ',
+            id: result.insertId,
+            investor_code: nextCode,
+            full_name: full_name.trim()
+          })
+        }
+      )
+    }
+  )
 }

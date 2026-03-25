@@ -75,13 +75,17 @@ export default function AuctionEditPage() {
   const [bids, setBids] = useState([])
   const [bidForm, setBidForm] = useState({
     investor_id: '', investor_name: '', investor_code: '', investor_phone: '',
-    bid_amount: '', bid_date: '', note: '', recorded_by: ''
+    bid_amount: '', bid_date: '', note: '', recorded_by: '', deposit_amount: ''
   })
+  const [bidDepositFile, setBidDepositFile] = useState(null)
+  const [bidDepositPreview, setBidDepositPreview] = useState(null) // base64 / object URL
   const [showBidForm, setShowBidForm] = useState(false)
   const [savingBid, setSavingBid] = useState(false)
   const [deletingBid, setDeletingBid] = useState(null)
+  const [markingWinner, setMarkingWinner] = useState(null)
+  const [previewSlip, setPreviewSlip] = useState(null)
 
-  const EMPTY_NEW_INV = { full_name: '', phone: '', line_id: '', email: '', status: 'active', investor_level: '', sort_order: '' }
+  const EMPTY_NEW_INV = { full_name: '', phone: '', line_id: '', national_id: '', email: '' }
 
   // inline investor creation ในส่วน bid form
   const [bidInvMode, setBidInvMode] = useState('select') // 'select' | 'create'
@@ -89,6 +93,8 @@ export default function AuctionEditPage() {
   const [creatingBidInv, setCreatingBidInv] = useState(false)
   const [createdBidInvId, setCreatedBidInvId] = useState(null)
   const [bidIdCardFile, setBidIdCardFile] = useState(null)
+  const [bidIdCardPreview, setBidIdCardPreview] = useState(null)
+  const [ocrScanningBidInv, setOcrScanningBidInv] = useState(false)
   const [uploadingBidIdCard, setUploadingBidIdCard] = useState(false)
   const [bidIdCardMsg, setBidIdCardMsg] = useState('')
 
@@ -226,28 +232,57 @@ export default function AuctionEditPage() {
     }
   }
 
-  // เพิ่มการเสนอราคา
+  // เพิ่มการเสนอราคา (FormData เพื่อรองรับไฟล์สลิปมัดจำ)
   const handleAddBid = async (e) => {
     e.preventDefault()
     setSavingBid(true)
     try {
-      const { recorded_by, ...bidData } = bidForm
+      const fd = new FormData()
+      fd.append('investor_id', bidForm.investor_id || '')
+      fd.append('investor_name', bidForm.investor_name || '')
+      fd.append('investor_code', bidForm.investor_code || '')
+      fd.append('investor_phone', bidForm.investor_phone || '')
+      fd.append('bid_amount', bidForm.bid_amount || '')
+      fd.append('bid_date', bidForm.bid_date || '')
+      fd.append('note', bidForm.note || '')
+      fd.append('deposit_amount', bidForm.deposit_amount || '')
+      if (bidDepositFile) fd.append('deposit_slip', bidDepositFile)
       const res = await fetch(`${API}/cases/${id}/bids`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
-        body: JSON.stringify(bidData)
+        headers: { Authorization: `Bearer ${token()}` },
+        body: fd
       })
       const data = await res.json()
       if (data.success) {
-        // โหลดใหม่
         const r2 = await fetch(`${API}/cases/${id}/bids`, { headers: { Authorization: `Bearer ${token()}` } })
         const d2 = await r2.json()
         if (d2.success) setBids(d2.bids || [])
-        setBidForm({ investor_id: '', investor_name: '', investor_code: '', investor_phone: '', bid_amount: '', bid_date: '', note: '', recorded_by: '' })
+        setBidForm({ investor_id: '', investor_name: '', investor_code: '', investor_phone: '', bid_amount: '', bid_date: '', note: '', recorded_by: '', deposit_amount: '' })
+        setBidDepositFile(null)
+        setBidDepositPreview(null)
         setShowBidForm(false)
       }
     } catch {}
     setSavingBid(false)
+  }
+
+  // ทำเครื่องหมายผู้ชนะการประมูล
+  const handleMarkBidWinner = async (bidId) => {
+    if (!confirm('ยืนยันว่านายทุนรายนี้ชนะการประมูล? นายทุนอื่นจะถูกตั้งเป็น "รอคืนเงิน"')) return
+    setMarkingWinner(bidId)
+    try {
+      const res = await fetch(`${API}/bids/${bidId}/winner`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token()}` }
+      })
+      const data = await res.json()
+      if (data.success) {
+        const r2 = await fetch(`${API}/cases/${id}/bids`, { headers: { Authorization: `Bearer ${token()}` } })
+        const d2 = await r2.json()
+        if (d2.success) setBids(d2.bids || [])
+      }
+    } catch {}
+    setMarkingWinner(null)
   }
 
   // ลบการเสนอราคา
@@ -283,26 +318,63 @@ export default function AuctionEditPage() {
     setUploading(false)
   }
 
-  // สร้างนายทุนใหม่ inline แล้ว apply ลง bid form (+ auto-upload ID card ถ้ามี)
+  // OCR บัตรประชาชนสำหรับ bid form → auto-fill ชื่อ
+  const handleOcrScanBidInv = async (file) => {
+    if (!file) return
+    const previewUrl = URL.createObjectURL(file)
+    setBidIdCardPreview(previewUrl)
+    setBidIdCardFile(file)
+    setOcrScanningBidInv(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('doc_type', 'id_card')
+      const r = await fetch('/api/admin/ocr/extract', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token()}` },
+        body: fd
+      })
+      const d = await r.json()
+      if (d.success && d.extracted) {
+        setNewBidInv(p => ({
+          ...p,
+          ...(d.extracted.full_name  ? { full_name:   d.extracted.full_name  } : {}),
+          ...(d.extracted.phone      ? { phone:        d.extracted.phone      } : {}),
+          ...(d.extracted.id_number  ? { national_id:  d.extracted.id_number  } : {}),
+        }))
+      }
+    } catch {}
+    setOcrScanningBidInv(false)
+  }
+
+  // สร้างนายทุนใหม่ inline → ลงทะเบียนเข้าระบบนายทุน + apply ลง bid form
   const handleCreateBidInvestor = async () => {
-    if (!newBidInv.full_name.trim()) return alert('กรุณาระบุชื่อนายทุน')
+    const name = newBidInv.full_name.trim()
+    if (!name) return alert('กรุณาระบุชื่อนายทุน')
     setCreatingBidInv(true)
     setBidIdCardMsg('')
     try {
-      const res = await fetch(INV_API, {
+      // ใช้ endpoint ภายใน auction routes เพื่อลงทะเบียนนายทุน
+      const res = await fetch('/api/admin/auction/register-investor', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
-        body: JSON.stringify(newBidInv)
+        body: JSON.stringify({
+          full_name:   name,
+          phone:       newBidInv.phone       || '',
+          line_id:     newBidInv.line_id     || '',
+          national_id: newBidInv.national_id || '',
+          email:       newBidInv.email       || '',
+        })
       })
       const data = await res.json()
       if (data.success) {
-        const newEntry = { id: data.id, full_name: newBidInv.full_name, phone: newBidInv.phone, investor_code: data.investor_code }
+        const newEntry = { id: data.id, full_name: data.full_name, phone: newBidInv.phone, investor_code: data.investor_code }
         setInvestorList(prev => [newEntry, ...prev])
         setBidForm(prev => ({
           ...prev,
-          investor_id: data.id,
-          investor_name: newBidInv.full_name,
-          investor_code: data.investor_code,
+          investor_id:    data.id,
+          investor_name:  data.full_name,
+          investor_code:  data.investor_code,
           investor_phone: newBidInv.phone
         }))
         setCreatedBidInvId(data.id)
@@ -310,12 +382,24 @@ export default function AuctionEditPage() {
         if (bidIdCardFile) {
           await handleUploadIdCard(data.id, bidIdCardFile, setUploadingBidIdCard, setBidIdCardMsg)
         } else {
-          setBidIdCardMsg('✅ สร้างนายทุนสำเร็จ')
+          setBidIdCardMsg(`✅ ลงทะเบียนสำเร็จ รหัส ${data.investor_code}`)
+        }
+        // Auto-upload deposit slip → บันทึกใน investors.deposit_slip ด้วย (ให้ปรากฏหน้าบัญชีและโปรไฟล์นายทุน)
+        if (bidDepositFile) {
+          try {
+            const fdSlip = new FormData()
+            fdSlip.append('deposit_slip', bidDepositFile)
+            await fetch(`${INV_API}/${data.id}/doc-upload`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${token()}` },
+              body: fdSlip
+            })
+          } catch {}
         }
       } else {
         alert(data.message || 'สร้างนายทุนไม่สำเร็จ')
       }
-    } catch { alert('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์') }
+    } catch (e) { alert('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์: ' + e.message) }
     setCreatingBidInv(false)
   }
 
@@ -442,9 +526,10 @@ export default function AuctionEditPage() {
     try { return JSON.parse(jsonStr) || [] } catch { return [] }
   }
 
-  let images = parseImages(caseData.images)
-  let deedImages = parseImages(caseData.deed_images)
-  let appraisalImages = parseImages(caseData.appraisal_images)
+  // ใช้ lr_images / lr_appraisal_images เพื่อหลีกเลี่ยงการชนกับ column ใน cases table (c.*)
+  let images = parseImages(caseData.lr_images || caseData.images)
+  let deedImages = parseImages(caseData.lr_deed_images || caseData.deed_images)
+  let appraisalImages = parseImages(caseData.lr_appraisal_images || caseData.appraisal_images)
   let salesPropertyPhotos = [
     ...images.filter(img => img.includes('properties')),
     ...parseImages(caseData.property_photos),
@@ -970,6 +1055,397 @@ export default function AuctionEditPage() {
                 </div>
               )}
             </div>
+
+            {/* ===== การเสนอราคา (ประมูล) — สลิปมัดจำ ===== */}
+            <div className="card" style={{ padding: 20, marginBottom: 20, borderLeft: '4px solid #e67e22' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#e67e22' }}>
+                  <i className="fas fa-balance-scale" style={{ marginRight: 8 }}></i>
+                  การเสนอราคา (สู้ราคา)
+                </h3>
+                <button type="button"
+                  onClick={() => { setShowBidForm(v => !v); if (showBidForm) { setBidIdCardFile(null); setBidIdCardPreview(null); setBidIdCardMsg('') } }}
+                  style={{ fontSize: 11, padding: '5px 12px', borderRadius: 6, border: 'none', background: showBidForm ? '#e67e22' : '#fef3c7', color: showBidForm ? '#fff' : '#92400e', cursor: 'pointer', fontWeight: 700 }}>
+                  {showBidForm ? '✕ ยกเลิก' : '+ เพิ่มนายทุนเสนอราคา'}
+                </button>
+              </div>
+
+              {/* ── ฟอร์มเพิ่มการเสนอราคา ── */}
+              {showBidForm && (
+                <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, padding: '14px 16px', marginBottom: 16 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#92400e', marginBottom: 12 }}>
+                    <i className="fas fa-plus-circle" style={{ marginRight: 6 }}></i>เพิ่มนายทุนเสนอราคา
+                  </div>
+
+                  {/* เลือกหรือสร้างนายทุน */}
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                    <button type="button" onClick={() => setBidInvMode('select')}
+                      style={{ flex: 1, padding: '6px 0', border: `2px solid ${bidInvMode === 'select' ? '#e67e22' : '#ddd'}`, borderRadius: 6, background: bidInvMode === 'select' ? '#fff7ed' : '#fff', color: bidInvMode === 'select' ? '#e67e22' : '#888', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
+                      <i className="fas fa-search" style={{ marginRight: 4 }}></i>เลือกจากรายการ
+                    </button>
+                    <button type="button" onClick={() => { setBidInvMode('create'); setCreatedBidInvId(null); setNewBidInv({ ...EMPTY_NEW_INV }); setBidIdCardFile(null); setBidIdCardPreview(null); setBidIdCardMsg('') }}
+                      style={{ flex: 1, padding: '6px 0', border: `2px solid ${bidInvMode === 'create' ? '#e67e22' : '#ddd'}`, borderRadius: 6, background: bidInvMode === 'create' ? '#fff7ed' : '#fff', color: bidInvMode === 'create' ? '#e67e22' : '#888', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
+                      <i className="fas fa-user-plus" style={{ marginRight: 4 }}></i>สร้างนายทุนใหม่
+                    </button>
+                  </div>
+
+                  {bidInvMode === 'select' ? (
+                    <div className="form-group" style={{ marginBottom: 10 }}>
+                      <label style={{ fontSize: 12 }}>เลือกนายทุน</label>
+                      <select value={bidForm.investor_id || ''} onChange={e => handleBidInvestorSelect(e.target.value)} style={{ fontSize: 13 }}>
+                        <option value="">-- เลือกนายทุน --</option>
+                        {investorList.map(inv => (
+                          <option key={inv.id} value={inv.id}>{inv.investor_code} — {inv.full_name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : createdBidInvId ? (
+                    <div style={{ fontSize: 12, color: '#166534', fontWeight: 600, marginBottom: 10, padding: '10px 12px', background: '#f0fdf4', borderRadius: 8, border: '1px solid #86efac' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                        <i className="fas fa-check-circle" style={{ color: '#16a34a', fontSize: 14 }}></i>
+                        ลงทะเบียนนายทุนสำเร็จ
+                      </div>
+                      <div style={{ fontWeight: 700, fontSize: 13 }}>{bidForm.investor_name}</div>
+                      {bidForm.investor_code && <div style={{ fontSize: 11, color: '#4ade80', fontWeight: 600 }}>รหัส: {bidForm.investor_code} · บันทึกในระบบนายทุนแล้ว</div>}
+                    </div>
+                  ) : (
+                    <div style={{ marginBottom: 10 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label style={{ fontSize: 11 }}>ชื่อ-นามสกุล <span style={{ color: '#e74c3c' }}>*</span></label>
+                          <input type="text" value={newBidInv.full_name} onChange={e => setNewBidInv(p => ({ ...p, full_name: e.target.value }))} placeholder="ชื่อนายทุน" style={{ fontSize: 12 }} />
+                        </div>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label style={{ fontSize: 11 }}>เบอร์โทร</label>
+                          <input type="text" value={newBidInv.phone} onChange={e => setNewBidInv(p => ({ ...p, phone: e.target.value }))} placeholder="เบอร์โทร" style={{ fontSize: 12 }} />
+                        </div>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label style={{ fontSize: 11 }}>เลขบัตรประชาชน</label>
+                          <input type="text" value={newBidInv.national_id} onChange={e => setNewBidInv(p => ({ ...p, national_id: e.target.value }))} placeholder="1-xxxx-xxxxx-xx-x" style={{ fontSize: 12 }} maxLength={17} />
+                        </div>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label style={{ fontSize: 11 }}>LINE ID</label>
+                          <input type="text" value={newBidInv.line_id} onChange={e => setNewBidInv(p => ({ ...p, line_id: e.target.value }))} placeholder="LINE ID" style={{ fontSize: 12 }} />
+                        </div>
+                      </div>
+                      {/* ── ID Card Upload + OCR ── */}
+                      <div style={{ marginTop: 10 }}>
+                        <label style={{
+                          display: 'block', cursor: ocrScanningBidInv ? 'default' : 'pointer',
+                          background: bidIdCardPreview ? '#fff7ed' : '#fffbeb',
+                          border: `2px dashed ${bidIdCardPreview ? '#f97316' : '#fde68a'}`,
+                          borderRadius: 12, padding: 12, transition: 'all 0.2s',
+                        }}
+                          onMouseEnter={e => { if (!bidIdCardPreview && !ocrScanningBidInv) e.currentTarget.style.borderColor = '#f97316' }}
+                          onMouseLeave={e => { if (!bidIdCardPreview && !ocrScanningBidInv) e.currentTarget.style.borderColor = '#fde68a' }}
+                        >
+                          <input type="file" accept=".jpg,.jpeg,.png" style={{ display: 'none' }}
+                            disabled={ocrScanningBidInv}
+                            onChange={e => { const f = e.target.files[0]; if (f) handleOcrScanBidInv(f); e.target.value = '' }} />
+
+                          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                            {/* thumbnail */}
+                            <div style={{
+                              width: 72, height: 72, flexShrink: 0, borderRadius: 10, overflow: 'hidden',
+                              background: '#fed7aa', border: '1.5px solid #fdba74',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
+                            }}>
+                              {bidIdCardPreview ? (
+                                <img src={bidIdCardPreview} alt="id card"
+                                  style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              ) : (
+                                <i className="fas fa-id-card" style={{ fontSize: 28, color: '#f97316' }}></i>
+                              )}
+                              {/* clear button */}
+                              {bidIdCardPreview && !ocrScanningBidInv && (
+                                <button type="button"
+                                  onClick={e => { e.preventDefault(); e.stopPropagation(); setBidIdCardFile(null); setBidIdCardPreview(null) }}
+                                  style={{ position: 'absolute', top: 3, right: 3, width: 18, height: 18, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff', fontSize: 9, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, zIndex: 2 }}>
+                                  ✕
+                                </button>
+                              )}
+                              {/* OCR overlay spinner */}
+                              {ocrScanningBidInv && (
+                                <div style={{ position: 'absolute', inset: 0, background: 'rgba(234,88,12,0.75)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                                  <i className="fas fa-spinner fa-spin" style={{ color: '#fff', fontSize: 18 }}></i>
+                                  <span style={{ fontSize: 8, color: '#fff', fontWeight: 700 }}>OCR</span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* text side */}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 12, fontWeight: 700, color: '#92400e', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 5 }}>
+                                <i className={`fas ${ocrScanningBidInv ? 'fa-magic' : bidIdCardPreview ? 'fa-check-circle' : 'fa-camera'}`}
+                                  style={{ color: ocrScanningBidInv ? '#f97316' : bidIdCardPreview ? '#16a34a' : '#f97316' }}></i>
+                                {ocrScanningBidInv
+                                  ? 'AI กำลังอ่านบัตร...'
+                                  : bidIdCardPreview
+                                    ? 'อัพโหลดบัตรแล้ว — คลิกเพื่อเปลี่ยน'
+                                    : 'อัพโหลดบัตรประชาชน'}
+                              </div>
+                              <div style={{ fontSize: 10, color: '#a8753c', lineHeight: 1.5 }}>
+                                {ocrScanningBidInv
+                                  ? <span style={{ color: '#f97316', fontWeight: 600 }}>กำลังอ่านชื่อ-สกุลอัตโนมัติ...</span>
+                                  : bidIdCardPreview
+                                    ? <span style={{ color: '#16a34a', fontWeight: 600 }}>✓ OCR กรอกชื่อให้แล้ว (ถ้าชัดเจน)</span>
+                                    : 'JPG / PNG · AI อ่านชื่ออัตโนมัติ (ไม่บังคับ)'
+                                }
+                              </div>
+                              {bidIdCardFile && !ocrScanningBidInv && (
+                                <div style={{ fontSize: 10, color: '#78350f', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  <i className="fas fa-paperclip" style={{ marginRight: 3 }}></i>{bidIdCardFile.name}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </label>
+                      </div>
+                      {bidIdCardMsg && <div style={{ fontSize: 11, marginTop: 6, color: bidIdCardMsg.startsWith('✅') ? '#27ae60' : '#e74c3c', fontWeight: 600 }}>{bidIdCardMsg}</div>}
+                      <button type="button" onClick={handleCreateBidInvestor} disabled={creatingBidInv || !newBidInv.full_name.trim()}
+                        style={{ marginTop: 8, padding: '6px 14px', background: '#e67e22', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>
+                        {creatingBidInv ? <><i className="fas fa-spinner fa-spin"></i> กำลังสร้าง...</> : <><i className="fas fa-plus"></i> สร้างและเลือก</>}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* ข้อมูลนายทุนที่เลือก */}
+                  {bidForm.investor_name && (
+                    <div style={{ background: '#fff', border: '1px solid #fed7aa', borderRadius: 6, padding: '6px 10px', marginBottom: 10, fontSize: 12, color: '#78350f' }}>
+                      <i className="fas fa-user-tie" style={{ marginRight: 5 }}></i>
+                      <strong>{bidForm.investor_name}</strong>
+                      {bidForm.investor_code && <span style={{ color: '#92400e', marginLeft: 8 }}>({bidForm.investor_code})</span>}
+                      {bidForm.investor_phone && <span style={{ color: '#aaa', marginLeft: 8 }}>{bidForm.investor_phone}</span>}
+                    </div>
+                  )}
+
+                  {/* ราคาเสนอ + มัดจำ */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label style={{ fontSize: 12 }}>ราคาเสนอ (บาท) <span style={{ color: '#e74c3c' }}>*</span></label>
+                      <input type="number" value={bidForm.bid_amount} onChange={e => setBidForm(p => ({ ...p, bid_amount: e.target.value }))} placeholder="0.00" style={{ fontSize: 13, fontWeight: 700 }} />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label style={{ fontSize: 12 }}>มัดจำที่โอนมา (บาท)</label>
+                      <input type="number" value={bidForm.deposit_amount} onChange={e => setBidForm(p => ({ ...p, deposit_amount: e.target.value }))} placeholder="0.00" style={{ fontSize: 13 }} />
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label style={{ fontSize: 12 }}>วันที่เสนอ</label>
+                      <input type="date" value={bidForm.bid_date} onChange={e => setBidForm(p => ({ ...p, bid_date: e.target.value }))} style={{ fontSize: 12 }} />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label style={{ fontSize: 12 }}>หมายเหตุ</label>
+                      <input type="text" value={bidForm.note} onChange={e => setBidForm(p => ({ ...p, note: e.target.value }))} placeholder="บันทึกเพิ่มเติม" style={{ fontSize: 12 }} />
+                    </div>
+                  </div>
+
+                  {/* สลิปมัดจำ — upload card พร้อม preview */}
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#92400e', marginBottom: 6, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                      <span><i className="fas fa-receipt" style={{ marginRight: 5 }}></i>แนบสลิปมัดจำ</span>
+                      <span style={{ fontSize: 10, fontWeight: 400, color: '#aaa' }}>JPG / PNG / PDF / WEBP</span>
+                      {bidInvMode === 'create' && !createdBidInvId && (
+                        <span style={{ fontSize: 10, fontWeight: 700, color: '#7c3aed', background: '#ede9fe', borderRadius: 4, padding: '2px 7px', border: '1px solid #c4b5fd' }}>
+                          <i className="fas fa-link" style={{ marginRight: 3 }}></i>บันทึกในโปรไฟล์นายทุน + หน้าบัญชีด้วย
+                        </span>
+                      )}
+                    </div>
+
+                    {bidDepositFile ? (
+                      /* ── มีไฟล์แล้ว: แสดง preview card ── */
+                      <div style={{ position: 'relative', borderRadius: 12, overflow: 'hidden', border: '2px solid #fed7aa', background: '#fff7ed' }}>
+                        {/* preview area */}
+                        {bidDepositPreview && !/\.pdf$/i.test(bidDepositFile.name) ? (
+                          <img src={bidDepositPreview} alt="slip preview"
+                            style={{ width: '100%', maxHeight: 180, objectFit: 'contain', background: '#f9fafb', display: 'block' }} />
+                        ) : (
+                          <div style={{ height: 100, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, background: '#fef3c7' }}>
+                            <i className="fas fa-file-pdf" style={{ fontSize: 32, color: '#ef4444' }}></i>
+                            <span style={{ fontSize: 11, color: '#92400e', fontWeight: 600 }}>PDF</span>
+                          </div>
+                        )}
+                        {/* filename bar */}
+                        <div style={{ padding: '6px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                          <div style={{ fontSize: 11, color: '#78350f', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                            <i className="fas fa-paperclip" style={{ marginRight: 4, color: '#e67e22' }}></i>
+                            {bidDepositFile.name}
+                          </div>
+                          <button type="button"
+                            onClick={() => { setBidDepositFile(null); setBidDepositPreview(null) }}
+                            style={{ padding: '3px 9px', borderRadius: 6, border: 'none', background: '#fecaca', color: '#b91c1c', fontSize: 11, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
+                            <i className="fas fa-times"></i> เอาออก
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      /* ── ยังไม่มีไฟล์: drag-drop zone ── */
+                      <label style={{
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
+                        height: 100, borderRadius: 12, border: '2px dashed #fdba74', background: '#fff7ed',
+                        cursor: 'pointer', transition: 'all 0.15s',
+                      }}
+                        onDragOver={e => { e.preventDefault(); e.currentTarget.style.background = '#fed7aa' }}
+                        onDragLeave={e => { e.currentTarget.style.background = '#fff7ed' }}
+                        onDrop={e => {
+                          e.preventDefault(); e.currentTarget.style.background = '#fff7ed'
+                          const file = e.dataTransfer.files[0]
+                          if (!file) return
+                          setBidDepositFile(file)
+                          if (file.type.startsWith('image/')) {
+                            const reader = new FileReader()
+                            reader.onload = ev => setBidDepositPreview(ev.target.result)
+                            reader.readAsDataURL(file)
+                          } else { setBidDepositPreview(null) }
+                        }}
+                      >
+                        <input type="file" accept=".jpg,.jpeg,.png,.pdf,.webp" style={{ display: 'none' }}
+                          onChange={e => {
+                            const file = e.target.files[0]
+                            if (!file) return
+                            setBidDepositFile(file)
+                            if (file.type.startsWith('image/')) {
+                              const reader = new FileReader()
+                              reader.onload = ev => setBidDepositPreview(ev.target.result)
+                              reader.readAsDataURL(file)
+                            } else { setBidDepositPreview(null) }
+                          }} />
+                        <i className="fas fa-cloud-upload-alt" style={{ fontSize: 28, color: '#f97316' }}></i>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: '#92400e' }}>คลิกหรือลากไฟล์มาวาง</div>
+                        <div style={{ fontSize: 10, color: '#fb923c' }}>JPG · PNG · PDF · WEBP (สูงสุด 10MB)</div>
+                      </label>
+                    )}
+                  </div>
+
+                  <button type="button" onClick={handleAddBid} disabled={savingBid || !bidForm.bid_amount}
+                    style={{ width: '100%', padding: '9px 0', background: '#e67e22', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                    {savingBid ? <><i className="fas fa-spinner fa-spin"></i> กำลังบันทึก...</> : <><i className="fas fa-plus-circle"></i> บันทึกการเสนอราคา</>}
+                  </button>
+                </div>
+              )}
+
+              {/* ── ตารางการเสนอราคา ── */}
+              {bids.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '24px 0', color: '#aaa', fontSize: 13 }}>
+                  <i className="fas fa-inbox" style={{ fontSize: 24, display: 'block', marginBottom: 8 }}></i>
+                  ยังไม่มีการเสนอราคา
+                </div>
+              ) : (
+                <div>
+                  <div style={{ fontSize: 11, color: '#92400e', fontWeight: 600, marginBottom: 8 }}>
+                    <i className="fas fa-list-ol" style={{ marginRight: 4 }}></i>
+                    รายการเสนอราคา ({bids.length} ราย) — เรียงตามสูงสุด
+                  </div>
+                  {[...bids].sort((a, b) => (Number(b.bid_amount) || 0) - (Number(a.bid_amount) || 0)).map((bid, idx) => {
+                    const isWinner = bid.refund_status === 'winner'
+                    const isRefunded = bid.refund_status === 'refunded'
+                    const rank = idx + 1
+                    const slipPath = bid.deposit_slip ? (bid.deposit_slip.startsWith('/') ? bid.deposit_slip : `/${bid.deposit_slip}`) : null
+                    return (
+                      <div key={bid.id} style={{
+                        border: `2px solid ${isWinner ? '#f59e0b' : '#e5e7eb'}`,
+                        borderRadius: 10, padding: '10px 14px', marginBottom: 10,
+                        background: isWinner ? '#fffbeb' : isRefunded ? '#f9fafb' : '#fff',
+                        opacity: isRefunded ? 0.75 : 1,
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{
+                              minWidth: 26, height: 26, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: 12, fontWeight: 800,
+                              background: rank === 1 ? '#fef08a' : rank === 2 ? '#e5e7eb' : '#fff',
+                              color: rank === 1 ? '#92400e' : '#555', border: '1.5px solid #e5e7eb',
+                            }}>#{rank}</span>
+                            <div>
+                              <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>
+                                {bid.investor_name || '—'}
+                                {bid.investor_code && <span style={{ fontSize: 11, color: '#888', marginLeft: 6 }}>({bid.investor_code})</span>}
+                              </div>
+                              <div style={{ fontSize: 11, color: '#64748b' }}>{bid.investor_phone || ''}</div>
+                            </div>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: 16, fontWeight: 800, color: '#e67e22' }}>
+                              {bid.bid_amount ? `฿${Number(bid.bid_amount).toLocaleString('th-TH')}` : '—'}
+                            </div>
+                            {bid.deposit_amount && (
+                              <div style={{ fontSize: 11, color: '#78350f' }}>
+                                มัดจำ ฿{Number(bid.deposit_amount).toLocaleString('th-TH')}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* สลิปมัดจำ */}
+                        {slipPath && (
+                          <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <button type="button" onClick={() => setPreviewSlip(slipPath)}
+                              style={{ padding: '4px 10px', borderRadius: 6, border: 'none', background: '#fef3c7', color: '#92400e', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                              <i className="fas fa-receipt" style={{ marginRight: 4 }}></i>ดูสลิปมัดจำ
+                            </button>
+                            <a href={slipPath} target="_blank" rel="noreferrer"
+                              style={{ fontSize: 11, color: '#64748b', textDecoration: 'none' }}>
+                              <i className="fas fa-external-link-alt" style={{ marginRight: 3 }}></i>เปิดใหม่
+                            </a>
+                          </div>
+                        )}
+
+                        {/* Badge + action */}
+                        <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          {isWinner ? (
+                            <span style={{ padding: '3px 10px', borderRadius: 20, background: '#fef08a', color: '#78350f', fontSize: 11, fontWeight: 700, border: '1px solid #f59e0b' }}>
+                              <i className="fas fa-trophy" style={{ marginRight: 4 }}></i>ผู้ชนะ
+                            </span>
+                          ) : isRefunded ? (
+                            <span style={{ padding: '3px 10px', borderRadius: 20, background: '#d1fae5', color: '#065f46', fontSize: 11, fontWeight: 700, border: '1px solid #6ee7b7' }}>
+                              <i className="fas fa-check-circle" style={{ marginRight: 4 }}></i>คืนเงินแล้ว
+                            </span>
+                          ) : (
+                            <span style={{ padding: '3px 10px', borderRadius: 20, background: '#fef9c3', color: '#854d0e', fontSize: 11, fontWeight: 600, border: '1px solid #fde047' }}>
+                              <i className="fas fa-clock" style={{ marginRight: 4 }}></i>รอคืนมัดจำ
+                            </span>
+                          )}
+                          {!isWinner && (
+                            <button type="button" onClick={() => handleMarkBidWinner(bid.id)} disabled={markingWinner === bid.id}
+                              style={{ padding: '3px 10px', borderRadius: 6, border: '1px solid #f59e0b', background: '#fffbeb', color: '#92400e', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                              {markingWinner === bid.id ? <i className="fas fa-spinner fa-spin"></i> : <><i className="fas fa-crown" style={{ marginRight: 3 }}></i>ตั้งเป็นผู้ชนะ</>}
+                            </button>
+                          )}
+                          <button type="button" onClick={() => handleDeleteBid(bid.id)} disabled={deletingBid === bid.id}
+                            style={{ marginLeft: 'auto', padding: '3px 8px', borderRadius: 6, border: '1px solid #fca5a5', background: '#fff', color: '#e74c3c', fontSize: 11, cursor: 'pointer' }}>
+                            {deletingBid === bid.id ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-trash-alt"></i>}
+                          </button>
+                        </div>
+
+                        {bid.note && (
+                          <div style={{ marginTop: 6, fontSize: 11, color: '#888', fontStyle: 'italic' }}>
+                            <i className="fas fa-comment-alt" style={{ marginRight: 4 }}></i>{bid.note}
+                          </div>
+                        )}
+                        {bid.bid_date && (
+                          <div style={{ fontSize: 10, color: '#b0bec5', marginTop: 4 }}>
+                            วันที่เสนอ: {new Date(bid.bid_date).toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Modal preview สลิปมัดจำ */}
+            {previewSlip && (
+              <div onClick={() => setPreviewSlip(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.82)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'zoom-out' }}>
+                <button onClick={e => { e.stopPropagation(); setPreviewSlip(null) }}
+                  style={{ position: 'fixed', top: 16, right: 16, width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.9)', border: 'none', fontSize: 20, cursor: 'pointer', zIndex: 100000 }}>✕</button>
+                {/\.pdf$/i.test(previewSlip)
+                  ? <iframe src={previewSlip} title="deposit slip" style={{ width: '85vw', height: '90vh', border: 'none', borderRadius: 8 }} onClick={e => e.stopPropagation()} />
+                  : <img src={previewSlip} alt="deposit slip" onClick={e => e.stopPropagation()} style={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: 8, boxShadow: '0 8px 32px rgba(0,0,0,0.5)', cursor: 'default' }} />
+                }
+              </div>
+            )}
 
             {/* ข้อมูลทรัพย์ (ฝ่ายประมูล) */}
             <div className="card" style={{ padding: 24, marginBottom: 20 }}>

@@ -1360,6 +1360,149 @@ function ContractExpiryTab({ q, onOpenCase }) {
 }
 
 // ============================================================
+// DEPOSIT REFUND TAB — สลิปมัดจำรอคืนนายทุนที่ไม่ชนะประมูล
+// ============================================================
+const AUC_API = '/api/admin/auction'
+
+function DepositRefundTab() {
+  const [bids, setBids] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [filter, setFilter] = useState('pending')
+  const [preview, setPreview] = useState(null)
+  const [markingRefund, setMarkingRefund] = useState(null)
+
+  const fetchBids = useCallback(() => {
+    setLoading(true)
+    fetch(`${AUC_API}/deposit-slips?refund_status=${filter}`, { headers: { Authorization: `Bearer ${token()}` } })
+      .then(r => r.json())
+      .then(d => { if (d.success) setBids(d.bids || []) })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [filter])
+
+  useEffect(() => { fetchBids() }, [fetchBids])
+
+  const handleMarkRefund = async (bidId) => {
+    if (!confirm('ยืนยันว่าได้โอนเงินคืนมัดจำให้นายทุนรายนี้แล้ว?')) return
+    setMarkingRefund(bidId)
+    try {
+      const res = await fetch(`${AUC_API}/bids/${bidId}/refund`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token()}` }
+      })
+      const data = await res.json()
+      if (data.success) {
+        setBids(prev => prev.filter(b => b.bid_id !== bidId))
+      }
+    } catch {}
+    setMarkingRefund(null)
+  }
+
+  const FILTERS = [
+    { v: 'pending',  l: '⏳ รอคืนเงิน', c: '#d97706', bg: '#fffbeb' },
+    { v: 'refunded', l: '✅ คืนแล้ว',   c: '#16a34a', bg: '#f0fdf4' },
+    { v: 'winner',   l: '🏆 ผู้ชนะ',    c: '#7c3aed', bg: '#faf5ff' },
+  ]
+
+  return (
+    <div>
+      <ImgPreview src={preview} onClose={() => setPreview(null)} />
+
+      {/* Filter pills */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+        {FILTERS.map(f => (
+          <button key={f.v} onClick={() => setFilter(f.v)}
+            style={{ padding: '6px 16px', borderRadius: 20, border: `2px solid ${filter === f.v ? f.c : '#e2e8f0'}`, background: filter === f.v ? f.bg : '#fff', color: filter === f.v ? f.c : '#64748b', fontSize: 13, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s' }}>
+            {f.l}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="empty-state"><i className="fas fa-spinner fa-spin"></i><p>กำลังโหลด...</p></div>
+      ) : bids.length === 0 ? (
+        <div className="empty-state" style={{ padding: 40 }}>
+          <i className="fas fa-check-circle" style={{ fontSize: 36, color: '#16a34a' }}></i>
+          <p style={{ marginTop: 12 }}>{filter === 'pending' ? 'ไม่มีสลิปมัดจำรอคืน 🎉' : 'ไม่พบรายการ'}</p>
+        </div>
+      ) : (
+        <div>
+          <div style={{ fontSize: 13, color: '#888', marginBottom: 14 }}>
+            พบ <strong style={{ color: filter === 'pending' ? '#d97706' : 'var(--primary)' }}>{bids.length}</strong> รายการ
+          </div>
+          <div style={{ display: 'grid', gap: 12 }}>
+            {bids.map(bid => {
+              const slipSrc = bid.deposit_slip ? (bid.deposit_slip.startsWith('/') ? bid.deposit_slip : `/${bid.deposit_slip}`) : null
+              const isPdf = slipSrc && /\.pdf$/i.test(slipSrc)
+              return (
+                <div key={bid.bid_id} style={{ background: '#fff', borderRadius: 12, padding: '14px 18px', boxShadow: '0 1px 6px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, alignItems: 'center' }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+                      <span style={{ fontWeight: 800, fontSize: 15, color: '#1e293b' }}>
+                        <i className="fas fa-user-tie" style={{ marginRight: 5, color: '#e67e22' }}></i>
+                        {bid.investor_name || '—'}
+                      </span>
+                      {bid.investor_code && <span style={{ fontSize: 11, fontFamily: 'monospace', background: '#f1f5f9', padding: '1px 6px', borderRadius: 4, color: '#475569' }}>{bid.investor_code}</span>}
+                      {bid.investor_phone && <span style={{ fontSize: 12, color: '#64748b' }}>{bid.investor_phone}</span>}
+                    </div>
+                    <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 12, color: '#64748b', marginBottom: 6 }}>
+                      <span><i className="fas fa-folder" style={{ marginRight: 4 }}></i>เคส: <strong style={{ color: '#1e293b' }}>{bid.case_code || '—'}</strong></span>
+                      <span><i className="fas fa-map-marker-alt" style={{ marginRight: 4 }}></i>{bid.province || ''}{bid.district ? ` · ${bid.district}` : ''}</span>
+                      {bid.debtor_name && <span><i className="fas fa-user" style={{ marginRight: 4 }}></i>ลูกหนี้: {bid.debtor_name}</span>}
+                    </div>
+                    <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+                      {bid.bid_amount && (
+                        <span style={{ fontSize: 14, fontWeight: 700, color: '#e67e22' }}>
+                          <i className="fas fa-gavel" style={{ marginRight: 4 }}></i>ราคาเสนอ: ฿{Number(bid.bid_amount).toLocaleString('th-TH')}
+                        </span>
+                      )}
+                      {bid.deposit_amount && (
+                        <span style={{ fontSize: 14, fontWeight: 700, color: '#78350f', background: '#fef3c7', padding: '2px 10px', borderRadius: 10 }}>
+                          <i className="fas fa-receipt" style={{ marginRight: 4 }}></i>มัดจำ: ฿{Number(bid.deposit_amount).toLocaleString('th-TH')}
+                        </span>
+                      )}
+                    </div>
+                    {bid.note && <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4, fontStyle: 'italic' }}>{bid.note}</div>}
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end', minWidth: 110 }}>
+                    {slipSrc && (
+                      <button onClick={() => setPreview(slipSrc)}
+                        style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: isPdf ? '#fee2e2' : '#fef3c7', color: isPdf ? '#b91c1c' : '#92400e', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
+                        <i className={`fas ${isPdf ? 'fa-file-pdf' : 'fa-image'}`}></i> ดูสลิป
+                      </button>
+                    )}
+                    {filter === 'pending' && (
+                      <button onClick={() => handleMarkRefund(bid.bid_id)} disabled={markingRefund === bid.bid_id}
+                        style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: markingRefund === bid.bid_id ? '#94a3b8' : '#16a34a', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                        {markingRefund === bid.bid_id
+                          ? <><i className="fas fa-spinner fa-spin"></i> กำลังบันทึก...</>
+                          : <><i className="fas fa-check-circle"></i> โอนคืนแล้ว</>
+                        }
+                      </button>
+                    )}
+                    {filter === 'refunded' && (
+                      <span style={{ fontSize: 11, color: '#16a34a', fontWeight: 700 }}>
+                        <i className="fas fa-check-circle" style={{ marginRight: 4 }}></i>คืนแล้ว
+                      </span>
+                    )}
+                    {filter === 'winner' && (
+                      <span style={{ fontSize: 11, color: '#7c3aed', fontWeight: 700 }}>
+                        <i className="fas fa-trophy" style={{ marginRight: 4 }}></i>ผู้ชนะ
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ============================================================
 // MAIN PAGE
 // ============================================================
 export default function AccountingPage() {
@@ -1379,6 +1522,7 @@ export default function AccountingPage() {
     { id: 'agents', label: 'นายหน้า', icon: 'fa-user-tie' },
     { id: 'investors', label: 'นายทุน', icon: 'fa-hand-holding-usd' },
     { id: 'expiry', label: 'ครบกำหนดสัญญา', icon: 'fa-calendar-exclamation' },
+    { id: 'deposit_refund', label: 'สลิปมัดจำรอคืน', icon: 'fa-receipt' },
   ]
 
   const statCards = [
@@ -1453,6 +1597,7 @@ export default function AccountingPage() {
       {tab === 'agents' && <AgentsTab q={q} searchField={searchField} onOpenCase={setSelectedCase} />}
       {tab === 'investors' && <InvestorsTab q={q} searchField={searchField} onOpenCase={setSelectedCase} />}
       {tab === 'expiry' && <ContractExpiryTab q={q} onOpenCase={setSelectedCase} />}
+      {tab === 'deposit_refund' && <DepositRefundTab />}
 
       {/* Case Modal */}
       {selectedCase && <CaseModal caseRow={selectedCase} onClose={() => setSelectedCase(null)} />}
