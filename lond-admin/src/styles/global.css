@@ -639,3 +639,107 @@ input[type="file"] {
     padding: 8px 6px !important;
   }
 }
+
+/* ===== DocEditorModal — Mobile Responsive ===== */
+
+/* Tablet: ≤768px — ลด padding + toolbar compact */
+@media (max-width: 768px) {
+  .doc-modal-toolbar {
+    padding: 8px 12px !important;
+    gap: 6px !important;
+  }
+
+  .doc-modal-toolbar-left {
+    gap: 8px !important;
+  }
+
+  .doc-modal-toolbar-right {
+    gap: 6px !important;
+  }
+
+  .doc-modal-title {
+    font-size: 13px !important;
+    max-width: 160px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* doc area scroll ซ้าย-ขวาได้เมื่อ paper กว้างกว่าหน้าจอ (เหมือน Google Docs mobile) */
+  .doc-modal-doc-area {
+    padding: 12px !important;
+    overflow-x: auto !important;
+    justify-content: flex-start !important;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Mobile: ≤600px — toolbar icon-only + ลด padding */
+@media (max-width: 600px) {
+  .doc-modal-toolbar {
+    padding: 6px 10px !important;
+  }
+
+  /* ซ่อนชื่อเอกสาร (ประหยัดพื้นที่) */
+  .doc-modal-title {
+    display: none !important;
+  }
+
+  /* ซ่อน page badge */
+  .doc-modal-page-badge {
+    display: none !important;
+  }
+
+  /* ปุ่มใน toolbar — เหลือแค่ icon บนมือถือ */
+  .doc-btn-label {
+    display: none !important;
+  }
+
+  .doc-modal-doc-area {
+    padding: 8px !important;
+  }
+}
+
+/* ===== Global input overflow prevention on mobile ===== */
+/* ช่องกรอกข้อมูลทุกช่องห้ามล้นออกนอก container บนมือถือ */
+@media (max-width: 768px) {
+  input[type="text"],
+  input[type="number"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="date"],
+  input[type="datetime-local"],
+  input[type="time"],
+  input[type="search"],
+  select,
+  textarea {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+}
+
+/* @media print — paper ขนาดเต็ม A4 เสมอ */
+@media print {
+  .doc-modal-overlay {
+    position: static !important;
+    background: none !important;
+  }
+
+  .doc-modal-toolbar {
+    display: none !important;
+  }
+
+  .doc-modal-doc-area {
+    padding: 0 !important;
+    overflow: visible !important;
+    background: none !important;
+    justify-content: center !important;
+  }
+
+  .doc-modal-paper {
+    width: 210mm !important;
+    max-width: 210mm !important;
+    box-shadow: none !important;
+    outline: none !important;
+  }
+}

@@ -2,8 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import '../styles/sales.css'
 import MapPreview from '../components/MapPreview'
-import { verifySlipFile } from '../utils/slipVerifier'
-import SlipVerifyBadge from '../components/SlipVerifyBadge'
 
 const token = () => localStorage.getItem('loandd_admin')
 const API = '/api/admin/accounting'
@@ -55,18 +53,10 @@ function ImageModal({ src, onClose }) {
 function SlipUpload({ label, value, onChange, fieldName = 'slip_image' }) {
   const [preview, setPreview] = useState(null)
   const [uploading, setUploading] = useState(false)
-  const [verifyResult, setVerifyResult] = useState(null)
-  const [verifying, setVerifying] = useState(false)
 
   const handleFile = async (e) => {
     const file = e.target.files[0]
     if (!file) return
-    // ★ สแกน QR สลิป (รันพร้อมกับ upload)
-    setVerifying(true)
-    setVerifyResult(null)
-    verifySlipFile(file)
-      .then(r => setVerifyResult(r ? { ...r, _file: file } : { status: 'no_qr', message: 'ไม่พบ QR', _file: file }))
-      .finally(() => setVerifying(false))
     setUploading(true)
     const fd = new FormData()
     fd.append(fieldName, file)
@@ -114,8 +104,6 @@ function SlipUpload({ label, value, onChange, fieldName = 'slip_image' }) {
         </div>
       )}
       <ImageModal src={preview} onClose={() => setPreview(null)} />
-      {/* ★ ผลตรวจสลิป QR */}
-      <SlipVerifyBadge result={verifyResult} verifying={verifying} />
     </div>
   )
 }

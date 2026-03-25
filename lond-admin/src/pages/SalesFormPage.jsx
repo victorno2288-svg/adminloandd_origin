@@ -4,8 +4,6 @@ import { io } from 'socket.io-client'
 import '../styles/sales.css'
 import CancelCaseButton from '../components/CancelCaseButton'
 import MapPreview from '../components/MapPreview'
-import { useSlipVerify } from '../components/SlipVerifyBadge'
-import SlipVerifyBadge from '../components/SlipVerifyBadge'
 import PropertyVideoPanel from '../components/PropertyVideoPanel'
 
 const token = () => localStorage.getItem('loandd_admin')
@@ -402,7 +400,6 @@ export default function SalesFormPage() {
 
   // ★ สลิปค่าประเมิน
   const [slipFiles, setSlipFiles] = useState([])
-  const slipVerify = useSlipVerify({ apiBase: '/api/admin', token: token() })   // ★ ตรวจ QR + เช็ค duplicate ref
   const slipFile = slipFiles[0] || null  // compat
   const [uploadingSlip, setUploadingSlip] = useState(false)
   const [slipMsg, setSlipMsg] = useState('')
@@ -1392,19 +1389,6 @@ export default function SalesFormPage() {
         }
       }
       setSlipMsg(`✅ อัพโหลดสลิปสำเร็จ ${slipFiles.length > 1 ? `(${slipFiles.length} ไฟล์)` : ''}`)
-      // ★ บันทึก ref สลิปลงฐานข้อมูล (ป้องกัน duplicate)
-      if (slipVerify.verifyResult?.qrData?.ref) {
-        fetch('/api/admin/slip/record-ref', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
-          body: JSON.stringify({
-            ref:        slipVerify.verifyResult.qrData.ref,
-            amount:     slipVerify.verifyResult.qrData.amount,
-            case_id:    caseInfo?.case_id || null,
-            field_name: 'appraisal_slip',
-          }),
-        }).catch(() => {})
-      }
       setSlipFiles([])
       // ★ Auto-set payment_status = 'paid' เมื่ออัพโหลดสลิปสำเร็จ
       if (caseInfo?.payment_status !== 'paid') {
@@ -3106,7 +3090,7 @@ export default function SalesFormPage() {
                       <input type="file" accept="image/*,.pdf" id="create-slip-file-input" style={{ display: 'none' }}
                         onChange={e => {
                           const f = e.target.files[0]
-                          if (f) { setSlipFiles([f]); slipVerify.runVerify(f) }
+                          if (f) { setSlipFiles([f]) }
                           e.target.value = ''
                         }} />
                       <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
@@ -3142,8 +3126,6 @@ export default function SalesFormPage() {
                         </div>
                       </div>
                     </label>
-                    {/* ★ ผลตรวจสลิป QR */}
-                    <SlipVerifyBadge result={slipVerify.verifyResult} verifying={slipVerify.verifying} />
                     {/* วันที่ชำระ */}
                     <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                       <label style={{ fontSize: 12, fontWeight: 700, color: '#e65100', whiteSpace: 'nowrap' }}>
@@ -3199,7 +3181,6 @@ export default function SalesFormPage() {
                           const files = Array.from(e.target.files)
                           setSlipFiles(files)
                           setSlipMsg('')
-                          if (files[0]) slipVerify.runVerify(files[0])
                           e.target.value = ''
                         }} />
                       <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
@@ -3240,8 +3221,6 @@ export default function SalesFormPage() {
                         </div>
                       </div>
                     </label>
-                    {/* ★ ผลตรวจสลิป QR */}
-                    <SlipVerifyBadge result={slipVerify.verifyResult} verifying={slipVerify.verifying} />
                     <button onClick={handleUploadSlip} disabled={!slipFiles.length || uploadingSlip}
                       style={{ padding: '6px 14px', background: slipFiles.length ? '#f57f17' : '#bdbdbd', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: slipFiles.length ? 'pointer' : 'not-allowed', opacity: slipFiles.length ? 1 : 0.6 }}>
                       {uploadingSlip ? <><i className="fas fa-spinner fa-spin"></i> กำลังอัพโหลด...</> : <><i className="fas fa-upload" style={{ marginRight: 4 }}></i>อัพโหลด</>}

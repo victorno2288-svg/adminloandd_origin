@@ -6,8 +6,6 @@ import MapPreview from '../components/MapPreview'
 import AgentCard from '../components/AgentCard'
 import ChecklistDocsPanel from '../components/ChecklistDocsPanel'
 import LandOfficeInput from '../components/LandOfficeInput'
-import { useSlipVerify } from '../components/SlipVerifyBadge'
-import SlipVerifyBadge from '../components/SlipVerifyBadge'
 // CaseInfoSummary removed
 // AppraisalStatusCard removed — ย้ายไปดูที่ฝ่ายประเมินโดยตรง
 
@@ -121,11 +119,6 @@ export default function CaseEditPage() {
   const bookRef = useRef(null)
   const createSlipRef = useRef(null)
   const createBookRef = useRef(null)
-
-  // ★ SlipVerify hooks
-  const createSlipVerify = useSlipVerify()  // สลิปค่าประเมิน (create)
-  const txSlipVerify     = useSlipVerify()  // transaction_slip
-  const advSlipVerify    = useSlipVerify()  // advance_slip
 
   // track ชื่อไฟล์ที่เลือกใหม่ (สำหรับแสดง X)
   const [createSlipName, setCreateSlipName] = useState('')
@@ -857,7 +850,6 @@ export default function CaseEditPage() {
                         const f = e.target.files[0]
                         setCreateSlipName(f?.name || '')
                         setCreateSlipPreview(f ? (f.type === 'application/pdf' ? 'pdf' : URL.createObjectURL(f)) : null)
-                        createSlipVerify.runVerify(f)
                       }} />
                     <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                       <div style={{
@@ -892,8 +884,6 @@ export default function CaseEditPage() {
                       </div>
                     </div>
                   </label>
-                  {/* ★ ผลตรวจสลิป QR */}
-                  <SlipVerifyBadge result={createSlipVerify.verifyResult} verifying={createSlipVerify.verifying} />
                   {debtorDetail?.slip_image && !createSlipName && (
                     <div style={{ marginTop: 6 }}>
                       <small style={{ color: '#888', fontSize: 11 }}>ฝ่ายประเมินอัพโหลดไว้แล้ว: </small>
@@ -1673,11 +1663,9 @@ export default function CaseEditPage() {
                           <i className={`fas ${hasNew ? 'fa-exchange-alt' : 'fa-cloud-upload-alt'}`}></i>
                           {hasNew ? 'เปลี่ยนไฟล์' : hasExisting ? 'ไฟล์ใหม่แทน' : 'เลือกไฟล์สลิป'}
                           <input type="file" accept="image/*,.pdf" ref={txSlipRef} style={{ display: 'none' }}
-                            onChange={e => { const f = e.target.files[0]; if (f) { set('_tx_slip_name', f.name); set('_tx_slip_changed', true); set('_tx_slip_cleared', false); txSlipVerify.runVerify(f) } }} />
+                            onChange={e => { const f = e.target.files[0]; if (f) { set('_tx_slip_name', f.name); set('_tx_slip_changed', true); set('_tx_slip_cleared', false) } }} />
                         </label>
                         <span style={{ fontSize: 10, color: '#9ca3af', marginLeft: 6 }}>รูปภาพ / PDF</span>
-                        {/* ★ ผลตรวจสลิป QR */}
-                        <SlipVerifyBadge result={txSlipVerify.verifyResult} verifying={txSlipVerify.verifying} />
                       </div>
                     )
                   })()}
@@ -1760,11 +1748,9 @@ export default function CaseEditPage() {
                           <i className={`fas ${hasNew ? 'fa-exchange-alt' : 'fa-cloud-upload-alt'}`}></i>
                           {hasNew ? 'เปลี่ยนไฟล์' : hasExisting ? 'ไฟล์ใหม่แทน' : 'เลือกไฟล์สลิป'}
                           <input type="file" accept="image/*,.pdf" ref={advanceSlipRef} style={{ display: 'none' }}
-                            onChange={e => { const f = e.target.files[0]; if (f) { set('_adv_slip_name', f.name); set('_adv_slip_changed', true); set('_adv_slip_cleared', false); advSlipVerify.runVerify(f) } }} />
+                            onChange={e => { const f = e.target.files[0]; if (f) { set('_adv_slip_name', f.name); set('_adv_slip_changed', true); set('_adv_slip_cleared', false) } }} />
                         </label>
                         <span style={{ fontSize: 10, color: '#9ca3af', marginLeft: 6 }}>รูปภาพ / PDF</span>
-                        {/* ★ ผลตรวจสลิป QR */}
-                        <SlipVerifyBadge result={advSlipVerify.verifyResult} verifying={advSlipVerify.verifying} />
                       </div>
                     )
                   })()}

@@ -2,8 +2,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import '../styles/sales.css'
-import { verifySlipFile } from '../utils/slipVerifier'
-import SlipVerifyBadge from '../components/SlipVerifyBadge'
 
 const token = () => localStorage.getItem('loandd_admin')
 const API = '/api/admin/accounting'
@@ -17,18 +15,10 @@ function formatDate(d) {
 function SlipUpload({ label, value, onChange, fieldName = 'commission_slip' }) {
   const [uploading, setUploading] = useState(false)
   const [preview, setPreview] = useState(null)
-  const [verifyResult, setVerifyResult] = useState(null)
-  const [verifying, setVerifying] = useState(false)
 
   const handleUpload = async (e) => {
     const file = e.target.files[0]
     if (!file) return
-    // ★ สแกน QR สลิป (รันพร้อมกับ upload)
-    setVerifying(true)
-    setVerifyResult(null)
-    verifySlipFile(file)
-      .then(r => setVerifyResult(r ? { ...r, _file: file } : { status: 'no_qr', message: 'ไม่พบ QR', _file: file }))
-      .finally(() => setVerifying(false))
     setUploading(true)
     try {
       const formData = new FormData()
@@ -97,8 +87,6 @@ function SlipUpload({ label, value, onChange, fieldName = 'commission_slip' }) {
             style={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: 8, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }} />
         </div>
       )}
-      {/* ★ ผลตรวจสลิป QR */}
-      <SlipVerifyBadge result={verifyResult} verifying={verifying} />
     </div>
   )
 }

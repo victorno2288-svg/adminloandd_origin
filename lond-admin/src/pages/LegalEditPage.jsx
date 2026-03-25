@@ -8,8 +8,6 @@ import CaseInfoSummary from '../components/CaseInfoSummary'
 import ChecklistDocsPanel from '../components/ChecklistDocsPanel'
 import PropertyVideoPanel from '../components/PropertyVideoPanel'
 import LandOfficeInput from '../components/LandOfficeInput'
-import { useSlipVerify } from '../components/SlipVerifyBadge'
-import SlipVerifyBadge from '../components/SlipVerifyBadge'
 
 
 const token = () => localStorage.getItem('loandd_admin')
@@ -513,12 +511,6 @@ export default function LegalEditPage() {
   const [caseData, setCaseData] = useState(null)
   const [msg, setMsg] = useState('')
   const [success, setSuccess] = useState('')
-
-  // ★ SlipVerify hooks — ตรวจ QR สลิปทุกช่อง
-  const agentSlipVerify = useSlipVerify()
-  const txSlipVerify    = useSlipVerify()
-  const advSlipVerify   = useSlipVerify()
-  const slipVerifyMap   = { transaction_slip: txSlipVerify, advance_slip: advSlipVerify }
 
   // ★ แจ้งฝ่ายอื่น
   const [notifySalesScheduled, setNotifySalesScheduled] = useState(false)
@@ -1322,11 +1314,8 @@ export default function LegalEditPage() {
                       const lbl = document.getElementById('agentSlipLabel')
                       if (lbl) lbl.textContent = f ? `✓ ${f.name}` : (caseData.agent_payment_slip ? 'เปลี่ยนสลิปค่านายหน้า' : 'อัพโหลดสลิปค่านายหน้า')
                       setLocalPreview('agent_payment_slip', f)
-                      agentSlipVerify.runVerify(f)
                     }} />
                 </label>
-                {/* ★ ผลตรวจสลิป */}
-                <SlipVerifyBadge result={agentSlipVerify.verifyResult} verifying={agentSlipVerify.verifying} />
               </div>}
 
               {/* ★ บัญชีธนาคารลูกหนี้ + สมุดบัญชี */}
@@ -2454,15 +2443,9 @@ export default function LegalEditPage() {
                           onChange={e => {
                             const f = e.target.files[0]
                             setFileName(field, f?.name || '')
-                            slipVerifyMap[field]?.runVerify(f)
                           }} />
                       </label>
                       <span style={{ fontSize: 10, color: '#9ca3af', marginLeft: 6 }}>รูปภาพ / PDF</span>
-                      {/* ★ ผลตรวจสลิป QR */}
-                      <SlipVerifyBadge
-                        result={slipVerifyMap[field]?.verifyResult}
-                        verifying={slipVerifyMap[field]?.verifying}
-                      />
                     </div>
                   )
                 })}
