@@ -6,6 +6,7 @@ import CancelCaseButton from '../components/CancelCaseButton'
 import MapPreview from '../components/MapPreview'
 import { useSlipVerify } from '../components/SlipVerifyBadge'
 import SlipVerifyBadge from '../components/SlipVerifyBadge'
+import PropertyVideoPanel from '../components/PropertyVideoPanel'
 
 const token = () => localStorage.getItem('loandd_admin')
 const API = '/api/admin/sales'
@@ -3538,87 +3539,8 @@ export default function SalesFormPage() {
                 )
               })()}
 
-              {/* ===== วีดีโอทรัพย์ — อัพโหลดผ่าน checklist ===== */}
-              {isEdit && (
-                <div style={{ marginTop: 14, padding: '12px 16px', background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 10 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#6d28d9', display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <i className="fas fa-video"></i> วีดีโอทรัพย์
-                    </span>
-                    <label style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 5,
-                      background: uploadingChecklistDoc === 'property_video' ? '#e0e0e0' : '#7c3aed',
-                      color: '#fff', borderRadius: 7, padding: '5px 14px',
-                      fontSize: 12, fontWeight: 600, cursor: uploadingChecklistDoc === 'property_video' ? 'default' : 'pointer',
-                      whiteSpace: 'nowrap'
-                    }}>
-                      {uploadingChecklistDoc === 'property_video'
-                        ? <><i className="fas fa-spinner fa-spin" /> กำลังอัพ...</>
-                        : <><i className="fas fa-upload" /> อัพโหลดวีดีโอ</>
-                      }
-                      <input type="file" accept="video/*" multiple style={{ display: 'none' }}
-                        disabled={uploadingChecklistDoc === 'property_video'}
-                        onChange={e => {
-                          if (e.target.files?.length) {
-                            handleChecklistUpload('property_video', Array.from(e.target.files))
-                            e.target.value = ''
-                          }
-                        }} />
-                    </label>
-                  </div>
-                  {/* Thumbnails ของวีดีโอที่อัพแล้ว */}
-                  {(checklistDocs.property_video || []).length > 0 && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
-                      {(checklistDocs.property_video || []).map((fp, fi) => (
-                        <div key={fi} style={{ position: 'relative', display: 'inline-flex' }}>
-                          <div
-                            onClick={() => window.open(`/${fp}`, '_blank')}
-                            style={{
-                              width: 64, height: 64, borderRadius: 8,
-                              background: '#ede9fe', border: '1.5px solid #c4b5fd',
-                              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                              cursor: 'pointer', fontSize: 10, color: '#7c3aed', gap: 3
-                            }}>
-                            <i className="fas fa-play-circle" style={{ fontSize: 22, color: '#7c3aed' }} />
-                            <span style={{ fontSize: 9, fontWeight: 600 }}>VDO</span>
-                          </div>
-                          <button type="button"
-                            onClick={() => handleChecklistRemove('property_video', fp)}
-                            style={{
-                              position: 'absolute', top: -5, right: -5,
-                              width: 18, height: 18, borderRadius: '50%',
-                              background: '#e53935', border: 'none', color: '#fff',
-                              fontSize: 9, cursor: 'pointer', display: 'flex',
-                              alignItems: 'center', justifyContent: 'center', padding: 0
-                            }}>
-                            <i className="fas fa-times" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {/* แสดงวีดีโอเก่าจาก images column (backward compat) */}
-                  {isEdit && existingImages.filter(p => p.includes('videos')).length > 0 && (
-                    <div style={{ marginTop: 6 }}>
-                      <small style={{ color: '#9ca3af', fontSize: 10 }}>วีดีโอเก่า:</small>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
-                        {existingImages.filter(p => p.includes('videos')).map((fp, fi) => (
-                          <div key={fi}
-                            onClick={() => window.open(`/${fp}`, '_blank')}
-                            style={{
-                              width: 56, height: 56, borderRadius: 6, background: '#f3f0ff', border: '1px solid #c4b5fd',
-                              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                              cursor: 'pointer', fontSize: 9, color: '#7c3aed', gap: 2
-                            }}>
-                            <i className="fas fa-play-circle" style={{ fontSize: 18 }} />
-                            <span>VDO</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+              {/* ===== VDO ทรัพย์สิน ===== */}
+              <PropertyVideoPanel lrId={isEdit ? id : null} token={token()} canUpload={true} />
 
             </div>
 

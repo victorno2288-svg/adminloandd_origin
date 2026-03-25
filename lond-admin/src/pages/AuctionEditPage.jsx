@@ -6,6 +6,7 @@ import MapPreview from '../components/MapPreview'
 import AgentCard from '../components/AgentCard'
 import CaseInfoSummary from '../components/CaseInfoSummary'
 import ChecklistDocsPanel from '../components/ChecklistDocsPanel'
+import PropertyVideoPanel from '../components/PropertyVideoPanel'
 import LandOfficeInput from '../components/LandOfficeInput'
 import AppraisalStatusCard from '../components/AppraisalStatusCard'
 
@@ -104,7 +105,7 @@ export default function AuctionEditPage() {
   const [notifySalesOnSave, setNotifySalesOnSave] = useState(false)       // ★ แจ้งฝ่ายขาย
   const [notifyLegalOnSave, setNotifyLegalOnSave] = useState(false)       // ★ แจ้งฝ่ายนิติ
   const [notifyAccountingOnSave, setNotifyAccountingOnSave] = useState(false) // ★ แจ้งฝ่ายบัญชี
-  const [videoFiles, setVideoFiles] = useState([])  // VDO จาก checklist-docs
+  // VDO — managed by PropertyVideoPanel
 
   const [form, setForm] = useState({
     investor_id: '', investor_name: '', investor_code: '', investor_phone: '', investor_line_id: '',
@@ -185,14 +186,6 @@ export default function AuctionEditPage() {
       .catch(() => {})
   }, [id])
 
-  // โหลด VDO ทรัพย์จาก checklist-docs (shared route)
-  useEffect(() => {
-    if (!caseData?.loan_request_id) return
-    fetch(`/api/admin/debtors/${caseData.loan_request_id}/checklist-docs`, { headers: { Authorization: `Bearer ${token()}` } })
-      .then(r => r.json())
-      .then(d => { if (d.success && d.docs?.property_video) setVideoFiles(d.docs.property_video) })
-      .catch(() => {})
-  }, [caseData?.loan_request_id])
 
   const set = (key, val) => setForm(prev => ({ ...prev, [key]: val }))
 
@@ -703,32 +696,8 @@ export default function AuctionEditPage() {
                 )
               })()}
 
-              {(videoFiles.length > 0 || images.filter(img => img.includes('videos')).length > 0) && (
-                <div style={{ marginTop: 16, padding: '12px 16px', background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 10 }}>
-                  <label style={{ fontSize: 13, fontWeight: 600, color: '#6d28d9', display: 'block', marginBottom: 8 }}>
-                    <i className="fas fa-video" style={{ marginRight: 6 }}></i>VDO ทรัพย์สิน
-                    <span style={{ fontSize: 10, color: '#9ca3af', fontStyle: 'italic', marginLeft: 8 }}>(อัพโหลดโดยฝ่ายประเมิน)</span>
-                  </label>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                    {videoFiles.map((fp, i) => (
-                      <a key={`new-${i}`} href={fp.startsWith('/') ? fp : `/${fp}`} target="_blank" rel="noreferrer"
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px',
-                          background: '#ede9fe', border: '1px solid #c4b5fd', borderRadius: 8,
-                          fontSize: 12, color: '#6d28d9', textDecoration: 'none', fontWeight: 600 }}>
-                        <i className="fas fa-video"></i> วิดีโอ {i + 1}
-                      </a>
-                    ))}
-                    {images.filter(img => img.includes('videos')).map((vid, i) => (
-                      <a key={`old-${i}`} href={vid.startsWith('/') ? vid : `/${vid}`} target="_blank" rel="noreferrer"
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px',
-                          background: '#ede9fe', border: '1px solid #c4b5fd', borderRadius: 8,
-                          fontSize: 12, color: '#6d28d9', textDecoration: 'none', fontWeight: 600 }}>
-                        <i className="fas fa-video"></i> วิดีโอเก่า {i + 1}
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* ===== VDO ทรัพย์สิน ===== */}
+              <PropertyVideoPanel lrId={caseData?.loan_request_id} token={token()} canUpload={false} />
             </div>
 
 

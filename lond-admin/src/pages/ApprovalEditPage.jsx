@@ -6,6 +6,7 @@ import MapPreview from '../components/MapPreview'
 import AgentCard from '../components/AgentCard'
 import CaseInfoSummary from '../components/CaseInfoSummary'
 import ChecklistDocsPanel from '../components/ChecklistDocsPanel'
+import PropertyVideoPanel from '../components/PropertyVideoPanel'
 
 // ========== PreviewModal ==========
 function PreviewModal({ src, onClose }) {
@@ -120,8 +121,7 @@ export default function ApprovalEditPage() {
   const [showPaymentSchedule, setShowPaymentSchedule] = useState(false) // collapsible ตารางผ่อนชำระ
   const [previewSrc, setPreviewSrc] = useState(null)
   const [capturing, setCapturing] = useState(false)
-  // ===== VDO (read-only — อัพโหลดที่ฝ่ายประเมิน) =====
-  const [videoFiles, setVideoFiles] = useState([])
+  // ===== VDO — managed by PropertyVideoPanel =====
   const [showCalcModal, setShowCalcModal] = useState(false)
   // ===== Credit Table Calculator State =====
   const [calcAmount, setCalcAmount] = useState('')
@@ -191,20 +191,6 @@ export default function ApprovalEditPage() {
       .catch(() => setLoading(false))
   }, [id])
 
-  // ===== โหลด checklist video docs =====
-  useEffect(() => {
-    if (!id) return
-    fetch(`/api/admin/debtors/${id}/checklist-docs`, {
-      headers: { Authorization: `Bearer ${token()}` }
-    })
-      .then(r => r.json())
-      .then(d => {
-        if (d.success && d.docs?.property_video) {
-          setVideoFiles(d.docs.property_video)
-        }
-      })
-      .catch(() => {})
-  }, [id])
 
   const handleDeleteCreditTable = async () => {
     if (!window.confirm('ต้องการลบไฟล์ตารางวงเงินนี้หรือไม่?')) return
@@ -701,44 +687,8 @@ export default function ApprovalEditPage() {
                 </div>
               </div>
 
-              {/* ===== VDO ทรัพย์สิน — ดูได้ (อัพโหลดที่ฝ่ายประเมิน) ===== */}
-              {(videoFiles.length > 0 || images.filter(img => img.includes('videos')).length > 0) && (
-                <div style={{ marginTop: 16, padding: '12px 16px', background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 10 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                    <i className="fas fa-video" style={{ color: '#6d28d9' }}></i>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#6d28d9' }}>VDO ทรัพย์สิน</span>
-                    <span style={{ fontSize: 10, color: '#9ca3af', fontStyle: 'italic' }}>(อัพโหลดโดยฝ่ายประเมิน)</span>
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {videoFiles.map((fp, fi) => (
-                      <div key={fi}
-                        onClick={() => window.open(fp.startsWith('/') ? fp : `/${fp}`, '_blank')}
-                        style={{
-                          width: 64, height: 64, borderRadius: 8,
-                          background: '#ede9fe', border: '1.5px solid #c4b5fd',
-                          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                          cursor: 'pointer', gap: 3
-                        }}>
-                        <i className="fas fa-play-circle" style={{ fontSize: 22, color: '#7c3aed' }} />
-                        <span style={{ fontSize: 9, fontWeight: 600, color: '#7c3aed' }}>VDO {fi + 1}</span>
-                      </div>
-                    ))}
-                    {images.filter(img => img.includes('videos')).map((fp, fi) => (
-                      <div key={`old-${fi}`}
-                        onClick={() => window.open(fp.startsWith('/') ? fp : `/${fp}`, '_blank')}
-                        style={{
-                          width: 64, height: 64, borderRadius: 8,
-                          background: '#f3f0ff', border: '1px solid #c4b5fd',
-                          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                          cursor: 'pointer', gap: 3
-                        }}>
-                        <i className="fas fa-play-circle" style={{ fontSize: 20, color: '#7c3aed' }} />
-                        <span style={{ fontSize: 9, color: '#7c3aed' }}>VDO</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* ===== VDO ทรัพย์สิน ===== */}
+              <PropertyVideoPanel lrId={id} token={token()} canUpload={false} />
 
               {caseData.preliminary_terms && (
                 <div style={{ marginTop: 16 }}>
