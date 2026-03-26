@@ -886,84 +886,71 @@ function InvestorModal({ isOpen, onClose, onSaved, editData }) {
 
           {/* ─── สลิปเงินมัดจำนายทุน 1% ─── */}
           <div style={{ borderTop: '1px solid #eee', paddingTop: 14 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#b45309', marginBottom: 8 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#b45309', marginBottom: 10 }}>
               <i className="fas fa-receipt" style={{ marginRight: 6 }}></i>สลิปเงินมัดจำนายทุน 1%
-              {!isEdit && <span style={{ fontSize: 11, fontWeight: 400, color: '#aaa', marginLeft: 6 }}>(อัพโหลดหลังบันทึก)</span>}
             </div>
-            {isEdit && editData?.deposit_slip && !depositSlipFile && (
-              <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
-                <a href={editData.deposit_slip.startsWith('/') ? editData.deposit_slip : `/${editData.deposit_slip}`}
-                  target="_blank" rel="noopener noreferrer"
-                  style={{ fontSize: 12, color: '#b45309', textDecoration: 'underline' }}>
-                  <i className="fas fa-paperclip" style={{ marginRight: 4 }}></i>ดูสลิปปัจจุบัน
-                </a>
-                <button type="button" onClick={() => handleDeleteDoc('deposit_slip')}
-                  style={{ fontSize: 11, padding: '2px 8px', background: '#fef2f2', color: '#e74c3c', border: '1px solid #fca5a5', borderRadius: 5, cursor: 'pointer' }}>
-                  <i className="fas fa-trash"></i> ลบ
-                </button>
+
+            {isEdit && depositSlipPreview ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, background: '#faf5ff', border: '1.5px solid #e9d5ff', borderRadius: 10 }}>
+                <div style={{ width: 56, height: 56, flexShrink: 0, borderRadius: 8, overflow: 'hidden', border: '1px solid #d8b4fe', background: '#f5f3ff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                  onClick={() => window.open(depositSlipPreview, '_blank')}>
+                  {depositSlipPreview.toLowerCase().includes('.pdf')
+                    ? <i className="fas fa-file-pdf" style={{ fontSize: 22, color: '#e53935' }}></i>
+                    : <img src={depositSlipPreview} alt="slip" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.target.style.display = 'none' }} />}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 600 }}>
+                    <i className="fas fa-check-circle" style={{ marginRight: 4 }}></i>มีสลิปแล้ว
+                  </div>
+                  <a href={depositSlipPreview} target="_blank" rel="noopener noreferrer"
+                    style={{ fontSize: 10, color: '#7c3aed', textDecoration: 'underline' }}>
+                    <i className="fas fa-external-link-alt" style={{ marginRight: 3 }}></i>ดูสลิป
+                  </a>
+                </div>
+                <label style={{ cursor: 'pointer', padding: '4px 10px', background: '#ede9fe', color: '#7c3aed', borderRadius: 6, fontSize: 10, fontWeight: 600, border: '1px solid #d8b4fe', whiteSpace: 'nowrap' }}>
+                  <i className="fas fa-sync-alt" style={{ marginRight: 3 }}></i>เปลี่ยน
+                  <input type="file" accept=".jpg,.jpeg,.png,.pdf,.webp" style={{ display: 'none' }}
+                    onChange={async (e) => {
+                      const f = e.target.files[0]; if (!f) return; e.target.value = ''
+                      const fd = new FormData(); fd.append('deposit_slip', f)
+                      try {
+                        const r = await fetch(`${API}/${editData.id}/doc-upload`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` }, body: fd })
+                        const d = await r.json()
+                        if (d.success) {
+                          setDepositSlipPreview(d.deposit_slip || depositSlipPreview)
+                          setDepositSlipMsg('✅ เปลี่ยนสลิปสำเร็จ')
+                        } else { alert(d.message || 'อัพโหลดไม่สำเร็จ') }
+                      } catch { alert('เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ') }
+                    }} />
+                </label>
               </div>
-            )}
-            <label style={{
-              display: 'block', cursor: 'pointer', marginBottom: 8,
-              background: depositSlipPreview ? '#fffbeb' : '#fefce8',
-              border: `2px dashed ${depositSlipPreview ? '#d97706' : '#fcd34d'}`,
-              borderRadius: 10, padding: 12, transition: 'border-color 0.2s',
-            }}>
-              <input type="file" accept=".jpg,.jpeg,.png,.pdf" style={{ display: 'none' }}
-                onChange={e => {
-                  const f = e.target.files[0] || null
-                  if (!f) return
-                  setDepositSlipFile(f); setDepositSlipMsg('')
-                  setDepositSlipPreview(f.type === 'application/pdf' ? 'pdf' : URL.createObjectURL(f))
-                  e.target.value = ''
-                }} />
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                <div style={{
-                  width: 72, height: 72, flexShrink: 0, borderRadius: 8, overflow: 'hidden',
-                  background: '#fef3c7', border: '1px solid #fcd34d',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
+            ) : isEdit ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <label style={{
+                  flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4,
+                  height: 80, borderRadius: 8, border: '2px dashed #fdba74', background: '#fff7ed',
+                  cursor: 'pointer', transition: 'all 0.15s',
                 }}>
-                  {depositSlipPreview === 'pdf'
-                    ? <i className="fas fa-file-pdf" style={{ fontSize: 26, color: '#d97706' }}></i>
-                    : depositSlipPreview && !depositSlipPreview.startsWith('/uploads') && !depositSlipPreview.startsWith('uploads')
-                      ? <img src={depositSlipPreview} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      : depositSlipPreview
-                        ? <i className="fas fa-check-circle" style={{ fontSize: 26, color: '#16a34a' }}></i>
-                        : <i className="fas fa-receipt" style={{ fontSize: 26, color: '#d97706' }}></i>
-                  }
-                  {depositSlipFile && (
-                    <button type="button"
-                      onClick={e => { e.preventDefault(); e.stopPropagation(); setDepositSlipFile(null); setDepositSlipPreview(editData?.deposit_slip || null) }}
-                      style={{ position: 'absolute', top: 3, right: 3, width: 18, height: 18, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, zIndex: 2 }}
-                      title="ลบไฟล์">✕</button>
-                  )}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#b45309', marginBottom: 3 }}>
-                    <i className="fas fa-upload" style={{ marginRight: 5 }}></i>
-                    {depositSlipPreview ? 'เปลี่ยนสลิป' : 'อัพโหลดสลิปเงินมัดจำ 1%'}
-                  </div>
-                  <div style={{ fontSize: 10, color: '#9ca3af', lineHeight: 1.5 }}>
-                    {depositSlipPreview
-                      ? <><span style={{ color: '#16a34a', fontWeight: 600 }}>✓ เลือกไฟล์แล้ว</span> — คลิกเพื่อเปลี่ยน</>
-                      : <>JPG / PNG / PDF</>
-                    }
-                  </div>
-                  {depositSlipFile && (
-                    <div style={{ fontSize: 10, color: '#b45309', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      <i className="fas fa-paperclip" style={{ marginRight: 3 }}></i>{depositSlipFile.name}
-                    </div>
-                  )}
-                </div>
+                  <input type="file" accept=".jpg,.jpeg,.png,.pdf,.webp" style={{ display: 'none' }}
+                    onChange={async (e) => {
+                      const f = e.target.files[0]; if (!f) return; e.target.value = ''
+                      const fd = new FormData(); fd.append('deposit_slip', f)
+                      try {
+                        const r = await fetch(`${API}/${editData.id}/doc-upload`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` }, body: fd })
+                        const d = await r.json()
+                        if (d.success) {
+                          setDepositSlipPreview(d.deposit_slip || URL.createObjectURL(f))
+                          setDepositSlipMsg('✅ อัพโหลดสลิปสำเร็จ')
+                        } else { alert(d.message || 'อัพโหลดไม่สำเร็จ') }
+                      } catch { alert('เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ') }
+                    }} />
+                  <i className="fas fa-cloud-upload-alt" style={{ fontSize: 22, color: '#f97316' }}></i>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#92400e' }}>อัพโหลดสลิปมัดจำ</div>
+                  <div style={{ fontSize: 9, color: '#fb923c' }}>JPG · PNG · PDF · WEBP</div>
+                </label>
               </div>
-            </label>
-            {isEdit && (
-              <button type="button"
-                onClick={() => handleUploadFile(null, 'deposit_slip', depositSlipFile, setUploadingDepositSlip, setDepositSlipMsg)}
-                disabled={uploadingDepositSlip || !depositSlipFile}
-                style={{ padding: '5px 12px', background: '#d97706', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                {uploadingDepositSlip ? <><i className="fas fa-spinner fa-spin"></i> กำลังอัพโหลด...</> : <><i className="fas fa-upload"></i> อัพโหลด</>}
-              </button>
+            ) : (
+              <div style={{ fontSize: 11, color: '#aaa' }}>(อัพโหลดหลังบันทึก)</div>
             )}
             {depositSlipMsg && <div style={{ fontSize: 11, marginTop: 6, color: depositSlipMsg.startsWith('✅') ? '#27ae60' : '#e74c3c' }}>{depositSlipMsg}</div>}
           </div>

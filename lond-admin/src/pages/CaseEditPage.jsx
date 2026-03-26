@@ -1373,66 +1373,65 @@ export default function CaseEditPage() {
             </div>
 
 
-            {/* ===== รูปเปรียบเทียบทรัพย์ ===== */}
+            {/* ===== เปรียบเทียบรูปทรัพย์: ฝ่ายขาย vs ฝ่ายประเมิน ===== */}
             {(() => {
-              const salesPhotos = images.filter(img => img.includes('properties'))
-              const appraisalPhotos = (() => { try { return JSON.parse(caseData.appraisal_images) || [] } catch { return [] } })()
-              if (salesPhotos.length === 0 && appraisalPhotos.length === 0) return null
+              const salesPropImgs = parseImages(caseData.property_photos)
+              const appraisalImgs = parseImages(caseData.appraisal_images)
+              const PhotoThumb = ({ src, colorBorder }) => {
+                const fullSrc = src.startsWith('/') ? src : `/${src}`
+                const isPdf = src.toLowerCase().includes('.pdf')
+                return (
+                  <div style={{ border: `1.5px solid ${colorBorder}`, borderRadius: 8, overflow: 'hidden', cursor: 'pointer', background: '#fafafa' }}
+                    onClick={() => window.open(fullSrc, '_blank')}>
+                    {isPdf ? (
+                      <div style={{ width: '100%', height: 90, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#fff5f5', gap: 4 }}>
+                        <i className="fas fa-file-pdf" style={{ fontSize: 24, color: '#e53935' }}></i>
+                        <span style={{ fontSize: 9, color: '#e53935', fontWeight: 600 }}>PDF</span>
+                      </div>
+                    ) : (
+                      <img src={fullSrc} alt="prop"
+                        style={{ width: '100%', height: 90, objectFit: 'cover' }}
+                        onError={e => { e.target.style.display = 'none' }} />
+                    )}
+                  </div>
+                )
+              }
               return (
-                <div className="card" style={{ padding: '16px 20px', marginBottom: 20 }}>
-                  <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}
-                    onClick={() => setShowPhotoCompare(p => !p)}>
-                    <i className="fas fa-columns" style={{ color: '#888' }}></i>
-                    เปรียบเทียบรูปทรัพย์
-                    <span style={{ fontSize: 11, color: '#888', fontWeight: 400 }}>({salesPhotos.length + appraisalPhotos.length} รูป)</span>
-                    <i className={`fas fa-chevron-${showPhotoCompare ? 'up' : 'down'}`} style={{ marginLeft: 'auto', fontSize: 11, color: '#aaa' }}></i>
-                  </h3>
-                  {showPhotoCompare && <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
-                    {/* ซ้าย: รูปจากฝ่ายขาย */}
-                    <div style={{ background: '#f0faf5', border: '1.5px solid #a5d6a7', borderRadius: 10, padding: 10 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: '#1b5e20', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
-                        <i className="fas fa-user-tie"></i>
-                        รูปจากฝ่ายขาย
-                        <span style={{ fontWeight: 400, color: '#888', marginLeft: 4 }}>({salesPhotos.length} รูป)</span>
+                <div style={{ marginTop: 16, padding: 16, background: '#f8faff', borderRadius: 10, border: '1.5px solid #c7d2fe' }}>
+                  <h4 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 700, color: '#3730a3', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <i className="fas fa-images"></i> เปรียบเทียบรูปทรัพย์
+                    <span style={{ fontSize: 11, fontWeight: 400, color: '#6b7280' }}>— ทุกแผนกมองเห็น</span>
+                  </h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    {/* ฝ่ายขาย */}
+                    <div style={{ background: '#f0fdf4', borderRadius: 8, padding: 12, border: '1px solid #86efac' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#15803d', marginBottom: 8 }}>
+                        <i className="fas fa-user-tie" style={{ marginRight: 5 }}></i>
+                        รูปจากฝ่ายขาย ({salesPropImgs.length} รูป)
                       </div>
-                      {salesPhotos.length > 0 ? (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
-                          {salesPhotos.map((img, i) => (
-                            <a key={i} href={img.startsWith('/') ? img : `/${img}`} target="_blank" rel="noreferrer">
-                              <img src={img.startsWith('/') ? img : `/${img}`} alt="" style={{ width: '100%', height: 60, objectFit: 'cover', borderRadius: 5, border: '1px solid #c8e6c9' }} onError={e => e.target.style.display = 'none'} />
-                            </a>
-                          ))}
+                      {salesPropImgs.length > 0 ? (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 6 }}>
+                          {salesPropImgs.map((src, i) => <PhotoThumb key={i} src={src} colorBorder="#86efac" />)}
                         </div>
                       ) : (
-                        <div style={{ textAlign: 'center', color: '#a5d6a7', padding: '12px 0', fontSize: 11 }}>
-                          <i className="fas fa-image" style={{ fontSize: 20, display: 'block', marginBottom: 4 }}></i>
-                          ยังไม่มีรูป
-                        </div>
+                        <span style={{ fontSize: 12, color: '#999' }}>ยังไม่มีรูปจากฝ่ายขาย</span>
                       )}
                     </div>
-                    {/* ขวา: รูปจากฝ่ายประเมิน */}
-                    <div style={{ background: '#fce4ec', border: '1.5px solid #f48fb1', borderRadius: 10, padding: 10 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: '#880e4f', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
-                        <i className="fas fa-search-location"></i>
-                        รูปจากฝ่ายประเมิน — เข้าพื้นที่
-                        <span style={{ fontWeight: 400, color: '#888', marginLeft: 4 }}>({appraisalPhotos.length} รูป)</span>
+                    {/* ฝ่ายประเมิน */}
+                    <div style={{ background: '#f3e5f5', borderRadius: 8, padding: 12, border: '1px solid #ce93d8' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#7b1fa2', marginBottom: 8 }}>
+                        <i className="fas fa-search-location" style={{ marginRight: 5 }}></i>
+                        รูปจากฝ่ายประเมิน – เข้าพื้นที่ ({appraisalImgs.length} รูป)
                       </div>
-                      {appraisalPhotos.length > 0 ? (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
-                          {appraisalPhotos.map((img, i) => (
-                            <a key={i} href={img.startsWith('/') ? img : `/${img}`} target="_blank" rel="noreferrer">
-                              <img src={img.startsWith('/') ? img : `/${img}`} alt="" style={{ width: '100%', height: 60, objectFit: 'cover', borderRadius: 5, border: '1px solid #f48fb1' }} onError={e => e.target.style.display = 'none'} />
-                            </a>
-                          ))}
+                      {appraisalImgs.length > 0 ? (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 6 }}>
+                          {appraisalImgs.map((src, i) => <PhotoThumb key={i} src={src} colorBorder="#ce93d8" />)}
                         </div>
                       ) : (
-                        <div style={{ textAlign: 'center', color: '#f48fb1', padding: '12px 0', fontSize: 11 }}>
-                          <i className="fas fa-hourglass-half" style={{ fontSize: 20, display: 'block', marginBottom: 4 }}></i>
-                          รูปจะปรากฏหลังนัดประเมิน
-                        </div>
+                        <span style={{ fontSize: 12, color: '#999' }}>ยังไม่มีรูปจากฝ่ายประเมิน</span>
                       )}
                     </div>
-                  </div>}
+                  </div>
                 </div>
               )
             })()}

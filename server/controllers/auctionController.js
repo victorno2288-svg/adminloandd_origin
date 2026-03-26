@@ -63,6 +63,7 @@ exports.getStats = (req, res) => {
     SELECT
       (SELECT COUNT(*) FROM cases c LEFT JOIN auction_transactions auc ON auc.case_id = c.id WHERE auc.id IS NULL OR auc.auction_status = 'pending') AS pending_count,
       (SELECT COUNT(*) FROM auction_transactions WHERE auction_status = 'auctioned') AS auctioned_count,
+      (SELECT COUNT(*) FROM auction_transactions WHERE auction_status = 'auction_completed') AS auction_completed_count,
       (SELECT COUNT(*) FROM auction_transactions WHERE auction_status = 'cancelled') AS cancelled_count,
       (SELECT COUNT(*) FROM cases) AS total_count
   `
@@ -73,11 +74,11 @@ exports.getStats = (req, res) => {
         const fallbackSql = `SELECT (SELECT COUNT(*) FROM cases) AS total_count`
         return db.query(fallbackSql, (err2, rows2) => {
           const total = (!err2 && rows2 && rows2[0]) ? rows2[0].total_count : 0
-          return res.json({ success: true, stats: { pending_count: total, auctioned_count: 0, cancelled_count: 0, total_count: total } })
+          return res.json({ success: true, stats: { pending_count: total, auctioned_count: 0, auction_completed_count: 0, cancelled_count: 0, total_count: total } })
         })
       }
       console.error('getStats error:', err)
-      return res.json({ success: true, stats: { pending_count: 0, auctioned_count: 0, cancelled_count: 0, total_count: 0 } })
+      return res.json({ success: true, stats: { pending_count: 0, auctioned_count: 0, auction_completed_count: 0, cancelled_count: 0, total_count: 0 } })
     }
     res.json({ success: true, stats: results[0] })
   })
@@ -310,7 +311,7 @@ function fetchAuctionDetail(caseId, res) {
           return res.status(500).json({ success: false, message: 'Server Error' })
         }
         if (!results2.length) return res.status(404).json({ success: false, message: 'ไม่พบข้อมูลเคส' })
-        res.json({ success: true, caseData: results2[0] })
+        injectLrImages(results2[0], res)
       })
     }
     if (err) {
@@ -318,8 +319,28 @@ function fetchAuctionDetail(caseId, res) {
       return res.status(500).json({ success: false, message: 'Server Error' })
     }
     if (results.length === 0) return res.status(404).json({ success: false, message: 'ไม่พบข้อมูลเคส' })
-    res.json({ success: true, caseData: results[0] })
+    injectLrImages(results[0], res)
   })
+
+  // ดึง images / appraisal_images / deed_images / property_photos จาก loan_requests โดยตรง
+  // เพื่อหลีกเลี่ยงการที่ c.* อาจบัง lr.images ใน mysql2 (กรณี cases มี column ชื่อเดียวกัน)
+  function injectLrImages(caseRow, res) {
+    const lrId = caseRow.loan_request_id
+    if (!lrId) return res.json({ success: true, caseData: caseRow })
+    db.query(
+      'SELECT images, appraisal_images, deed_images, property_photos FROM loan_requests WHERE id = ?',
+      [lrId],
+      (errLr, lrRows) => {
+        if (!errLr && lrRows && lrRows.length > 0) {
+          caseRow.lr_images            = lrRows[0].images
+          caseRow.lr_appraisal_images  = lrRows[0].appraisal_images
+          caseRow.lr_deed_images       = lrRows[0].deed_images
+          caseRow.lr_property_photos   = lrRows[0].property_photos
+        }
+        res.json({ success: true, caseData: caseRow })
+      }
+    )
+  }
 }
 
 // ========== อัพเดทเคส (ฝ่ายประมูลทรัพย์) ==========

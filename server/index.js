@@ -293,6 +293,23 @@ app.use('/api/admin/contract-expiry', authMiddleware, contractExpiryRoutes);
     });
   });
 
+  // ★ auction_bids — เพิ่มคอลัมน์ที่อาจยังไม่มี
+  const bidCols = [
+    { col: 'deposit_slip',   sql: "ALTER TABLE auction_bids ADD COLUMN deposit_slip VARCHAR(500) NULL DEFAULT NULL" },
+    { col: 'deposit_amount', sql: "ALTER TABLE auction_bids ADD COLUMN deposit_amount DECIMAL(15,2) NULL DEFAULT NULL" },
+    { col: 'refund_status',  sql: "ALTER TABLE auction_bids ADD COLUMN refund_status VARCHAR(50) NULL DEFAULT 'pending'" },
+  ]
+  bidCols.forEach(({ col, sql }) => {
+    db.query(`SHOW COLUMNS FROM auction_bids LIKE '${col}'`, (err, cols) => {
+      if (!err && (!cols || cols.length === 0)) {
+        db.query(sql, (err2) => {
+          if (!err2) console.log(`[migrate] ✅ auction_bids: เพิ่ม ${col} column`)
+          else console.warn(`[migrate] ⚠️ auction_bids ${col}:`, err2.message)
+        })
+      }
+    })
+  })
+
   function restoreAuctionData() {
     db.query('SELECT COUNT(*) AS cnt FROM auction_transactions', (e2, rows) => {
       if (e2 || !rows || rows[0].cnt > 0) return;

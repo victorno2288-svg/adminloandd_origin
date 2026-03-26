@@ -136,6 +136,10 @@ const migrations = [
       PRIMARY KEY (id),
       KEY idx_case_id (case_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci` },
+  // auction_bids — เพิ่มคอลัมน์ที่ขาด
+  { name: 'auction_bids: deposit_slip',   sql: `ALTER TABLE auction_bids ADD COLUMN IF NOT EXISTS deposit_slip VARCHAR(500) NULL DEFAULT NULL COMMENT 'สลิปมัดจำ (path ไฟล์)'` },
+  { name: 'auction_bids: deposit_amount', sql: `ALTER TABLE auction_bids ADD COLUMN IF NOT EXISTS deposit_amount DECIMAL(15,2) NULL DEFAULT NULL COMMENT 'จำนวนเงินมัดจำ'` },
+  { name: 'auction_bids: refund_status',  sql: `ALTER TABLE auction_bids ADD COLUMN IF NOT EXISTS refund_status VARCHAR(50) NULL DEFAULT 'pending' COMMENT 'pending|winner|refunded'` },
   {
     name: 'chat_conversations: next_follow_up_at',
     sql: `ALTER TABLE chat_conversations

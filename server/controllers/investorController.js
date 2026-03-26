@@ -140,7 +140,22 @@ exports.getInvestorById = (req, res) => {
       if (err || results.length === 0) {
         return res.status(404).json({ success: false, message: 'Investor not found' })
       }
-      res.json({ success: true, data: results[0] })
+      const investor = results[0]
+      // ดึง bids ทั้งหมดของนายทุน (ทั้งที่มีสลิปและยังไม่มี) พร้อมข้อมูลเคส
+      db.query(
+        `SELECT ab.id AS bid_id, ab.case_id, ab.deposit_slip, ab.deposit_amount, ab.bid_date, ab.bid_amount,
+                c.case_code, lr.debtor_code
+         FROM auction_bids ab
+         LEFT JOIN cases c ON c.id = ab.case_id
+         LEFT JOIN loan_requests lr ON lr.id = c.loan_request_id
+         WHERE ab.investor_id = ?
+         ORDER BY ab.created_at DESC`,
+        [id],
+        (err2, allBids) => {
+          investor.bid_deposit_slips = (!err2 && allBids) ? allBids : []
+          res.json({ success: true, data: investor })
+        }
+      )
     }
   )
 }
@@ -477,6 +492,38 @@ exports.deleteDoc = (req, res) => {
   db.query(`UPDATE investors SET ${field} = NULL, updated_at = NOW() WHERE id = ?`, [id], (err) => {
     if (err) return res.status(500).json({ success: false, message: 'Server Error' })
     res.json({ success: true, message: 'ลบไฟล์เรียบร้อย', field })
+  })
+}
+
+// ========== POST: อัพโหลดสลิปมัดจำเข้า auction_bid (ระบุ bid_id) ==========
+const bidSlipStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(__dirname, '..', 'uploads', 'deposit_slips')
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+    cb(null, dir)
+  },
+  filename: (req, file, cb) => cb(null, `${Date.now()}-${Math.floor(Math.random() * 1000)}${path.extname(file.originalname)}`)
+})
+const bidSlipMulter = multer({
+  storage: bidSlipStorage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['.jpg', '.jpeg', '.png', '.pdf', '.webp']
+    if (allowed.includes(path.extname(file.originalname).toLowerCase())) cb(null, true)
+    else cb(new Error('รองรับเฉพาะไฟล์ JPG, PNG, PDF, WEBP'))
+  }
+}).single('deposit_slip')
+
+exports.uploadBidSlip = (req, res) => {
+  bidSlipMulter(req, res, (err) => {
+    if (err) return res.status(400).json({ success: false, message: err.message })
+    const { bidId } = req.params
+    if (!req.file) return res.status(400).json({ success: false, message: 'ไม่มีไฟล์' })
+    const filePath = `/uploads/deposit_slips/${req.file.filename}`
+    db.query('UPDATE auction_bids SET deposit_slip = ? WHERE id = ?', [filePath, bidId], (err2) => {
+      if (err2) return res.status(500).json({ success: false, message: 'Server Error' })
+      res.json({ success: true, deposit_slip: filePath })
+    })
   })
 }
 

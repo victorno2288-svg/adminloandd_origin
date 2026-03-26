@@ -64,8 +64,8 @@ function DocViewerModal({ show, onClose, title, documents }) {
   )
 }
 
-const statusLabel = { pending: 'รอประมูล', auctioned: 'ประมูลแล้ว', cancelled: 'ยกเลิก' }
-const statusBadge = { pending: 'badge-pending', auctioned: 'badge-paid', cancelled: 'badge-cancelled' }
+const statusLabel = { pending: 'รอประมูล', auctioned: 'ประมูลแล้ว', auction_completed: 'โอนทรัพย์เสร็จสิ้น', cancelled: 'ยกเลิก' }
+const statusBadge = { pending: 'badge-pending', auctioned: 'badge-paid', auction_completed: 'badge-completed', cancelled: 'badge-cancelled' }
 const allStatuses = Object.entries(statusLabel)
 
 function formatDate(d) {
@@ -100,11 +100,11 @@ function Pagination({ total, page, setPage }) {
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', marginTop: 8 }}>
       <span style={{ fontSize: 13, color: '#888' }}>แสดง {startItem} ถึง {endItem} จาก {total} รายการ</span>
       <div style={{ display: 'flex', gap: 4 }}>
-        <button style={btnStyle(false)} onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>Previous</button>
+        <button style={btnStyle(false)} onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>ก่อนหน้า</button>
         {pages.map(p => (
           <button key={p} style={btnStyle(p === page)} onClick={() => setPage(p)}>{p}</button>
         ))}
-        <button style={btnStyle(false)} onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page === totalPages}>Next</button>
+        <button style={btnStyle(false)} onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page === totalPages}>ถัดไป</button>
       </div>
     </div>
   )
@@ -128,9 +128,17 @@ function StatusDropdown({ value, options, badgeMap, labelMap, onChange }) {
     <div style={{ display: 'inline-block' }}>
       <span ref={badgeRef}
         className={`badge ${value ? (badgeMap[value] || 'badge-pending') : 'badge-pending'}`}
-        style={{ cursor: 'pointer', userSelect: 'none' }}
+        style={{
+          cursor: 'pointer', userSelect: 'none',
+          ...(value === 'auction_completed' ? {
+            background: 'linear-gradient(135deg, #16a34a, #15803d)',
+            color: '#fff', fontWeight: 700, padding: '5px 14px', borderRadius: 20,
+            boxShadow: '0 2px 8px rgba(22,163,74,0.3)', fontSize: 12, letterSpacing: 0.3,
+          } : {})
+        }}
         onClick={handleOpen} title="คลิกเพื่อเปลี่ยน"
       >
+        {value === 'auction_completed' && <i className="fas fa-check-double" style={{ marginRight: 5, fontSize: 11 }}></i>}
         {value ? (labelMap[value] || value) : 'รอประมูล'} <i className="fas fa-caret-down" style={{ fontSize: 10, marginLeft: 3 }}></i>
       </span>
       {open && (
@@ -153,7 +161,17 @@ function StatusDropdown({ value, options, badgeMap, labelMap, onChange }) {
                 onMouseLeave={e => e.currentTarget.style.background = key === value ? '#f0faf5' : '#fff'}
                 onClick={() => { onChange(key); setOpen(false) }}
               >
-                <span className={`badge ${badgeMap[key]}`} style={{ fontSize: 11 }}>{label}</span>
+                {key === 'auction_completed' ? (
+                  <span style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                    padding: '3px 12px', borderRadius: 20, fontSize: 11, fontWeight: 700,
+                    background: 'linear-gradient(135deg, #16a34a, #15803d)', color: '#fff',
+                  }}>
+                    <i className="fas fa-check-double" style={{ fontSize: 10 }}></i>{label}
+                  </span>
+                ) : (
+                  <span className={`badge ${badgeMap[key]}`} style={{ fontSize: 11 }}>{label}</span>
+                )}
               </div>
             ))}
           </div>
@@ -300,6 +318,7 @@ export default function AuctionPage() {
   const statCards = [
     { key: 'pending', label: 'ทรัพย์รอการประมูล', value: stats.pending_count || 0, color: '#3498db', icon: 'fa-hourglass-half' },
     { key: 'auctioned', label: 'ทรัพย์ที่ประมูลแล้ว', value: stats.auctioned_count || 0, color: '#27ae60', icon: 'fa-gavel' },
+    { key: 'auction_completed', label: 'โอนทรัพย์เสร็จสิ้น', value: stats.auction_completed_count || 0, color: '#16a34a', icon: 'fa-check-double' },
     { key: 'cancelled', label: 'เคสยกเลิก', value: stats.cancelled_count || 0, color: '#e74c3c', icon: 'fa-times-circle' },
   ]
 

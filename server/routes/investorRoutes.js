@@ -26,4 +26,7 @@ router.post('/:id/id-card', investorController.uploadIdCard)
 router.post('/:id/doc-upload', investorController.uploadDoc)
 router.delete('/:id/doc', investorController.deleteDoc)
 
+// อัพโหลดสลิปมัดจำเข้า auction_bid (ระบุ bid_id)
+router.post('/bids/:bidId/deposit-slip', investorController.uploadBidSlip)
+
 module.exports = router
