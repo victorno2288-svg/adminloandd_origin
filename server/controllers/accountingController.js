@@ -737,7 +737,10 @@ exports.getCaseDocs = (req, res) => {
       (SELECT CONCAT(COALESCE(i.investor_code,''), '|', COALESCE(i.full_name,''), '|', COALESCE(i.phone,''))
         FROM investors i
         JOIN investor_withdrawals iw3 ON iw3.investor_id = i.id
-        WHERE iw3.case_id = c.id LIMIT 1) AS investor_info`
+        WHERE iw3.case_id = c.id LIMIT 1) AS investor_info,
+      (SELECT GROUP_CONCAT(DISTINCT CONCAT(COALESCE(ab2.investor_name,''), '||', COALESCE(ab2.deposit_slip,''), '||', COALESCE(ab2.deposit_amount,''), '||', COALESCE(ab2.refund_status,'')) ORDER BY ab2.id SEPARATOR ';;')
+        FROM auction_bids ab2
+        WHERE ab2.case_id = c.id AND ab2.deposit_slip IS NOT NULL) AS bid_deposit_slips`
 
   // otherFields ที่ปลอดภัย — แทน auc.* columns ใหม่ด้วย NULL (ใช้เมื่อ auction_transactions มีปัญหา)
   const otherFieldsSafe = `
@@ -767,7 +770,8 @@ exports.getCaseDocs = (req, res) => {
       NULL AS marriage_cert, NULL AS spouse_name_change_doc,
       NULL AS auc_bank_name, NULL AS auc_bank_account_no,
       NULL AS auc_bank_account_name, NULL AS auc_bank_book_file, NULL AS transfer_slip,
-      NULL AS investor_slips, NULL AS investor_info`
+      NULL AS investor_slips, NULL AS investor_info,
+      NULL AS bid_deposit_slips`
   // joinsSafe — ไม่มี auction_transactions (ปลอดภัยเมื่อ table นั้นเสีย) แต่มี legal_transactions
   const joinsSafe = `
     FROM loan_requests lr

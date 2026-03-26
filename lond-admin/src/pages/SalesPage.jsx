@@ -115,9 +115,9 @@ function Pagination({ total, page, setPage }) {
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', marginTop: 8 }}>
       <span style={{ fontSize: 13, color: '#888' }}>แสดง {startItem} ถึง {endItem} จาก {total} รายการ</span>
       <div style={{ display: 'flex', gap: 4 }}>
-        <button style={btnStyle(false)} onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>Previous</button>
+        <button style={btnStyle(false)} onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>ก่อนหน้า</button>
         {pages.map(p => (<button key={p} style={btnStyle(p === page)} onClick={() => setPage(p)}>{p}</button>))}
-        <button style={btnStyle(false)} onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page === totalPages}>Next</button>
+        <button style={btnStyle(false)} onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page === totalPages}>ถัดไป</button>
       </div>
     </div>
   )
@@ -329,7 +329,7 @@ function DebtorsTab({ search, searchField, refreshKey }) {
     <div>
       <div className="table-responsive">
         <table className="table-green">
-          <thead><tr><th>ลำดับ</th><th>IDลูกหนี้</th><th>ชื่อ-นามสกุล</th><th>เบอร์โทร</th><th>นายหน้า</th><th>ผู้สร้าง/แก้ไข</th><th>ประเภททรัพย์</th><th>ประเภทสินเชื่อ</th><th>SOP</th><th>สถานะชำระ</th><th>สถานะ</th><th>วันที่สมัคร</th><th>จัดการ</th></tr></thead>
+          <thead><tr><th>ลำดับ</th><th>IDลูกหนี้</th><th>ชื่อ-นามสกุล</th><th>เบอร์โทร</th><th>นายหน้า</th><th>ผู้สร้าง/แก้ไข</th><th>ประเภททรัพย์</th><th>ประเภทสินเชื่อ</th><th>สถานะชำระ</th><th>สถานะ</th><th>วันที่สร้าง</th><th>อัพเดทล่าสุด</th><th>จัดการ</th></tr></thead>
           <tbody>
             {filtered.length === 0 ? (<tr><td colSpan="13"><div className="empty-state"><i className="fas fa-inbox"></i><p>ยังไม่มีข้อมูลลูกหนี้</p></div></td></tr>) : paged.map((d, i) => (
               <tr key={d.id}>
@@ -355,7 +355,7 @@ function DebtorsTab({ search, searchField, refreshKey }) {
                 <td>
                   <span style={{ fontSize: 11, color: '#555', background: '#f0f4ff', padding: '2px 8px', borderRadius: 10, whiteSpace: 'nowrap' }}>
                     <i className="fas fa-user-edit" style={{ marginRight: 4, color: '#3498db' }}></i>
-                    {d.case_creator || d.created_by_name || '-'}
+                    {d.case_creator || d.creator_display_name || d.created_by_name || '-'}
                   </span>
                 </td>
                 <td>{propertyTypeLabel[d.property_type] || d.property_type || '-'}</td>
@@ -368,7 +368,6 @@ function DebtorsTab({ search, searchField, refreshKey }) {
                     <span style={{ color: '#bbb', fontSize: 11 }}>-</span>
                   )}
                 </td>
-                <td><SopBadge debtor={d} /></td>
                 <td>
                   <StatusDropdown
                     value={d.payment_status || 'unpaid'}
@@ -400,7 +399,8 @@ function DebtorsTab({ search, searchField, refreshKey }) {
                   />
                 </td>
                 <td>{d.case_id ? (<span className={`badge ${statusBadge[d.case_status] || 'badge-pending'}`}>{statusLabel[d.case_status] || d.case_status || '-'}</span>) : <span style={{ color: '#ccc', fontSize: 12 }}>-</span>}</td>
-                <td>{formatDate(d.created_at)}</td>
+                <td style={{ fontSize: 11 }}>{formatDate(d.created_at)}</td>
+                <td style={{ fontSize: 11 }}>{formatDate(d.updated_at)}</td>
                 <td>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
                     <button onClick={() => openDocViewer(d)} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 6, border: '1px solid #e67e22', background: '#fff8f0', color: '#e67e22', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s' }} onMouseEnter={e => { e.currentTarget.style.background = '#e67e22'; e.currentTarget.style.color = '#fff' }} onMouseLeave={e => { e.currentTarget.style.background = '#fff8f0'; e.currentTarget.style.color = '#e67e22' }}><i className="fas fa-images"></i> เอกสาร</button>
@@ -467,9 +467,9 @@ function CasesTab({ search, searchField, refreshKey, onReload }) {
     <div>
       <div className="table-responsive">
         <table className="table-green">
-          <thead><tr><th>ลำดับ</th><th>IDลูกหนี้</th><th>ID Case</th><th>ประเภทสินเชื่อ</th><th>ชื่อ-สกุล</th><th>เบอร์โทร</th><th>นายหน้า</th><th>ผู้สร้าง/แก้ไข</th><th>สถานะชำระ</th><th>สถานะ</th><th>วันที่สร้าง</th><th>จัดการ</th></tr></thead>
+          <thead><tr><th>ลำดับ</th><th>IDลูกหนี้</th><th>ID Case</th><th>ประเภทสินเชื่อ</th><th>ชื่อ-สกุล</th><th>เบอร์โทร</th><th>นายหน้า</th><th>ผู้สร้าง/แก้ไข</th><th>สถานะชำระ</th><th>สถานะ</th><th>วันที่สร้าง</th><th>อัพเดทล่าสุด</th><th>จัดการ</th></tr></thead>
           <tbody>
-            {filtered.length === 0 ? (<tr><td colSpan="12"><div className="empty-state"><i className="fas fa-folder-open"></i><p>ยังไม่มีเคส</p></div></td></tr>) : paged.map((c, i) => (
+            {filtered.length === 0 ? (<tr><td colSpan="13"><div className="empty-state"><i className="fas fa-folder-open"></i><p>ยังไม่มีเคส</p></div></td></tr>) : paged.map((c, i) => (
               <tr key={c.id}>
                 <td>{String((page - 1) * PER_PAGE + i + 1).padStart(2, '0')}</td>
                 <td><strong style={{ color: 'var(--primary)' }}>{c.debtor_code || '-'}</strong></td>
@@ -489,12 +489,13 @@ function CasesTab({ search, searchField, refreshKey, onReload }) {
                 <td>
                   <span style={{ fontSize: 11, color: '#555', background: '#f0f4ff', padding: '2px 8px', borderRadius: 10, whiteSpace: 'nowrap' }}>
                     <i className="fas fa-user-edit" style={{ marginRight: 4, color: '#3498db' }}></i>
-                    {c.recorded_by || c.sales_name || '-'}
+                    {c.creator_name || c.sales_name || c.recorded_by || '-'}
                   </span>
                 </td>
                 <td><StatusDropdown value={c.payment_status || 'unpaid'} options={allPayments} badgeMap={paymentBadge} labelMap={paymentLabel} onChange={async (val) => { try { const res = await fetch(`/api/admin/accounting/debtor-master-status/${c.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` }, body: JSON.stringify({ status: val }) }); const r = await res.json(); if (r.success) setData(prev => prev.map(x => x.id === c.id ? { ...x, payment_status: val } : x)) } catch { } }} /></td>
                 <td><span className={`badge ${statusBadge[c.status] || 'badge-pending'}`}>{statusLabel[c.status] || c.status || '-'}</span></td>
-                <td>{formatDate(c.created_at)}</td>
+                <td style={{ fontSize: 11 }}>{formatDate(c.created_at)}</td>
+                <td style={{ fontSize: 11 }}>{formatDate(c.updated_at)}</td>
                 <td>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
                     <button onClick={() => openDocViewer(c)} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 6, border: '1px solid #e67e22', background: '#fff8f0', color: '#e67e22', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s' }} onMouseEnter={e => { e.currentTarget.style.background = '#e67e22'; e.currentTarget.style.color = '#fff' }} onMouseLeave={e => { e.currentTarget.style.background = '#fff8f0'; e.currentTarget.style.color = '#e67e22' }}><i className="fas fa-images"></i> เอกสาร</button>

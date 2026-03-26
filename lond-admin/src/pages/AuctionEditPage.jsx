@@ -773,12 +773,14 @@ export default function AuctionEditPage() {
 
               {/* ===== เปรียบเทียบรูปทรัพย์: ฝ่ายขาย vs ฝ่ายประเมิน ===== */}
               {(() => {
+                // ใช้ lr_appraisal_images (จาก injectLrImages) เป็นหลัก, fallback เป็น appraisal_images
+                const rawAppraisal = caseData?.lr_appraisal_images || caseData?.appraisal_images
                 let appraisalImgs = []
-                if (caseData?.appraisal_images) {
-                  try { appraisalImgs = JSON.parse(caseData.appraisal_images) || [] } catch { appraisalImgs = [] }
+                if (rawAppraisal) {
+                  try { appraisalImgs = typeof rawAppraisal === 'string' ? JSON.parse(rawAppraisal) || [] : (Array.isArray(rawAppraisal) ? rawAppraisal : []) } catch { appraisalImgs = [] }
                 }
-                // รูปจากฝ่ายขาย: จาก property_photos (= lr.property_photos จาก JOIN)
-                const salesPropImgs = parseImages(caseData.property_photos)
+                // รูปจากฝ่ายขาย: จาก lr_property_photos (injectLrImages) หรือ property_photos
+                const salesPropImgs = parseImages(caseData.lr_property_photos || caseData.property_photos)
                 const PhotoThumb = ({ src, colorBorder }) => {
                   const fullSrc = src.startsWith('/') ? src : `/${src}`
                   const isPdf = src.toLowerCase().includes('.pdf')

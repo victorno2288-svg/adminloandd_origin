@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Mar 26, 2026 at 03:35 AM
+-- Generation Time: Mar 26, 2026 at 07:50 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -49,8 +49,8 @@ CREATE TABLE `admin_users` (
 --
 
 INSERT INTO `admin_users` (`id`, `username`, `password_hash`, `full_name`, `nickname`, `email`, `phone`, `department`, `position`, `avatar_url`, `status`, `last_login`, `created_at`, `updated_at`) VALUES
-(1, 'ภัคจิรา', '$2b$10$9w8osaagoxsoTPzmEQm83.rnug3meF2iyC0OTS7CEjzxKNgsAjsK6', 'ภัคจิรา อุดมนา', 'แฟรี่', 'lafatano22@gmail.com', '0956504157', 'super_admin', 'เทสเตอร์', NULL, 'active', '2026-03-25 15:09:45', '2026-02-17 04:24:05', '2026-03-25 08:09:45'),
-(3, 'ดา', '$2b$10$ahsOrgwr7Plhyki4HDVZZuw/T5a/QfRGVDW5L14IohiiinZ2lELry', 'ดา', 'ก็ดา', 'loandd02@gmail.com', '0956504157', 'sales', 'เทสเตอร์', NULL, 'active', '2026-03-25 15:09:33', '2026-02-19 08:28:41', '2026-03-25 08:09:33'),
+(1, 'ภัคจิรา', '$2b$10$9w8osaagoxsoTPzmEQm83.rnug3meF2iyC0OTS7CEjzxKNgsAjsK6', 'ภัคจิรา อุดมนา', 'แฟรี่', 'lafatano22@gmail.com', '0956504157', 'super_admin', 'เทสเตอร์', NULL, 'active', '2026-03-26 13:14:54', '2026-02-17 04:24:05', '2026-03-26 06:14:54'),
+(3, 'ดา', '$2b$10$ahsOrgwr7Plhyki4HDVZZuw/T5a/QfRGVDW5L14IohiiinZ2lELry', 'ดา', 'ก็ดา', 'loandd02@gmail.com', '0956504157', 'sales', 'เทสเตอร์', NULL, 'active', '2026-03-26 13:14:36', '2026-02-19 08:28:41', '2026-03-26 06:14:36'),
 (5, 'นุ่น', '$2b$10$2ZMbmErFoZ6rnCU7Ydzi4.cJ3gZimihr88fIhmrlUFKTLxGUHGBqW', 'คคคคค', 'คคคค', 'llll2@gmail.com', '00000000000', 'sales', 'ทาย', NULL, 'active', '2026-02-20 16:44:17', '2026-02-20 09:16:13', '2026-02-20 09:44:17');
 
 -- --------------------------------------------------------
@@ -224,8 +224,6 @@ CREATE TABLE `approval_transactions` (
 --
 
 INSERT INTO `approval_transactions` (`id`, `case_id`, `loan_request_id`, `approval_type`, `approved_credit`, `interest_per_year`, `interest_per_month`, `operation_fee`, `land_tax_estimate`, `advance_interest`, `advance_interest_months`, `net_disbursement`, `credit_table_file`, `is_cancelled`, `approval_status`, `recorded_by`, `recorded_at`, `created_at`, `updated_at`, `approval_date`, `offer_manager_status`, `offer_sent_at`, `manager_approved_by`, `manager_approved_at`, `manager_note`, `customer_sent_at`, `payment_schedule_approved`, `payment_schedule_approved_at`, `approval_schedule_file`, `credit_table_file2`) VALUES
-(1, 1, NULL, 'mortgage', 45555.00, 0.50, 45.00, 23333.00, 33333.00, 33333.00, NULL, NULL, NULL, 0, 'cancelled', 'ทาย', '2026-02-18 22:02:00', '2026-02-19 04:11:25', '2026-02-26 08:11:24', NULL, 'draft', NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL),
-(6, 1, 18, 'mortgage', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '/uploads/credit_tables/credit_1772186128377.pdf', 1, 'approved', NULL, NULL, '2026-02-27 07:46:24', '2026-03-13 03:55:14', NULL, 'draft', NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL),
 (7, NULL, 29, 'selling_pledge', 30000.00, 4.50, 0.18, 40000.00, 5000.00, 20000.00, NULL, NULL, '/uploads/credit_tables/credit_1772179351921.jpg', 0, 'approved', 'fairy', '2026-02-27 08:03:00', '2026-02-27 08:02:25', '2026-03-13 03:55:12', '2026-02-26', 'draft', NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL),
 (8, NULL, 30, 'mortgage', 600000.00, 4.00, 1.40, 30000.00, 29998.00, 2000.00, NULL, NULL, '/uploads/credit_tables/credit_1772787020106.png', 0, 'approved', 'g', '2026-02-27 08:57:00', '2026-02-27 08:56:29', '2026-03-13 03:55:06', '2026-02-26', 'pending_manager', '2026-03-11 15:46:49', NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL),
 (9, NULL, 33, 'mortgage', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '/uploads/credit_tables/credit_1774431864869.png', 0, 'approved', 'ระบบ', '2026-03-25 16:44:47', '2026-03-02 02:17:42', '2026-03-25 09:44:47', '2026-02-11', 'draft', NULL, NULL, NULL, NULL, NULL, 2, NULL, '/uploads/credit_tables/apv_schedule_1773912896826.png', NULL),
@@ -416,8 +414,7 @@ CREATE TABLE `cases` (
 --
 
 INSERT INTO `cases` (`id`, `case_code`, `loan_request_id`, `user_id`, `agent_id`, `assigned_sales_id`, `appraisal_company_id`, `status`, `pipeline_stage`, `sale_method`, `exclusive_contract_file`, `contract_option`, `contract_auto_generated`, `contract_pdf_file`, `contract_signed_back_image`, `exclusive_contract_signed`, `exclusive_contract_signed_at`, `debtor_docs_complete`, `debtor_docs_complete_at`, `investor_docs_complete`, `investor_docs_complete_at`, `appointment_unlocked`, `last_follow_up_at`, `follow_up_count`, `payment_status`, `appraisal_fee`, `approved_amount`, `note`, `appraisal_type`, `appraisal_result`, `appraisal_date`, `payment_date`, `slip_image`, `appraisal_book_image`, `recorded_by`, `recorded_at`, `created_at`, `updated_at`, `transaction_date`, `transaction_time`, `transaction_land_office`, `transaction_note`, `transaction_recorded_by`, `transaction_recorded_at`, `outside_result`, `outside_reason`, `outside_recorded_at`, `inside_result`, `inside_reason`, `inside_recorded_at`, `check_price_value`, `check_price_detail`, `check_price_recorded_at`, `land_transfer_date`, `land_transfer_note`, `broker_contract_signed`, `broker_contract_date`, `broker_contract_file`, `land_transfer_time`, `land_transfer_location`, `next_follow_up_at`, `investor_marital_status`, `commission_paid`, `commission_amount`, `commission_slip`, `broker_id_file`, `investor_amount`, `contract_start_date`, `contract_end_date`, `contract_redemption_amount`, `transaction_slip`, `advance_slip`) VALUES
-(1, '0001', 18, NULL, 1, NULL, NULL, 'credit_approved', 'chat', 'pending', NULL, NULL, 0, NULL, NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, 0, 'paid', 5000.00, 246666.00, NULL, 'outside', 'passed', '2026-02-18', '2026-02-08', 'uploads/slips/1771467833852-305.jpg', 'uploads/appraisal-books/1771388483754-712.jpg', 'ทาย', '2026-02-15 13:21:23', '2026-02-18 04:21:23', '2026-03-13 03:55:14', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-(10, 'CS0001', 33, 1, NULL, 3, NULL, 'completed', 'chat', 'pending', NULL, NULL, 0, NULL, NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, 0, 'unpaid', 2888.00, NULL, NULL, 'outside', NULL, '2026-02-06', '2026-02-06', NULL, NULL, 'ระบบ', '2026-03-25 16:46:47', '2026-03-25 09:46:14', '2026-03-26 01:54:43', '2026-03-26', '11.00 น.', 'สำนักงานที่ดินกรุงเทพมหานคร สาขาดอนเมือง', NULL, 'ระบบ', '2026-03-25 16:46:47', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, '2026-03-25', '2029-03-25', NULL, 'uploads/slips/1774432007684-599.jpg', 'uploads/slips/1774432007689-291.jpg');
+(10, 'CS0001', 33, 1, NULL, 3, NULL, 'legal_completed', 'chat', 'pending', NULL, NULL, 0, NULL, NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, 0, 'paid', 2888.00, NULL, NULL, 'outside', NULL, '2026-02-06', '2026-03-26', NULL, NULL, 'ระบบ', '2026-03-26 13:14:29', '2026-03-25 09:46:14', '2026-03-26 06:43:58', '2026-03-26', '11.00 น.', 'สำนักงานที่ดินกรุงเทพมหานคร สาขาดอนเมือง', NULL, 'ระบบ', '2026-03-26 13:14:29', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, '2026-03-25', '2029-03-25', NULL, 'uploads/slips/1774432007684-599.jpg', 'uploads/slips/1774432007689-291.jpg');
 
 -- --------------------------------------------------------
 
@@ -437,13 +434,6 @@ CREATE TABLE `case_cancellations` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `case_cancellations`
---
-
-INSERT INTO `case_cancellations` (`id`, `case_id`, `requested_by`, `reason`, `previous_status`, `status`, `approved_by`, `approved_at`, `created_at`, `updated_at`) VALUES
-(1, 1, 1, 'ไม่พร้อม', NULL, 'approved', NULL, '2026-02-20 09:35:26', '2026-02-20 02:34:53', '2026-02-20 02:35:26');
 
 -- --------------------------------------------------------
 
@@ -785,7 +775,7 @@ CREATE TABLE `debtor_accounting` (
 --
 
 INSERT INTO `debtor_accounting` (`id`, `case_id`, `loan_request_id`, `debtor_status`, `property_location`, `contact_person`, `id_card_image`, `appraisal_amount`, `appraisal_payment_date`, `appraisal_slip`, `appraisal_status`, `bag_fee_amount`, `bag_fee_payment_date`, `bag_fee_slip`, `bag_fee_status`, `contract_sale_amount`, `contract_sale_payment_date`, `contract_sale_slip`, `contract_sale_status`, `redemption_amount`, `redemption_payment_date`, `redemption_slip`, `redemption_status`, `additional_service_amount`, `additional_service_payment_date`, `additional_service_note`, `property_forfeited_amount`, `property_forfeited_payment_date`, `property_forfeited_slip`, `property_forfeited_status`, `property_forfeited_note`, `recorded_by`, `created_at`, `updated_at`) VALUES
-(1, 1, NULL, 'ทำงาน', 'กาญจนบุรี', NULL, '/uploads/id-cards/1771398926610-237.jpg', 68.00, '2026-02-01', '/uploads/slips/1771398921099-797.jpg', 'paid', 70.00, '2026-02-01', '/uploads/slips/1771398917989-399.jpg', 'paid', 91.00, '2026-02-01', '/uploads/slips/1771398915140-610.jpg', 'paid', 80.00, '2026-02-01', '/uploads/slips/1771398930565-787.jpg', 'paid', 20.00, '2026-02-01', NULL, 90.00, '2026-02-01', '/uploads/slips/1771398935104-554.jpg', 'paid', NULL, 'ทาย', '2026-02-18 06:57:37', '2026-02-19 03:07:51');
+(9, 10, NULL, NULL, NULL, NULL, NULL, 0.00, NULL, NULL, 'paid', 0.00, NULL, NULL, 'paid', 0.00, NULL, NULL, 'paid', 0.00, NULL, NULL, 'paid', 0.00, NULL, NULL, 0.00, NULL, NULL, 'paid', NULL, NULL, '2026-03-26 06:43:58', '2026-03-26 06:43:58');
 
 -- --------------------------------------------------------
 
@@ -1064,7 +1054,6 @@ CREATE TABLE `issuing_transactions` (
 --
 
 INSERT INTO `issuing_transactions` (`id`, `case_id`, `contract_appointment`, `contract_selling_pledge`, `contract_mortgage`, `reminder_selling_pledge`, `reminder_mortgage`, `tracking_no`, `issuing_status`, `note`, `created_at`, `updated_at`, `doc_selling_pledge`, `doc_mortgage`, `commission_slip`, `closing_check_schedule`, `closing_check_personal`, `closing_check_legal`, `closing_check_docs`, `commission_amount`, `doc_sp_broker`, `doc_sp_appendix`, `doc_sp_notice`, `doc_mg_addendum`, `doc_mg_appendix`, `doc_mg_broker`) VALUES
-(1, 1, 0, 0, 1, 0, 1, 'TH1234567890', 'cancelled', NULL, '2026-02-19 05:01:47', '2026-02-27 07:45:09', NULL, NULL, NULL, 0, 0, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 (9, 10, 0, 0, 0, 0, 0, NULL, 'sent', NULL, '2026-03-25 09:48:54', '2026-03-25 09:51:39', NULL, 'uploads/issuing/doc-mortgage/1774432299597-386.doc', NULL, 0, 0, 0, 0, NULL, NULL, NULL, NULL, 'uploads/issuing/doc-mg-addendum/1774432299602-446.doc', 'uploads/issuing/doc-mg-appendix/1774432299599-445.doc', 'uploads/issuing/doc-mg-broker/1774432299601-687.doc');
 
 -- --------------------------------------------------------
@@ -1143,8 +1132,7 @@ CREATE TABLE `legal_transactions` (
 --
 
 INSERT INTO `legal_transactions` (`id`, `case_id`, `officer_name`, `visit_date`, `land_office`, `time_slot`, `team`, `legal_status`, `attachment`, `doc_selling_pledge`, `deed_selling_pledge`, `doc_extension`, `deed_extension`, `doc_redemption`, `deed_redemption`, `note`, `created_at`, `updated_at`, `commission_slip`, `tax_receipt`, `broker_contract`, `broker_id`, `commission_amount`, `commission_collected`, `commission_collected_at`, `commission_slip_verified`, `commission_slip_verified_by`, `commission_slip_verified_at`, `case_closeable`, `net_payout`, `payment_method`, `actual_transfer_fee`, `actual_stamp_duty`, `agent_bank_name`, `agent_bank_account_no`, `agent_bank_account_name`, `agent_payment_slip`, `agent_bank_book`, `doc_checklist_json`, `house_reg_prop_legal`, `borrower_id_card_legal`, `closing_check_schedule`, `closing_check_personal`, `closing_check_legal`, `closing_check_docs`) VALUES
-(1, 1, 'ทาย', '2026-02-15', 'ทาย', '50.33', 'q', 'cancelled', 'uploads/legal/attachment/1771473106000-117.jpeg', 'uploads/legal/doc-selling-pledge/1771473106013-742.pdf', 'uploads/legal/deed-selling-pledge/1771473106015-922.jpg', 'uploads/legal/doc-extension/1771473106025-117.jpg', 'uploads/legal/deed-extension/1771473106029-993.jpg', 'uploads/legal/doc-redemption/1771473106039-241.pdf', 'uploads/legal/deed-redemption/1771473106042-51.jpg', NULL, '2026-02-19 03:37:50', '2026-02-27 07:45:12', NULL, NULL, NULL, NULL, NULL, 0, NULL, 0, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0, 0, 0),
-(9, 10, 'ภัคจิรา ', '2026-03-15', 'สำนักงานที่ดินกรุงเทพมหานคร สาขาดอนเมือง', '11.00 น.', NULL, 'completed', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '2026-03-25 09:47:31', '2026-03-26 02:30:09', NULL, NULL, NULL, NULL, NULL, 0, NULL, 0, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '{}', NULL, NULL, 0, 0, 0, 0);
+(9, 10, 'ภัคจิรา ', '2026-03-26', 'สำนักงานที่ดินกรุงเทพมหานคร สาขาดอนเมือง', '11.00 น.', NULL, 'completed', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '2026-03-25 09:47:31', '2026-03-26 06:31:10', NULL, NULL, NULL, NULL, NULL, 0, NULL, 0, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '{}', NULL, NULL, 0, 0, 0, 0);
 
 -- --------------------------------------------------------
 
@@ -1299,8 +1287,7 @@ CREATE TABLE `loan_requests` (
 --
 
 INSERT INTO `loan_requests` (`id`, `debtor_code`, `source`, `user_id`, `property_type`, `has_obligation`, `obligation_amount`, `obligation_count`, `property_address`, `province`, `district`, `subdistrict`, `house_no`, `village_name`, `additional_details`, `location_url`, `deed_number`, `deed_type`, `preliminary_terms`, `land_area`, `road_access`, `seizure_status`, `building_area`, `loan_type`, `loan_type_detail`, `estimated_value`, `loan_amount`, `loan_duration`, `images`, `deed_images`, `contact_name`, `contact_phone`, `contact_email`, `contact_line`, `contact_facebook`, `preferred_contact`, `status`, `admin_note`, `rejection_reason`, `appraised_value`, `approved_amount`, `interest_rate`, `desired_amount`, `occupation`, `monthly_income`, `loan_purpose`, `contract_years`, `net_desired_amount`, `payment_status`, `payment_date`, `created_at`, `updated_at`, `created_by_id`, `created_by_name`, `agent_id`, `appraisal_images`, `appraisal_type`, `appraisal_result`, `appraisal_date`, `appraisal_fee`, `slip_image`, `appraisal_book_image`, `appraisal_note`, `appraisal_recorded_by`, `appraisal_recorded_at`, `outside_result`, `outside_reason`, `outside_recorded_at`, `inside_result`, `inside_reason`, `inside_recorded_at`, `check_price_value`, `check_price_detail`, `check_price_recorded_at`, `marital_status`, `bank_account_number`, `bank_account_name`, `bank_name`, `bank_book_file`, `borrower_id_card`, `house_reg_book`, `name_change_doc`, `divorce_doc`, `spouse_id_card`, `spouse_reg_copy`, `marriage_cert`, `single_cert`, `death_cert`, `will_court_doc`, `testator_house_reg`, `lead_source`, `dead_reason`, `customer_gender`, `customer_age`, `existing_debt`, `reject_category`, `reject_alternative`, `sub_district`, `deed_copy`, `building_permit`, `house_reg_prop`, `sale_contract`, `debt_free_cert`, `blueprint`, `property_photos`, `land_tax_receipt`, `maps_url`, `condo_title_deed`, `condo_location_map`, `common_fee_receipt`, `floor_plan`, `location_sketch_map`, `land_use_cert`, `rental_contract`, `business_reg`, `advance_months`, `road_width`, `utility_access`, `flood_risk`, `ineligible_property`, `ineligible_reason`, `screening_status`, `screened_by_id`, `screened_by_name`, `screened_at`, `prop_checklist_json`, `property_video`, `payment_schedule_file`, `bedrooms`, `project_name`, `appraisal_company`, `appraiser_name`, `building_year`, `floors`, `bathrooms`, `rental_rooms`, `rental_price_per_month`, `advance_slip`, `checklist_ticks_json`) VALUES
-(18, 'LDD0001', NULL, NULL, 'house', 'no', NULL, 1, '', 'กาญจนบุรี', 'ทาย', 'ทาย', NULL, NULL, NULL, 'https://www.thaiproperty.in.th/', '123456', NULL, NULL, 'ทาย', NULL, NULL, NULL, NULL, 'mortgage', NULL, 0.00, 12, '[\"uploads/id-cards/1771464867071-498.jpg\",\"uploads/properties/1771465322902-442.jpg\",\"uploads/permits/1771465322903-861.jpg\"]', '[\"uploads/deeds/1771465322897-54.jpg\"]', 'ทาย', '0000000000', NULL, NULL, NULL, 'phone', '', NULL, NULL, NULL, 69999.97, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'paid', NULL, '2026-02-18 02:10:47', '2026-03-21 04:03:25', NULL, NULL, 1, '[\"uploads/appraisal-properties/1772186181381-70.jpg\",\"uploads/appraisal-properties/1772186184598-895.jpg\"]', 'inside', 'passed', '2026-02-26', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'passed', NULL, '2026-02-27 16:56:35', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '[\"uploads/auction-docs/1774065801310-361.jpg\"]', '0', '0', '0', '0', '0', '0', '0', NULL, '0', '0', '0', '0', '0', '0', '0', '0', NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, '{\"deed_copy\":true}', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '{\"deed_copy\":true}'),
-(33, 'LDD0004', NULL, NULL, 'single_house', 'no', NULL, NULL, '', 'ระยอง', 'เมืองระยอง', 'ห้วยโป่ง', '285', 'หมู่ 4 ถนนสุขุมวิท', NULL, 'https://www.google.com/maps/@12.7264856,101.423939,16z', '111598', 'chanote', NULL, '1 ไร่ 2 งาน 85 ตร.ว.', 'yes', 'none', NULL, NULL, 'mortgage', 700000.00, 0.00, 12, '[\"uploads/id-cards/1774431618333-757.jpg\"]', NULL, 'นางปริญา แสงศิริมล', '0955635331', NULL, NULL, NULL, 'phone', 'matched', NULL, NULL, NULL, NULL, 1.50, '2000', 'พนักงานบริษัท ชัยรัชการ(กรุงเทพ) จำกัด', NULL, 'กู้ให้แม่', '3', '4000', 'paid', '2026-02-06', '2026-02-28 04:16:00', '2026-03-26 01:54:36', NULL, NULL, NULL, '[\"uploads/appraisal-properties/1774431656497-289.jpg\",\"uploads/appraisal-properties/1774431666332-346.jpg\"]', 'outside', 'passed', '2026-02-06', 2888.00, 'uploads/slips/1774407233278-236.jpg', 'uploads/appraisal-books/1774431707960-716.pdf', NULL, 'ระบบ', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 2865000.00, NULL, '2026-03-25 16:44:47', 'married_reg', NULL, NULL, NULL, NULL, '[\"uploads/id-cards/1774431739191-627.jpg\"]', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'line', NULL, 'male', NULL, NULL, NULL, NULL, NULL, '[\"uploads/auction-docs/1774431289091-5.jpg\"]', '[\"uploads/permits/1774431332511-238.jpg\"]', '[\"uploads/auction-docs/1774431328600-15.jpg\"]', '0', '0', '0', '[\"uploads/auction-docs/1774431279200-202.jpg\",\"uploads/auction-docs/1774431279203-274.jpg\"]', '[]', '[\"uploads/auction-docs/1774431363524-510.jpg\"]', '0', '0', '0', '0', '0', '0', '0', '0', NULL, 'gt6', 'yes', 'never', 0, NULL, 'eligible', 1, NULL, '2026-03-17 16:27:42', '{\"maps_url\":true,\"deed_copy\":true,\"building_permit\":true,\"house_reg_prop\":true,\"sale_contract\":false,\"debt_free_cert\":false,\"property_photos\":true,\"land_tax_receipt\":false,\"blueprint\":false,\"borrower_id_card\":true}', '[\"uploads/videos/1774431047822-747.mp4\"]', 'uploads/payment-schedules/1773374381071-38.png', NULL, NULL, NULL, NULL, NULL, 8, NULL, 50, 3999.00, NULL, '{\"house_reg_book\":true,\"borrower_id_card\":true,\"building_permit\":true,\"maps_url\":true}');
+(33, 'LDD0004', NULL, NULL, 'single_house', 'no', NULL, NULL, '', 'ระยอง', 'เมืองระยอง', 'ห้วยโป่ง', '285', 'หมู่ 4 ถนนสุขุมวิท', NULL, 'https://www.google.com/maps/@12.7264856,101.423939,16z', '111598', 'chanote', NULL, '1 ไร่ 2 งาน 85 ตร.ว.', 'yes', 'none', NULL, NULL, 'mortgage', 700000.00, 0.00, 12, '[\"uploads/id-cards/1774431618333-757.jpg\"]', NULL, 'นางปริญา แสงศิริมล', '0955635331', 'loandd02@gmail.com', NULL, NULL, 'phone', 'matched', NULL, NULL, NULL, NULL, 1.50, '2000', 'พนักงานบริษัท ชัยรัชการ(กรุงเทพ) จำกัด', NULL, 'กู้ให้แม่', '3', '4000', 'paid', '2026-02-05', '2026-02-28 04:16:00', '2026-03-26 06:44:09', NULL, NULL, NULL, '[\"uploads/appraisal-properties/1774431656497-289.jpg\",\"uploads/appraisal-properties/1774431666332-346.jpg\"]', 'outside', 'passed', '2026-02-05', 2888.00, 'uploads/slips/1774407233278-236.jpg', 'uploads/appraisal-books/1774431707960-716.pdf', NULL, 'ระบบ', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 2865000.00, NULL, '2026-03-25 16:44:47', 'married_reg', '33222125555', 'แสง', 'ออมสิน', 'uploads/legal/debtor-bank-book/1774506670015-688.jpg', '[\"uploads/id-cards/1774431739191-627.jpg\"]', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'line', NULL, 'male', NULL, NULL, NULL, NULL, NULL, '[\"uploads/auction-docs/1774431289091-5.jpg\"]', '[\"uploads/permits/1774431332511-238.jpg\"]', '[\"uploads/auction-docs/1774431328600-15.jpg\"]', '0', '0', '0', '[\"uploads/auction-docs/1774431279200-202.jpg\",\"uploads/auction-docs/1774431279203-274.jpg\"]', '[]', '[\"uploads/auction-docs/1774431363524-510.jpg\"]', '0', '0', '0', '0', '0', '0', '0', '0', NULL, 'gt6', 'yes', 'never', 0, NULL, 'eligible', 1, NULL, '2026-03-17 16:27:42', '{\"maps_url\":true,\"deed_copy\":true,\"building_permit\":true,\"house_reg_prop\":true,\"sale_contract\":false,\"debt_free_cert\":false,\"property_photos\":true,\"land_tax_receipt\":false,\"blueprint\":false,\"borrower_id_card\":true}', '[\"uploads/videos/1774431047822-747.mp4\"]', 'uploads/payment-schedules/1773374381071-38.png', NULL, NULL, NULL, NULL, NULL, 8, NULL, 50, 3999.00, NULL, '{\"house_reg_book\":true,\"borrower_id_card\":true,\"building_permit\":true,\"maps_url\":true}');
 
 -- --------------------------------------------------------
 
@@ -1513,7 +1500,10 @@ INSERT INTO `notifications` (`id`, `type`, `loan_request_id`, `case_id`, `from_d
 (174, 'internal', 33, 10, NULL, 'all', NULL, NULL, NULL, NULL, 'เคสเสร็จสมบูรณ์', 'เคส LDD0004 (นางปริญา แสงศิริมล) ดำเนินการเสร็จสมบูรณ์แล้ว', NULL, 'completed', 0, 0, NULL, NULL, '/sales/case/edit/10', 1, '2026-03-26 09:11:50'),
 (175, 'internal', 33, 10, NULL, 'all', NULL, NULL, NULL, NULL, 'เคสเสร็จสมบูรณ์', 'เคส LDD0004 (นางปริญา แสงศิริมล) ดำเนินการเสร็จสมบูรณ์แล้ว', NULL, 'completed', 0, 0, NULL, NULL, '/sales/case/edit/10', 1, '2026-03-26 09:27:13'),
 (176, 'internal', 33, 10, NULL, 'all', NULL, NULL, NULL, NULL, 'เคสเสร็จสมบูรณ์', 'เคส LDD0004 (นางปริญา แสงศิริมล) ดำเนินการเสร็จสมบูรณ์แล้ว', NULL, 'completed', 0, 0, NULL, NULL, '/sales/case/edit/10', 1, '2026-03-26 09:27:18'),
-(177, 'internal', 33, 10, NULL, 'all', NULL, NULL, NULL, NULL, 'เคสเสร็จสมบูรณ์', 'เคส LDD0004 (นางปริญา แสงศิริมล) ดำเนินการเสร็จสมบูรณ์แล้ว', NULL, 'completed', 0, 0, NULL, NULL, '/sales/case/edit/10', 1, '2026-03-26 09:30:09');
+(177, 'internal', 33, 10, NULL, 'all', NULL, NULL, NULL, NULL, 'เคสเสร็จสมบูรณ์', 'เคส LDD0004 (นางปริญา แสงศิริมล) ดำเนินการเสร็จสมบูรณ์แล้ว', NULL, 'completed', 0, 0, NULL, NULL, '/sales/case/edit/10', 1, '2026-03-26 09:30:09'),
+(178, 'internal', 33, 10, NULL, 'legal', NULL, NULL, NULL, NULL, '📅 นัดวันโอนแล้ว — แจ้งฝ่ายนิติกรรม', 'ฝ่ายขายกำหนดวันโอนกรรมสิทธิ์เคส LDD0004 (นางปริญา แสงศิริมล) แล้ว — 26 มีนาคม 2569 · 11.00 น. · สำนักงานที่ดินกรุงเทพมหานคร สาขาดอนเมือง', NULL, 'transaction_scheduled_to_legal', 0, 0, NULL, NULL, '/legal/edit/10', 1, '2026-03-26 13:14:29'),
+(179, 'internal', 33, 10, NULL, 'all', NULL, NULL, NULL, NULL, 'เคสเสร็จสมบูรณ์', 'เคส LDD0004 (นางปริญา แสงศิริมล) ดำเนินการเสร็จสมบูรณ์แล้ว', NULL, 'completed', 0, 0, NULL, NULL, '/sales/case/edit/10', 1, '2026-03-26 13:14:29'),
+(180, 'internal', 33, 10, NULL, 'all', NULL, NULL, NULL, NULL, 'นิติกรรมเสร็จสิ้น', 'เคส LDD0004 (นางปริญา แสงศิริมล) ทำธุรกรรมเรียบร้อยแล้ว', NULL, 'legal_completed', 0, 0, NULL, NULL, '/legal/edit/10', 1, '2026-03-26 13:31:10');
 
 -- --------------------------------------------------------
 
@@ -1539,176 +1529,356 @@ INSERT INTO `notification_reads` (`notification_id`, `user_id`, `read_at`) VALUE
 (3, 1, '2026-03-06 10:12:53'),
 (3, 3, '2026-03-02 17:22:35'),
 (4, 1, '2026-03-13 10:55:50'),
+(4, 3, '2026-03-26 13:05:10'),
 (5, 1, '2026-03-13 10:55:50'),
+(5, 3, '2026-03-26 13:05:10'),
 (6, 1, '2026-03-13 10:55:50'),
+(6, 3, '2026-03-26 13:05:10'),
 (7, 1, '2026-03-13 10:55:50'),
+(7, 3, '2026-03-26 13:05:10'),
 (8, 1, '2026-03-13 10:55:50'),
+(8, 3, '2026-03-26 13:05:10'),
 (9, 1, '2026-03-13 10:55:50'),
+(9, 3, '2026-03-26 13:05:10'),
 (10, 1, '2026-03-13 10:55:50'),
+(10, 3, '2026-03-26 13:05:10'),
 (11, 1, '2026-03-13 10:55:50'),
+(11, 3, '2026-03-26 13:05:10'),
 (12, 1, '2026-03-13 10:55:50'),
+(12, 3, '2026-03-26 13:05:10'),
 (13, 1, '2026-03-13 10:55:50'),
+(13, 3, '2026-03-26 13:05:10'),
 (14, 1, '2026-03-13 10:55:50'),
+(14, 3, '2026-03-26 13:05:10'),
 (15, 1, '2026-03-13 10:55:50'),
+(15, 3, '2026-03-26 13:05:10'),
 (16, 1, '2026-03-13 10:55:50'),
+(16, 3, '2026-03-26 13:05:10'),
 (17, 1, '2026-03-13 10:55:50'),
+(17, 3, '2026-03-26 13:05:10'),
 (18, 1, '2026-03-13 10:55:50'),
+(18, 3, '2026-03-26 13:05:10'),
 (19, 1, '2026-03-13 15:27:40'),
+(19, 3, '2026-03-26 13:05:10'),
 (20, 1, '2026-03-13 15:27:40'),
+(20, 3, '2026-03-26 13:05:10'),
 (21, 1, '2026-03-16 14:22:59'),
+(21, 3, '2026-03-26 13:05:10'),
 (22, 1, '2026-03-16 17:45:30'),
+(22, 3, '2026-03-26 13:05:10'),
 (23, 1, '2026-03-20 08:40:08'),
+(23, 3, '2026-03-26 13:05:10'),
 (24, 1, '2026-03-20 08:40:08'),
+(24, 3, '2026-03-26 13:05:10'),
 (25, 1, '2026-03-20 08:40:08'),
+(25, 3, '2026-03-26 13:05:10'),
 (26, 1, '2026-03-20 08:40:08'),
+(26, 3, '2026-03-26 13:05:10'),
 (27, 1, '2026-03-20 08:40:08'),
+(27, 3, '2026-03-26 13:05:10'),
 (28, 1, '2026-03-20 08:40:08'),
+(28, 3, '2026-03-26 13:05:10'),
 (29, 1, '2026-03-20 08:40:08'),
+(29, 3, '2026-03-26 13:05:10'),
 (30, 1, '2026-03-20 08:40:08'),
+(30, 3, '2026-03-26 13:05:10'),
 (31, 1, '2026-03-20 08:40:08'),
+(31, 3, '2026-03-26 13:05:10'),
 (32, 1, '2026-03-20 08:40:08'),
+(32, 3, '2026-03-26 13:05:10'),
 (33, 1, '2026-03-20 08:40:08'),
+(33, 3, '2026-03-26 13:05:10'),
 (34, 1, '2026-03-20 08:40:08'),
+(34, 3, '2026-03-26 13:05:10'),
 (35, 1, '2026-03-20 08:40:08'),
+(35, 3, '2026-03-26 13:05:10'),
 (36, 1, '2026-03-20 08:40:08'),
+(36, 3, '2026-03-26 13:05:10'),
 (37, 1, '2026-03-20 08:40:08'),
+(37, 3, '2026-03-26 13:05:10'),
 (38, 1, '2026-03-20 08:40:08'),
+(38, 3, '2026-03-26 13:05:10'),
 (39, 1, '2026-03-20 08:40:08'),
+(39, 3, '2026-03-26 13:05:10'),
 (40, 1, '2026-03-20 08:40:08'),
+(40, 3, '2026-03-26 13:05:10'),
 (41, 1, '2026-03-20 08:40:08'),
+(41, 3, '2026-03-26 13:05:10'),
 (42, 1, '2026-03-20 08:40:08'),
+(42, 3, '2026-03-26 13:05:10'),
 (43, 1, '2026-03-20 08:40:08'),
+(43, 3, '2026-03-26 13:05:10'),
 (44, 1, '2026-03-20 08:40:08'),
+(44, 3, '2026-03-26 13:05:10'),
 (45, 1, '2026-03-20 08:40:08'),
+(45, 3, '2026-03-26 13:05:10'),
 (46, 1, '2026-03-20 08:40:08'),
+(46, 3, '2026-03-26 13:05:10'),
 (47, 1, '2026-03-20 08:40:08'),
+(47, 3, '2026-03-26 13:05:10'),
 (48, 1, '2026-03-20 08:40:08'),
+(48, 3, '2026-03-26 13:05:10'),
 (49, 1, '2026-03-20 08:40:08'),
+(49, 3, '2026-03-26 13:05:10'),
 (50, 1, '2026-03-20 08:40:08'),
+(50, 3, '2026-03-26 13:05:10'),
 (51, 1, '2026-03-20 08:40:08'),
+(51, 3, '2026-03-26 13:05:10'),
 (52, 1, '2026-03-20 08:40:08'),
+(52, 3, '2026-03-26 13:05:10'),
 (53, 1, '2026-03-20 08:40:08'),
+(53, 3, '2026-03-26 13:05:10'),
 (54, 1, '2026-03-20 08:40:08'),
+(54, 3, '2026-03-26 13:05:10'),
 (55, 1, '2026-03-20 08:40:08'),
+(55, 3, '2026-03-26 13:05:10'),
 (56, 1, '2026-03-20 08:40:08'),
+(56, 3, '2026-03-26 13:05:10'),
 (57, 1, '2026-03-20 08:40:08'),
+(57, 3, '2026-03-26 13:05:10'),
 (58, 1, '2026-03-20 08:40:08'),
+(58, 3, '2026-03-26 13:05:10'),
 (59, 1, '2026-03-20 08:40:08'),
+(59, 3, '2026-03-26 13:05:10'),
 (60, 1, '2026-03-20 08:40:08'),
+(60, 3, '2026-03-26 13:05:10'),
 (61, 1, '2026-03-20 08:40:08'),
+(61, 3, '2026-03-26 13:05:10'),
 (62, 1, '2026-03-20 08:40:08'),
+(62, 3, '2026-03-26 13:05:10'),
 (63, 1, '2026-03-20 08:40:08'),
+(63, 3, '2026-03-26 13:05:10'),
 (64, 1, '2026-03-20 08:40:08'),
+(64, 3, '2026-03-26 13:05:10'),
 (65, 1, '2026-03-20 08:40:08'),
+(65, 3, '2026-03-26 13:05:10'),
 (66, 1, '2026-03-20 08:40:08'),
+(66, 3, '2026-03-26 13:05:10'),
 (67, 1, '2026-03-20 08:40:08'),
+(67, 3, '2026-03-26 13:05:10'),
 (68, 1, '2026-03-20 08:40:08'),
+(68, 3, '2026-03-26 13:05:10'),
 (69, 1, '2026-03-20 08:40:08'),
+(69, 3, '2026-03-26 13:05:10'),
 (70, 1, '2026-03-20 08:40:08'),
+(70, 3, '2026-03-26 13:05:10'),
 (71, 1, '2026-03-20 08:40:08'),
+(71, 3, '2026-03-26 13:05:10'),
 (72, 1, '2026-03-20 08:40:08'),
+(72, 3, '2026-03-26 13:05:10'),
 (73, 1, '2026-03-20 08:40:08'),
+(73, 3, '2026-03-26 13:05:10'),
 (74, 1, '2026-03-20 08:40:08'),
+(74, 3, '2026-03-26 13:05:10'),
 (75, 1, '2026-03-20 08:40:08'),
+(75, 3, '2026-03-26 13:05:10'),
 (76, 1, '2026-03-20 08:40:08'),
+(76, 3, '2026-03-26 13:05:10'),
 (77, 1, '2026-03-20 08:40:08'),
+(77, 3, '2026-03-26 13:05:10'),
 (78, 1, '2026-03-20 08:40:08'),
+(78, 3, '2026-03-26 13:05:10'),
 (79, 1, '2026-03-20 08:40:08'),
+(79, 3, '2026-03-26 13:05:10'),
 (80, 1, '2026-03-20 08:40:08'),
+(80, 3, '2026-03-26 13:05:10'),
 (81, 1, '2026-03-20 08:40:08'),
+(81, 3, '2026-03-26 13:05:10'),
 (82, 1, '2026-03-20 08:40:08'),
+(82, 3, '2026-03-26 13:05:10'),
 (83, 1, '2026-03-20 08:40:08'),
+(83, 3, '2026-03-26 13:05:10'),
 (84, 1, '2026-03-20 08:40:08'),
+(84, 3, '2026-03-26 13:05:10'),
 (85, 1, '2026-03-20 08:40:08'),
+(85, 3, '2026-03-26 13:05:10'),
 (86, 1, '2026-03-20 08:40:08'),
+(86, 3, '2026-03-26 13:05:10'),
 (87, 1, '2026-03-20 08:40:08'),
+(87, 3, '2026-03-26 13:05:10'),
 (88, 1, '2026-03-20 08:40:08'),
+(88, 3, '2026-03-26 13:05:10'),
 (89, 1, '2026-03-20 08:40:08'),
+(89, 3, '2026-03-26 13:05:10'),
 (90, 1, '2026-03-20 08:40:08'),
+(90, 3, '2026-03-26 13:05:10'),
 (91, 1, '2026-03-20 08:40:08'),
+(91, 3, '2026-03-26 13:05:10'),
 (92, 1, '2026-03-20 08:40:08'),
+(92, 3, '2026-03-26 13:05:10'),
 (93, 1, '2026-03-20 08:40:08'),
+(93, 3, '2026-03-26 13:05:10'),
 (94, 1, '2026-03-20 08:40:08'),
+(94, 3, '2026-03-26 13:05:10'),
 (95, 1, '2026-03-20 08:40:08'),
+(95, 3, '2026-03-26 13:05:10'),
 (96, 1, '2026-03-20 08:40:08'),
+(96, 3, '2026-03-26 13:05:10'),
 (97, 1, '2026-03-20 08:40:08'),
+(97, 3, '2026-03-26 13:05:10'),
 (98, 1, '2026-03-20 08:40:08'),
+(98, 3, '2026-03-26 13:05:10'),
 (99, 1, '2026-03-20 08:40:08'),
+(99, 3, '2026-03-26 13:05:10'),
 (100, 1, '2026-03-20 08:40:08'),
+(100, 3, '2026-03-26 13:05:10'),
 (101, 1, '2026-03-20 08:40:08'),
+(101, 3, '2026-03-26 13:05:10'),
 (102, 1, '2026-03-20 08:40:08'),
+(102, 3, '2026-03-26 13:05:10'),
 (103, 1, '2026-03-20 08:40:08'),
+(103, 3, '2026-03-26 13:05:10'),
 (104, 1, '2026-03-20 08:40:08'),
+(104, 3, '2026-03-26 13:05:10'),
 (105, 1, '2026-03-20 08:40:08'),
+(105, 3, '2026-03-26 13:05:10'),
 (106, 1, '2026-03-20 08:40:08'),
+(106, 3, '2026-03-26 13:05:10'),
 (107, 1, '2026-03-20 08:40:08'),
+(107, 3, '2026-03-26 13:05:10'),
 (108, 1, '2026-03-20 08:40:08'),
+(108, 3, '2026-03-26 13:05:10'),
 (109, 1, '2026-03-20 08:40:08'),
+(109, 3, '2026-03-26 13:05:10'),
 (110, 1, '2026-03-20 08:40:08'),
+(110, 3, '2026-03-26 13:05:10'),
 (111, 1, '2026-03-20 08:40:08'),
+(111, 3, '2026-03-26 13:05:10'),
 (112, 1, '2026-03-20 08:40:08'),
+(112, 3, '2026-03-26 13:05:10'),
 (113, 1, '2026-03-20 08:40:08'),
+(113, 3, '2026-03-26 13:05:10'),
 (114, 1, '2026-03-20 08:40:08'),
+(114, 3, '2026-03-26 13:05:10'),
 (115, 1, '2026-03-20 08:40:08'),
+(115, 3, '2026-03-26 13:05:10'),
 (116, 1, '2026-03-20 08:40:08'),
+(116, 3, '2026-03-26 13:05:10'),
 (117, 1, '2026-03-20 08:40:08'),
+(117, 3, '2026-03-26 13:05:10'),
 (118, 1, '2026-03-20 08:40:08'),
+(118, 3, '2026-03-26 13:05:10'),
 (119, 1, '2026-03-20 08:40:08'),
+(119, 3, '2026-03-26 13:05:10'),
 (120, 1, '2026-03-20 08:40:08'),
+(120, 3, '2026-03-26 13:05:10'),
 (121, 1, '2026-03-20 08:40:08'),
+(121, 3, '2026-03-26 13:05:10'),
 (122, 1, '2026-03-20 08:40:08'),
+(122, 3, '2026-03-26 13:05:10'),
 (123, 1, '2026-03-20 08:40:08'),
+(123, 3, '2026-03-26 13:05:10'),
 (124, 1, '2026-03-20 08:40:08'),
+(124, 3, '2026-03-26 13:05:10'),
 (125, 1, '2026-03-20 08:47:30'),
+(125, 3, '2026-03-26 13:05:10'),
 (126, 1, '2026-03-20 08:47:30'),
+(126, 3, '2026-03-26 13:05:10'),
 (127, 1, '2026-03-20 11:06:41'),
+(127, 3, '2026-03-26 13:05:10'),
 (128, 1, '2026-03-20 11:06:41'),
+(128, 3, '2026-03-26 13:05:10'),
 (129, 1, '2026-03-20 11:06:41'),
+(129, 3, '2026-03-26 13:05:10'),
 (130, 1, '2026-03-20 11:06:41'),
+(130, 3, '2026-03-26 13:05:10'),
 (131, 1, '2026-03-20 11:06:41'),
+(131, 3, '2026-03-26 13:05:10'),
 (132, 1, '2026-03-20 11:31:23'),
+(132, 3, '2026-03-26 13:05:10'),
 (133, 1, '2026-03-20 11:31:23'),
+(133, 3, '2026-03-26 13:05:10'),
 (134, 1, '2026-03-20 11:31:23'),
+(134, 3, '2026-03-26 13:05:10'),
 (135, 1, '2026-03-20 11:31:23'),
+(135, 3, '2026-03-26 13:05:10'),
 (136, 1, '2026-03-20 13:36:46'),
+(136, 3, '2026-03-26 13:05:10'),
 (137, 1, '2026-03-20 13:36:46'),
+(137, 3, '2026-03-26 13:05:10'),
 (138, 1, '2026-03-21 09:26:12'),
+(138, 3, '2026-03-26 13:05:10'),
 (139, 1, '2026-03-21 09:26:12'),
+(139, 3, '2026-03-26 13:05:10'),
 (140, 1, '2026-03-21 09:26:12'),
+(140, 3, '2026-03-26 13:05:10'),
 (141, 1, '2026-03-21 09:26:12'),
+(141, 3, '2026-03-26 13:05:10'),
 (142, 1, '2026-03-21 09:26:12'),
+(142, 3, '2026-03-26 13:05:10'),
 (143, 1, '2026-03-23 10:37:08'),
+(143, 3, '2026-03-26 13:05:10'),
 (144, 1, '2026-03-23 10:37:08'),
+(144, 3, '2026-03-26 13:05:10'),
 (145, 1, '2026-03-23 10:37:08'),
+(145, 3, '2026-03-26 13:05:10'),
 (146, 1, '2026-03-23 10:37:08'),
+(146, 3, '2026-03-26 13:05:10'),
 (147, 1, '2026-03-23 10:37:08'),
+(147, 3, '2026-03-26 13:05:10'),
 (148, 1, '2026-03-24 09:00:36'),
+(148, 3, '2026-03-26 13:05:10'),
 (149, 1, '2026-03-24 09:00:36'),
+(149, 3, '2026-03-26 13:05:10'),
 (150, 1, '2026-03-26 09:14:37'),
+(150, 3, '2026-03-26 13:05:10'),
 (151, 1, '2026-03-26 09:14:37'),
+(151, 3, '2026-03-26 13:05:10'),
 (152, 1, '2026-03-26 09:14:37'),
+(152, 3, '2026-03-26 13:05:10'),
 (153, 1, '2026-03-26 09:14:37'),
+(153, 3, '2026-03-26 13:05:10'),
 (154, 1, '2026-03-26 09:14:37'),
+(154, 3, '2026-03-26 13:05:10'),
 (155, 1, '2026-03-26 09:14:37'),
+(155, 3, '2026-03-26 13:05:10'),
 (156, 1, '2026-03-26 09:14:37'),
+(156, 3, '2026-03-26 13:05:10'),
 (157, 1, '2026-03-26 09:14:37'),
+(157, 3, '2026-03-26 13:05:10'),
 (158, 1, '2026-03-26 09:14:37'),
+(158, 3, '2026-03-26 13:05:10'),
 (159, 1, '2026-03-26 09:14:37'),
+(159, 3, '2026-03-26 13:05:10'),
 (160, 1, '2026-03-26 09:14:37'),
+(160, 3, '2026-03-26 13:05:10'),
 (161, 1, '2026-03-26 09:14:37'),
+(161, 3, '2026-03-26 13:05:10'),
 (162, 1, '2026-03-26 09:14:37'),
+(162, 3, '2026-03-26 13:05:10'),
 (163, 1, '2026-03-26 09:14:37'),
+(163, 3, '2026-03-26 13:05:10'),
 (164, 1, '2026-03-26 09:14:37'),
+(164, 3, '2026-03-26 13:05:10'),
 (165, 1, '2026-03-26 09:14:37'),
+(165, 3, '2026-03-26 13:05:10'),
 (166, 1, '2026-03-26 09:14:37'),
+(166, 3, '2026-03-26 13:05:10'),
 (167, 1, '2026-03-26 09:14:37'),
+(167, 3, '2026-03-26 13:05:10'),
 (168, 1, '2026-03-26 09:14:37'),
+(168, 3, '2026-03-26 13:05:10'),
 (169, 1, '2026-03-26 09:14:37'),
+(169, 3, '2026-03-26 13:05:10'),
 (170, 1, '2026-03-26 09:14:37'),
+(170, 3, '2026-03-26 13:05:10'),
 (171, 1, '2026-03-26 09:14:37'),
+(171, 3, '2026-03-26 13:05:10'),
 (172, 1, '2026-03-26 09:14:37'),
+(172, 3, '2026-03-26 13:05:10'),
 (173, 1, '2026-03-26 09:14:37'),
-(174, 1, '2026-03-26 09:14:37');
+(173, 3, '2026-03-26 13:05:10'),
+(174, 1, '2026-03-26 09:14:37'),
+(174, 3, '2026-03-26 13:05:10'),
+(175, 1, '2026-03-26 13:37:06'),
+(175, 3, '2026-03-26 13:05:10'),
+(176, 1, '2026-03-26 13:37:06'),
+(176, 3, '2026-03-26 13:05:10'),
+(177, 1, '2026-03-26 13:37:06'),
+(177, 3, '2026-03-26 13:05:10'),
+(178, 1, '2026-03-26 13:37:06'),
+(179, 1, '2026-03-26 13:37:06'),
+(180, 1, '2026-03-26 13:37:06');
 
 -- --------------------------------------------------------
 
@@ -2149,7 +2319,7 @@ ALTER TABLE `customer_blacklists`
 -- AUTO_INCREMENT for table `debtor_accounting`
 --
 ALTER TABLE `debtor_accounting`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- AUTO_INCREMENT for table `investors`
@@ -2203,7 +2373,7 @@ ALTER TABLE `loan_requests`
 -- AUTO_INCREMENT for table `notifications`
 --
 ALTER TABLE `notifications`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=178;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=181;
 
 --
 -- AUTO_INCREMENT for table `provinces`

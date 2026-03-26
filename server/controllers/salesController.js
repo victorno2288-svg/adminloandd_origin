@@ -241,14 +241,29 @@ exports.createDebtor = (req, res) => {
 }
 
 // ========== ID ลูกหนี้ (ใช้ subquery ดึงเคสล่าสุด — ไม่ซ้ำแถว) ==========
+// ฝ่ายขาย (department=sales) → เห็นเฉพาะลูกหนี้ที่ตัวเองสร้าง หรือเคสที่ถูก assign ให้
+// super_admin / ฝ่ายอื่น → เห็นทั้งหมด
 exports.getDebtors = (req, res) => {
+  const isSales = req.user?.department === 'sales'
+  const userId = req.user?.id
+
+  let whereClause = ''
+  const params = []
+  if (isSales && userId) {
+    whereClause = `WHERE (lr.created_by_id = ? OR EXISTS (
+      SELECT 1 FROM cases cx WHERE cx.loan_request_id = lr.id AND cx.assigned_sales_id = ?
+    ))`
+    params.push(userId, userId)
+  }
+
   const sql = `
     SELECT
       lr.id, lr.debtor_code, lr.contact_name, lr.contact_phone, lr.contact_line, lr.contact_facebook,
       lr.property_type, lr.loan_type, lr.loan_type_detail, lr.province, lr.loan_amount,
       lr.status, lr.source, lr.lead_source, lr.reject_category, lr.reject_alternative, lr.dead_reason,
-      lr.created_at, lr.agent_id AS lr_agent_id,
+      lr.created_at, lr.updated_at, lr.agent_id AS lr_agent_id,
       lr.created_by_id, lr.created_by_name,
+      COALESCE(NULLIF(creator_user.full_name, ''), NULLIF(creator_user.nickname, ''), creator_user.username, lr.created_by_name) AS creator_display_name,
       lr.images, lr.appraisal_images, lr.deed_images,
       lr.payment_status AS lr_payment_status,
       latest_case.case_id, latest_case.case_code, latest_case.case_status,
@@ -260,13 +275,15 @@ exports.getDebtors = (req, res) => {
       latest_case.case_recorded_by,
       latest_case.case_creator
     FROM loan_requests lr
+    LEFT JOIN admin_users creator_user ON creator_user.id = lr.created_by_id
     LEFT JOIN (
       SELECT c.loan_request_id,
         c.id AS case_id, c.case_code, c.status AS case_status,
         c.pipeline_stage,
         c.payment_status, c.approved_amount, c.agent_id,
         c.recorded_by AS case_recorded_by,
-        COALESCE(c.recorded_by, au.full_name, au.username) AS case_creator,
+        COALESCE(NULLIF(au.full_name, ''), NULLIF(au.nickname, ''), au.username, NULLIF(c.recorded_by, 'ระบบ'), c.recorded_by) AS case_creator,
+        au.id AS assigned_sales_id,
         a.agent_code, a.full_name AS agent_name
       FROM cases c
       LEFT JOIN agents a ON a.id = c.agent_id
@@ -278,9 +295,10 @@ exports.getDebtors = (req, res) => {
       )
     ) latest_case ON latest_case.loan_request_id = lr.id
     LEFT JOIN agents direct_agent ON direct_agent.id = lr.agent_id
+    ${whereClause}
     ORDER BY lr.created_at DESC
   `
-  db.query(sql, (err, results) => {
+  db.query(sql, params, (err, results) => {
     if (err) {
       console.error('getDebtors error:', err)
       return res.status(500).json({ success: false, message: 'Server Error' })
@@ -290,7 +308,19 @@ exports.getDebtors = (req, res) => {
 }
 
 // ========== ID เคส (LEFT JOIN loan_requests + agents + admin_users) ==========
+// ฝ่ายขาย (department=sales) → เห็นเฉพาะเคสที่ถูก assign ให้ หรือลูกหนี้ที่ตัวเองสร้าง
+// super_admin / ฝ่ายอื่น → เห็นทั้งหมด
 exports.getCases = (req, res) => {
+  const isSales = req.user?.department === 'sales'
+  const userId = req.user?.id
+
+  let whereClause = ''
+  const params = []
+  if (isSales && userId) {
+    whereClause = `WHERE (c.assigned_sales_id = ? OR lr.created_by_id = ?)`
+    params.push(userId, userId)
+  }
+
   const sql = `
     SELECT
       c.id, c.case_code, c.status, c.payment_status,
@@ -299,6 +329,7 @@ exports.getCases = (req, res) => {
       lr.slip_image, lr.appraisal_book_image,
       c.created_at, c.updated_at,
       c.recorded_by,
+      COALESCE(NULLIF(au.full_name, ''), NULLIF(au.nickname, ''), au.username, NULLIF(c.recorded_by, 'ระบบ'), c.recorded_by) AS creator_name,
       lr.id AS loan_request_id, lr.debtor_code,
       lr.contact_name AS debtor_name,
       lr.contact_phone AS debtor_phone,
@@ -313,9 +344,10 @@ exports.getCases = (req, res) => {
     LEFT JOIN loan_requests lr ON lr.id = c.loan_request_id
     LEFT JOIN agents a ON a.id = c.agent_id
     LEFT JOIN admin_users au ON au.id = c.assigned_sales_id
+    ${whereClause}
     ORDER BY c.created_at DESC
   `
-  db.query(sql, (err, results) => {
+  db.query(sql, params, (err, results) => {
     if (err) {
       console.error('getCases error:', err)
       return res.status(500).json({ success: false, message: 'Server Error' })
@@ -1840,21 +1872,39 @@ exports.deleteCase = (req, res) => {
 
 // ========== สถิติฝ่ายขาย ==========
 exports.getSalesStats = (req, res) => {
+  const isSales = req.user?.department === 'sales'
+  const userId = req.user?.id
+
+  // ฝ่ายขาย → นับเฉพาะเคส/ลูกหนี้ที่ตัวเองดูแล
+  let caseWhere = ''
+  let debtorWhere = ''
+  const caseParams = []
+  const debtorParams = []
+  if (isSales && userId) {
+    caseWhere = `WHERE (c.assigned_sales_id = ? OR lr.created_by_id = ?)`
+    caseParams.push(userId, userId)
+    debtorWhere = `WHERE (lr2.created_by_id = ? OR EXISTS (SELECT 1 FROM cases cx WHERE cx.loan_request_id = lr2.id AND cx.assigned_sales_id = ?))`
+    debtorParams.push(userId, userId)
+  }
+
   const sql = `
     SELECT
-      SUM(CASE WHEN status = 'pending_approve' THEN 1 ELSE 0 END) AS pending_approve,
-      SUM(CASE WHEN status = 'incomplete' THEN 1 ELSE 0 END) AS incomplete,
-      SUM(CASE WHEN status = 'pending_auction' THEN 1 ELSE 0 END) AS pending_auction,
-      SUM(CASE WHEN status = 'preparing_docs' THEN 1 ELSE 0 END) AS preparing_docs,
-      SUM(CASE WHEN status = 'legal_completed' THEN 1 ELSE 0 END) AS legal_completed,
-      SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed,
-      SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled,
-      COALESCE(SUM(approved_amount), 0) AS total_approved,
-      (SELECT COUNT(*) FROM loan_requests) AS total_debtors,
+      SUM(CASE WHEN c.status = 'pending_approve' THEN 1 ELSE 0 END) AS pending_approve,
+      SUM(CASE WHEN c.status = 'incomplete' THEN 1 ELSE 0 END) AS incomplete,
+      SUM(CASE WHEN c.status = 'pending_auction' THEN 1 ELSE 0 END) AS pending_auction,
+      SUM(CASE WHEN c.status = 'preparing_docs' THEN 1 ELSE 0 END) AS preparing_docs,
+      SUM(CASE WHEN c.status = 'legal_completed' THEN 1 ELSE 0 END) AS legal_completed,
+      SUM(CASE WHEN c.status = 'completed' THEN 1 ELSE 0 END) AS completed,
+      SUM(CASE WHEN c.status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled,
+      COALESCE(SUM(c.approved_amount), 0) AS total_approved,
+      (SELECT COUNT(*) FROM loan_requests lr2 ${debtorWhere}) AS total_debtors,
       (SELECT COUNT(*) FROM agents) AS total_agents
-    FROM cases
+    FROM cases c
+    LEFT JOIN loan_requests lr ON lr.id = c.loan_request_id
+    ${caseWhere}
   `
-  db.query(sql, (err, results) => {
+  const allParams = [...debtorParams, ...caseParams]
+  db.query(sql, allParams, (err, results) => {
     if (err) {
       console.error('getSalesStats error:', err)
       return res.status(500).json({ success: false, message: 'Server Error' })
@@ -2548,4 +2598,90 @@ exports.brokerContractSign = (req, res) => {
       res.json({ success: true, message: 'บันทึกการเซ็นสัญญาแล้ว', signed_at: new Date() })
     }
   )
+}
+
+// ============================================================
+// GET /api/admin/sales/case-journey
+// สรุปเคส — แสดง timeline การเดินทางของเคสผ่านแต่ละฝ่าย
+// ============================================================
+exports.getCaseJourney = (req, res) => {
+  const isSales = req.user?.department === 'sales'
+  const userId = req.user?.id
+
+  let whereClause = ''
+  const params = []
+  if (isSales && userId) {
+    whereClause = `WHERE (c.assigned_sales_id = ? OR lr.created_by_id = ?)`
+    params.push(userId, userId)
+  }
+
+  const sql = `
+    SELECT
+      c.id AS case_id,
+      c.case_code,
+      c.status AS case_status,
+      c.payment_status,
+      c.created_at AS case_created_at,
+      c.updated_at AS case_updated_at,
+      c.approved_amount,
+
+      lr.debtor_code,
+      lr.contact_name,
+      lr.property_type,
+      lr.loan_type,
+      lr.loan_amount,
+      lr.created_at AS debtor_created_at,
+
+      -- ฝ่ายขาย (assigned sales)
+      COALESCE(NULLIF(sales_user.full_name, ''), NULLIF(sales_user.nickname, ''), sales_user.username) AS sales_name,
+
+      -- ฝ่ายอนุมัติ
+      at2.id AS approval_id,
+      at2.approval_status,
+      at2.created_at AS approval_created_at,
+      at2.updated_at AS approval_updated_at,
+      at2.offer_sent_at,
+      at2.manager_approved_at,
+
+      -- ฝ่ายประมูล
+      auc.id AS auction_id,
+      auc.auction_status,
+      auc.created_at AS auction_created_at,
+      auc.updated_at AS auction_updated_at,
+
+      -- ฝ่ายออกสัญญา
+      iss.id AS issuing_id,
+      iss.issuing_status,
+      iss.created_at AS issuing_created_at,
+      iss.updated_at AS issuing_updated_at,
+
+      -- ฝ่ายนิติกรรม
+      lt.id AS legal_id,
+      lt.legal_status,
+      lt.created_at AS legal_created_at,
+      lt.updated_at AS legal_updated_at,
+      lt.transfer_date,
+
+      -- ฝ่ายบัญชี (ใช้ payment_status ของ case)
+      c.payment_date
+
+    FROM cases c
+    LEFT JOIN loan_requests lr ON lr.id = c.loan_request_id
+    LEFT JOIN admin_users sales_user ON sales_user.id = c.assigned_sales_id
+    LEFT JOIN approval_transactions at2 ON at2.loan_request_id = c.loan_request_id
+    LEFT JOIN auction_transactions auc ON auc.case_id = c.id
+    LEFT JOIN issuing_transactions iss ON iss.case_id = c.id
+    LEFT JOIN legal_transactions lt ON lt.case_id = c.id
+    ${whereClause}
+    ORDER BY c.created_at DESC
+    LIMIT 200
+  `
+
+  db.query(sql, params, (err, rows) => {
+    if (err) {
+      console.error('getCaseJourney error:', err)
+      return res.status(500).json({ success: false, message: 'Server Error' })
+    }
+    res.json({ success: true, cases: rows })
+  })
 }

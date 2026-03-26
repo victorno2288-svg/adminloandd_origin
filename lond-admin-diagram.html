@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LoanDD Admin — System Diagram & Flow</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.5; }
+  .tabs { display: flex; gap: 4px; padding: 12px 20px; background: #1e293b; border-bottom: 2px solid #334155; flex-wrap: wrap; position: sticky; top: 0; z-index: 10; }
+  .tab { padding: 8px 18px; border-radius: 8px 8px 0 0; border: none; cursor: pointer; font-size: 13px; font-weight: 700; background: transparent; color: #94a3b8; transition: all 0.2s; }
+  .tab.active { background: #3b82f6; color: #fff; }
+  .tab:hover:not(.active) { background: #334155; color: #e2e8f0; }
+  .page { display: none; padding: 24px; max-width: 1400px; margin: 0 auto; }
+  .page.active { display: block; }
+  h1 { font-size: 22px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+  h1 .icon { font-size: 28px; }
+  h2 { font-size: 16px; margin: 20px 0 12px; color: #60a5fa; border-bottom: 1px solid #334155; padding-bottom: 6px; }
+  .card { background: #1e293b; border-radius: 12px; padding: 20px; margin-bottom: 16px; border: 1px solid #334155; }
+  .card:hover { border-color: #3b82f6; }
+
+  /* Architecture */
+  .arch-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+  .arch-layer { padding: 16px; border-radius: 10px; border: 2px solid; }
+  .layer-client { border-color: #3b82f6; background: #1e3a5f20; }
+  .layer-server { border-color: #10b981; background: #064e3b20; }
+  .layer-db { border-color: #f59e0b; background: #78350f20; }
+  .layer-ext { border-color: #8b5cf6; background: #4c1d9520; }
+  .layer-title { font-weight: 800; font-size: 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .layer-items { display: flex; flex-wrap: wrap; gap: 8px; }
+  .layer-item { padding: 5px 12px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+  .layer-client .layer-item { background: #1e40af; color: #bfdbfe; }
+  .layer-server .layer-item { background: #065f46; color: #a7f3d0; }
+  .layer-db .layer-item { background: #78350f; color: #fde68a; }
+  .layer-ext .layer-item { background: #4c1d95; color: #c4b5fd; }
+  .arrow-down { text-align: center; font-size: 24px; color: #475569; padding: 4px 0; }
+
+  /* Flow */
+  .flow-container { overflow-x: auto; padding: 10px 0; }
+  .flow-row { display: flex; align-items: center; gap: 0; min-width: max-content; padding: 8px 0; }
+  .flow-node { min-width: 120px; padding: 10px 14px; border-radius: 10px; text-align: center; font-size: 11px; font-weight: 700; border: 2px solid; position: relative; }
+  .flow-arrow { width: 40px; text-align: center; color: #64748b; font-size: 18px; flex-shrink: 0; }
+  .flow-arrow.down { transform: rotate(90deg); }
+  .dept-sales { background: #1e3a5f; border-color: #3b82f6; color: #93c5fd; }
+  .dept-appraisal { background: #3b1f0b; border-color: #f97316; color: #fdba74; }
+  .dept-approval { background: #3b0764; border-color: #a855f7; color: #d8b4fe; }
+  .dept-auction { background: #4a1d96; border-color: #8b5cf6; color: #c4b5fd; }
+  .dept-issuing { background: #134e4a; border-color: #14b8a6; color: #99f6e4; }
+  .dept-legal { background: #1e3a5f; border-color: #06b6d4; color: #a5f3fc; }
+  .dept-accounting { background: #14532d; border-color: #22c55e; color: #bbf7d0; }
+  .dept-end { background: #1c1917; border-color: #78716c; color: #d6d3d1; }
+  .dept-cancel { background: #450a0a; border-color: #ef4444; color: #fca5a5; }
+  .flow-sub { font-size: 9px; font-weight: 400; opacity: 0.7; margin-top: 3px; }
+
+  /* Tables */
+  .tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .tbl th { background: #334155; padding: 8px 12px; text-align: left; font-weight: 700; color: #94a3b8; position: sticky; top: 0; }
+  .tbl td { padding: 7px 12px; border-bottom: 1px solid #1e293b; }
+  .tbl tr:hover td { background: #1e293b; }
+  .badge { padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; white-space: nowrap; }
+  .badge-blue { background: #1e40af; color: #93c5fd; }
+  .badge-green { background: #065f46; color: #6ee7b7; }
+  .badge-orange { background: #78350f; color: #fde68a; }
+  .badge-purple { background: #4c1d95; color: #c4b5fd; }
+  .badge-red { background: #7f1d1d; color: #fca5a5; }
+  .badge-teal { background: #134e4a; color: #99f6e4; }
+  .badge-cyan { background: #164e63; color: #a5f3fc; }
+
+  /* ER Diagram */
+  .er-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+  .er-table { background: #1e293b; border-radius: 10px; overflow: hidden; border: 2px solid #334155; }
+  .er-table:hover { border-color: #3b82f6; }
+  .er-header { padding: 8px 12px; font-weight: 800; font-size: 13px; }
+  .er-cols { padding: 8px 12px; font-size: 11px; color: #94a3b8; }
+  .er-col { padding: 2px 0; display: flex; justify-content: space-between; gap: 8px; }
+  .er-col .pk { color: #fbbf24; font-weight: 700; }
+  .er-col .fk { color: #60a5fa; }
+  .er-col .type { color: #64748b; font-size: 10px; }
+
+  /* Department Cards */
+  .dept-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+  .dept-card { border-radius: 12px; padding: 16px; border: 2px solid; }
+  .dept-card h3 { font-size: 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+  .dept-pages { font-size: 11px; color: #94a3b8; margin-top: 8px; }
+  .dept-pages span { display: inline-block; background: #0f172a; padding: 2px 8px; border-radius: 4px; margin: 2px; }
+
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="tabs">
+  <button class="tab active" onclick="showTab('arch')">🏗️ Architecture</button>
+  <button class="tab" onclick="showTab('flow')">🔄 Case Flow</button>
+  <button class="tab" onclick="showTab('dept')">🏢 แผนก/หน้า</button>
+  <button class="tab" onclick="showTab('api')">🔌 API Routes</button>
+  <button class="tab" onclick="showTab('db')">🗄️ Database</button>
+  <button class="tab" onclick="showTab('auth')">🔐 Auth & Roles</button>
+</div>
+
+<!-- ============ TAB 1: ARCHITECTURE ============ -->
+<div id="arch" class="page active">
+  <h1><span class="icon">🏗️</span> System Architecture — LoanDD Admin</h1>
+
+  <div class="arch-grid">
+    <div class="arch-layer layer-client">
+      <div class="layer-title" style="color:#60a5fa">🖥️ Frontend — React + Vite (lond-admin)</div>
+      <div class="layer-items">
+        <span class="layer-item">React 18</span>
+        <span class="layer-item">Vite</span>
+        <span class="layer-item">React Router DOM</span>
+        <span class="layer-item">Socket.io Client</span>
+        <span class="layer-item">48 Pages</span>
+        <span class="layer-item">JWT LocalStorage</span>
+        <span class="layer-item">FontAwesome</span>
+      </div>
+    </div>
+    <div class="arrow-down">⬇ HTTP / WebSocket ⬇</div>
+    <div class="arch-layer layer-server">
+      <div class="layer-title" style="color:#34d399">⚙️ Backend — Express.js + Node.js</div>
+      <div class="layer-items">
+        <span class="layer-item">Express.js</span>
+        <span class="layer-item">31 Controllers</span>
+        <span class="layer-item">26 Route Files</span>
+        <span class="layer-item">JWT Auth</span>
+        <span class="layer-item">Role Middleware</span>
+        <span class="layer-item">Multer (Uploads)</span>
+        <span class="layer-item">Socket.io Server</span>
+        <span class="layer-item">Node-Cron</span>
+      </div>
+    </div>
+    <div class="arrow-down">⬇ SQL / Connection Pool ⬇</div>
+    <div class="arch-layer layer-db">
+      <div class="layer-title" style="color:#fbbf24">🗄️ Database — MySQL (MariaDB / XAMPP)</div>
+      <div class="layer-items">
+        <span class="layer-item">35 Tables</span>
+        <span class="layer-item">InnoDB Engine</span>
+        <span class="layer-item">JSON Columns</span>
+        <span class="layer-item">55+ Migrations</span>
+        <span class="layer-item">Auto-migrate on boot</span>
+      </div>
+    </div>
+    <div class="arrow-down">⬇ Integrations ⬇</div>
+    <div class="arch-layer layer-ext">
+      <div class="layer-title" style="color:#a78bfa">🔗 External Services</div>
+      <div class="layer-items">
+        <span class="layer-item">LINE Messaging API</span>
+        <span class="layer-item">Facebook Webhook</span>
+        <span class="layer-item">OpenAI GPT (AI Summary)</span>
+        <span class="layer-item">Email (Nodemailer)</span>
+        <span class="layer-item">OCR (ดึงข้อมูลเอกสาร)</span>
+      </div>
+    </div>
+  </div>
+
+  <h2>📊 Background Jobs</h2>
+  <div class="card">
+    <table class="tbl">
+      <thead><tr><th>Job</th><th>Interval</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td>SLA Monitor</td><td>ทุก 1 นาที</td><td>แจ้งเตือนเมื่อลูกค้ารอตอบ > 5 นาที</td></tr>
+        <tr><td>Ghost Chat</td><td>ทุก 1 ชม.</td><td>ตรวจจับแชทไม่ตอบ > 72 ชม. → ghost</td></tr>
+        <tr><td>Follow-up</td><td>Scheduled</td><td>แจ้งเตือนนัดติดตาม</td></tr>
+        <tr><td>Contract Expiry</td><td>ทุกวัน 08:00</td><td>ตรวจสัญญาใกล้หมด 90/60/30 วัน</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ============ TAB 2: CASE FLOW ============ -->
+<div id="flow" class="page">
+  <h1><span class="icon">🔄</span> Case Flow — การเดินทางของเคส</h1>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div>ฝ่ายขาย</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#f97316"></div>ฝ่ายประเมิน</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#a855f7"></div>ฝ่ายอนุมัติ</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#8b5cf6"></div>ฝ่ายประมูล</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#14b8a6"></div>ฝ่ายออกสัญญา</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#06b6d4"></div>ฝ่ายนิติกรรม</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#22c55e"></div>ฝ่ายบัญชี</div>
+  </div>
+
+  <h2>🛤️ Main Flow (ปกติ)</h2>
+  <div class="flow-container">
+    <div class="flow-row">
+      <div class="flow-node dept-sales">📞 Lead เข้ามา<div class="flow-sub">LINE / FB / Walk-in</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node dept-sales">📝 สร้าง ID ลูกหนี้<div class="flow-sub">loan_requests</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node dept-sales">📂 สร้าง ID เคส<div class="flow-sub">cases (new)</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node dept-sales">💰 ชำระค่าประเมิน<div class="flow-sub">payment_status=paid</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node dept-appraisal">🔍 ประเมินทรัพย์<div class="flow-sub">appraisal_in_progress</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node dept-appraisal">✅ ผ่านประเมิน<div class="flow-sub">appraisal_passed</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node dept-approval">📋 อนุมัติวงเงิน<div class="flow-sub">credit_approved</div></div>
+    </div>
+  </div>
+  <div class="flow-container" style="margin-top: -4px">
+    <div class="flow-row" style="padding-left: 0">
+      <div style="width: 60px"></div>
+      <div class="flow-node dept-approval" style="margin-left: 0">📋 credit_approved</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node dept-auction">🏦 จับคู่นายทุน<div class="flow-sub">pending_auction</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node dept-auction">🔨 ประมูล<div class="flow-sub">auction_transactions</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node dept-issuing">📄 ออกสัญญา<div class="flow-sub">preparing_docs → sent</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node dept-legal">⚖️ นิติกรรม<div class="flow-sub">legal_scheduled → legal_completed</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node dept-auction">🏠 โอนทรัพย์<div class="flow-sub">auction_completed</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node dept-end">🎉 ปิดเคส<div class="flow-sub">completed</div></div>
+    </div>
+  </div>
+
+  <h2>🔀 Alternative Paths</h2>
+  <div class="flow-container">
+    <div class="flow-row">
+      <div class="flow-node dept-appraisal">🔍 ประเมินทรัพย์</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node dept-cancel">❌ ไม่ผ่านประเมิน<div class="flow-sub">appraisal_not_passed</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node dept-cancel">🚫 ยกเลิก / ดีดออก<div class="flow-sub">cancelled + dead_reason</div></div>
+    </div>
+  </div>
+  <div class="flow-container">
+    <div class="flow-row">
+      <div class="flow-node dept-approval">📋 อนุมัติวงเงิน</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node dept-cancel">❌ ไม่อนุมัติ<div class="flow-sub">rejected</div></div>
+    </div>
+  </div>
+  <div class="flow-container">
+    <div class="flow-row">
+      <div class="flow-node dept-end">ทุกขั้นตอน</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node dept-cancel">🗑️ ขอยกเลิกเคส<div class="flow-sub">pending_cancel</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node dept-cancel">🚫 ยกเลิก<div class="flow-sub">cancelled</div></div>
+    </div>
+  </div>
+
+  <h2>💰 ฝ่ายบัญชี — ทำงานคู่ขนาน</h2>
+  <div class="flow-container">
+    <div class="flow-row">
+      <div class="flow-node dept-accounting">💵 รับชำระค่าประเมิน<div class="flow-sub">debtor_accounting</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node dept-accounting">📊 จัดการเอกสาร<div class="flow-sub">สลิป / ใบเสร็จ</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node dept-accounting">🏦 บัญชีนายทุน<div class="flow-sub">investor_withdrawals</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node dept-accounting">💸 คืนมัดจำ<div class="flow-sub">auction_bids refund</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node dept-accounting">📑 บัญชีนายหน้า<div class="flow-sub">agent_accounting</div></div>
+    </div>
+  </div>
+
+  <h2>📊 Status Codes ทั้งหมด</h2>
+  <div class="card">
+    <table class="tbl">
+      <thead><tr><th>Status</th><th>ภาษาไทย</th><th>แผนก</th><th>ขั้นตอน</th></tr></thead>
+      <tbody>
+        <tr><td><span class="badge badge-blue">new</span></td><td>เคสใหม่</td><td>ฝ่ายขาย</td><td>เริ่มต้น</td></tr>
+        <tr><td><span class="badge badge-blue">contacting</span></td><td>กำลังติดต่อ</td><td>ฝ่ายขาย</td><td>ติดตาม</td></tr>
+        <tr><td><span class="badge badge-blue">awaiting_appraisal_fee</span></td><td>รอค่าประเมิน</td><td>ฝ่ายขาย</td><td>รอชำระ</td></tr>
+        <tr><td><span class="badge badge-orange">appraisal_scheduled</span></td><td>นัดประเมิน</td><td>ฝ่ายประเมิน</td><td>นัดหมาย</td></tr>
+        <tr><td><span class="badge badge-orange">appraisal_in_progress</span></td><td>กำลังประเมิน</td><td>ฝ่ายประเมิน</td><td>ดำเนินการ</td></tr>
+        <tr><td><span class="badge badge-green">appraisal_passed</span></td><td>ประเมินผ่าน</td><td>ฝ่ายประเมิน</td><td>✅ ผ่าน</td></tr>
+        <tr><td><span class="badge badge-red">appraisal_not_passed</span></td><td>ประเมินไม่ผ่าน</td><td>ฝ่ายประเมิน</td><td>❌ ไม่ผ่าน</td></tr>
+        <tr><td><span class="badge badge-purple">pending_approve</span></td><td>รออนุมัติ</td><td>ฝ่ายอนุมัติ</td><td>รอพิจารณา</td></tr>
+        <tr><td><span class="badge badge-purple">credit_approved</span></td><td>อนุมัติวงเงิน</td><td>ฝ่ายอนุมัติ</td><td>✅ อนุมัติ</td></tr>
+        <tr><td><span class="badge badge-red">rejected</span></td><td>ไม่อนุมัติ</td><td>ฝ่ายอนุมัติ</td><td>❌ ปฏิเสธ</td></tr>
+        <tr><td><span class="badge badge-purple">pending_auction</span></td><td>รอประมูล</td><td>ฝ่ายประมูล</td><td>รอจับคู่นายทุน</td></tr>
+        <tr><td><span class="badge badge-green">auction_completed</span></td><td>โอนทรัพย์เสร็จสิ้น</td><td>ฝ่ายประมูล</td><td>✅ โอนแล้ว</td></tr>
+        <tr><td><span class="badge badge-teal">preparing_docs</span></td><td>เตรียมเอกสาร</td><td>ฝ่ายออกสัญญา</td><td>ร่างสัญญา</td></tr>
+        <tr><td><span class="badge badge-cyan">legal_scheduled</span></td><td>นัดนิติกรรม</td><td>ฝ่ายนิติกรรม</td><td>นัดวัน</td></tr>
+        <tr><td><span class="badge badge-cyan">legal_completed</span></td><td>นิติกรรมเสร็จ</td><td>ฝ่ายนิติกรรม</td><td>✅ เสร็จ</td></tr>
+        <tr><td><span class="badge badge-green">completed</span></td><td>ปิดเคส</td><td>-</td><td>🎉 จบ</td></tr>
+        <tr><td><span class="badge badge-red">cancelled</span></td><td>ยกเลิก</td><td>-</td><td>🚫 ยกเลิก</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ============ TAB 3: DEPARTMENTS ============ -->
+<div id="dept" class="page">
+  <h1><span class="icon">🏢</span> แผนกและหน้าจอ</h1>
+  <div class="dept-grid">
+    <div class="dept-card" style="border-color:#3b82f6; background:#1e3a5f20">
+      <h3 style="color:#60a5fa">📞 ฝ่ายขาย (Sales)</h3>
+      <div style="font-size:12px; color:#94a3b8">สร้าง lead, สร้างเคส, จัดการลูกหนี้/นายหน้า, follow-up, แชท</div>
+      <div class="dept-pages">
+        <span>SalesPage</span><span>SalesFormPage</span><span>CaseEditPage</span><span>AgentFormPage</span>
+        <span>ChatPage</span><span>FollowUpPage</span><span>KpiDashboardPage</span><span>LoanTablePage</span>
+        <span>PaymentSchedulePage</span><span>PropertyScreeningPage</span><span>CalendarPage</span>
+      </div>
+    </div>
+    <div class="dept-card" style="border-color:#f97316; background:#3b1f0b20">
+      <h3 style="color:#fb923c">🔍 ฝ่ายประเมิน (Appraisal)</h3>
+      <div style="font-size:12px; color:#94a3b8">ประเมินทรัพย์, ลงพื้นที่, อัพโหลดรูป, ออกผลประเมิน</div>
+      <div class="dept-pages">
+        <span>AppraisalPage</span><span>AppraisalEditPage</span>
+      </div>
+    </div>
+    <div class="dept-card" style="border-color:#a855f7; background:#3b076420">
+      <h3 style="color:#c084fc">📋 ฝ่ายอนุมัติ (Approval)</h3>
+      <div style="font-size:12px; color:#94a3b8">พิจารณาอนุมัติวงเงิน, ตารางสินเชื่อ, ตารางผ่อนชำระ</div>
+      <div class="dept-pages">
+        <span>ApprovalPage</span><span>ApprovalEditPage</span><span>LoanTablePage</span><span>PaymentSchedulePage</span>
+      </div>
+    </div>
+    <div class="dept-card" style="border-color:#8b5cf6; background:#4c1d9520">
+      <h3 style="color:#a78bfa">🔨 ฝ่ายประมูล (Auction)</h3>
+      <div style="font-size:12px; color:#94a3b8">จับคู่นายทุน, ประมูล, จัดการ bid, โอนทรัพย์</div>
+      <div class="dept-pages">
+        <span>AuctionPage</span><span>AuctionEditPage</span><span>InvestorPage</span>
+        <span>InvestorPortfolioPage</span><span>InvestorAuctionHistoryPage</span>
+      </div>
+    </div>
+    <div class="dept-card" style="border-color:#14b8a6; background:#134e4a20">
+      <h3 style="color:#5eead4">📄 ฝ่ายออกสัญญา (Issuing)</h3>
+      <div style="font-size:12px; color:#94a3b8">เตรียมสัญญา, ส่งสัญญา, นัดนายหน้า</div>
+      <div class="dept-pages">
+        <span>IssuingPage</span><span>IssuingEditPage</span><span>ContractPreviewPage</span>
+        <span>BrokerAppointmentPage</span>
+      </div>
+    </div>
+    <div class="dept-card" style="border-color:#06b6d4; background:#164e6320">
+      <h3 style="color:#67e8f9">⚖️ ฝ่ายนิติกรรม (Legal)</h3>
+      <div style="font-size:12px; color:#94a3b8">จัดการนิติกรรม, โอนกรมที่ดิน, เอกสารขายฝาก</div>
+      <div class="dept-pages">
+        <span>LegalPage</span><span>LegalEditPage</span><span>ContractPage</span><span>CancellationPage</span>
+      </div>
+    </div>
+    <div class="dept-card" style="border-color:#22c55e; background:#14532d20">
+      <h3 style="color:#4ade80">💰 ฝ่ายบัญชี (Accounting)</h3>
+      <div style="font-size:12px; color:#94a3b8">บัญชีลูกหนี้, บัญชีนายทุน, บัญชีนายหน้า, สลิป, คืนมัดจำ</div>
+      <div class="dept-pages">
+        <span>AccountingPage</span><span>DebtorAccountingEditPage</span><span>InvestorAccountingEditPage</span>
+        <span>AgentAccountingEditPage</span><span>InvestorCasesPage</span><span>WithdrawalHistoryPage</span>
+      </div>
+    </div>
+    <div class="dept-card" style="border-color:#ef4444; background:#450a0a20">
+      <h3 style="color:#f87171">👑 Super Admin</h3>
+      <div style="font-size:12px; color:#94a3b8">ดูทุกอย่าง, จัดการผู้ใช้, dashboard, รายงาน</div>
+      <div class="dept-pages">
+        <span>DashboardPage</span><span>CeoDashboardPage</span><span>DailyReportPage</span>
+        <span>WeeklyReportPage</span><span>AccountUserPage</span><span>SalesUsersPage</span>
+        <span>SalesTeamsPage</span><span>BlacklistPage</span><span>AdvanceDashboard</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ TAB 4: API ROUTES ============ -->
+<div id="api" class="page">
+  <h1><span class="icon">🔌</span> API Routes</h1>
+  <div class="card">
+    <table class="tbl">
+      <thead><tr><th>Base Path</th><th>Route File</th><th>แผนก</th><th>Auth</th></tr></thead>
+      <tbody>
+        <tr><td>/api/auth</td><td>authRoutes</td><td>-</td><td><span class="badge badge-green">Public</span></td></tr>
+        <tr><td>/api/admin/sales</td><td>salesRoutes</td><td>ฝ่ายขาย</td><td><span class="badge badge-blue">sales</span></td></tr>
+        <tr><td>/api/admin/appraisal</td><td>appraisalRoutes</td><td>ฝ่ายประเมิน</td><td><span class="badge badge-orange">appraisal</span></td></tr>
+        <tr><td>/api/admin/approval</td><td>approvalRoutes</td><td>ฝ่ายอนุมัติ</td><td><span class="badge badge-purple">approval</span></td></tr>
+        <tr><td>/api/admin/auction</td><td>auctionRoutes</td><td>ฝ่ายประมูล</td><td><span class="badge badge-purple">approval</span></td></tr>
+        <tr><td>/api/admin/issuing</td><td>issuingRoutes</td><td>ฝ่ายออกสัญญา</td><td><span class="badge badge-teal">legal</span></td></tr>
+        <tr><td>/api/admin/legal</td><td>legalRoutes</td><td>ฝ่ายนิติกรรม</td><td><span class="badge badge-cyan">legal</span></td></tr>
+        <tr><td>/api/admin/accounting</td><td>accountingRoutes</td><td>ฝ่ายบัญชี</td><td><span class="badge badge-green">accounting</span></td></tr>
+        <tr><td>/api/admin/investors</td><td>investorRoutes</td><td>นายทุน</td><td><span class="badge badge-purple">approval</span></td></tr>
+        <tr><td>/api/admin/chat</td><td>chatRoutes</td><td>แชท</td><td><span class="badge badge-blue">auth</span></td></tr>
+        <tr><td>/api/admin/dashboard</td><td>dashboardRoutes</td><td>Dashboard</td><td><span class="badge badge-blue">auth</span></td></tr>
+        <tr><td>/api/admin/notifications</td><td>notificationRoutes</td><td>แจ้งเตือน</td><td><span class="badge badge-blue">auth</span></td></tr>
+        <tr><td>/api/admin/ocr</td><td>ocrRoutes</td><td>OCR</td><td><span class="badge badge-blue">auth</span></td></tr>
+        <tr><td>/api/admin/cancellation</td><td>cancellationRoutes</td><td>ยกเลิก</td><td><span class="badge badge-cyan">legal</span></td></tr>
+        <tr><td>/api/admin/account-user</td><td>accountUserRoutes</td><td>จัดการ user</td><td><span class="badge badge-red">super_admin</span></td></tr>
+        <tr><td>/api/admin/advance</td><td>advanceRoutes</td><td>ราคาล่วงหน้า</td><td><span class="badge badge-blue">auth</span></td></tr>
+        <tr><td>/api/admin/sales-management</td><td>salesManagementRoutes</td><td>จัดการทีมขาย</td><td><span class="badge badge-blue">sales</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ============ TAB 5: DATABASE ============ -->
+<div id="db" class="page">
+  <h1><span class="icon">🗄️</span> Database Tables (35 ตาราง)</h1>
+  <div class="er-grid">
+    <div class="er-table">
+      <div class="er-header" style="background:#1e40af; color:#bfdbfe">📋 loan_requests (ลูกหนี้)</div>
+      <div class="er-cols">
+        <div class="er-col"><span class="pk">🔑 id</span><span class="type">INT PK</span></div>
+        <div class="er-col"><span>debtor_code</span><span class="type">VARCHAR</span></div>
+        <div class="er-col"><span>contact_name, phone, email</span><span class="type">VARCHAR</span></div>
+        <div class="er-col"><span>property_type, loan_type</span><span class="type">VARCHAR</span></div>
+        <div class="er-col"><span>loan_amount, estimated_value</span><span class="type">DECIMAL</span></div>
+        <div class="er-col"><span>images, deed_images, appraisal_images</span><span class="type">JSON</span></div>
+        <div class="er-col"><span>payment_status, status</span><span class="type">ENUM</span></div>
+        <div class="er-col"><span class="fk">→ created_by_id</span><span class="type">FK admin_users</span></div>
+      </div>
+    </div>
+    <div class="er-table">
+      <div class="er-header" style="background:#065f46; color:#a7f3d0">📂 cases (เคส)</div>
+      <div class="er-cols">
+        <div class="er-col"><span class="pk">🔑 id</span><span class="type">INT PK</span></div>
+        <div class="er-col"><span>case_code</span><span class="type">VARCHAR</span></div>
+        <div class="er-col"><span>status</span><span class="type">VARCHAR(50)</span></div>
+        <div class="er-col"><span>payment_status</span><span class="type">ENUM</span></div>
+        <div class="er-col"><span>approved_amount</span><span class="type">DECIMAL</span></div>
+        <div class="er-col"><span>pipeline_stage</span><span class="type">VARCHAR</span></div>
+        <div class="er-col"><span class="fk">→ loan_request_id</span><span class="type">FK loan_requests</span></div>
+        <div class="er-col"><span class="fk">→ assigned_sales_id</span><span class="type">FK admin_users</span></div>
+        <div class="er-col"><span class="fk">→ agent_id</span><span class="type">FK agents</span></div>
+      </div>
+    </div>
+    <div class="er-table">
+      <div class="er-header" style="background:#78350f; color:#fde68a">👤 admin_users</div>
+      <div class="er-cols">
+        <div class="er-col"><span class="pk">🔑 id</span><span class="type">INT PK</span></div>
+        <div class="er-col"><span>username, full_name, nickname</span><span class="type">VARCHAR</span></div>
+        <div class="er-col"><span>department</span><span class="type">ENUM</span></div>
+        <div class="er-col"><span>role</span><span class="type">ENUM</span></div>
+        <div class="er-col"><span>password_hash</span><span class="type">VARCHAR</span></div>
+      </div>
+    </div>
+    <div class="er-table">
+      <div class="er-header" style="background:#4c1d95; color:#c4b5fd">✅ approval_transactions</div>
+      <div class="er-cols">
+        <div class="er-col"><span class="pk">🔑 id</span><span class="type">INT PK</span></div>
+        <div class="er-col"><span>approval_status</span><span class="type">ENUM</span></div>
+        <div class="er-col"><span>credit_table_file</span><span class="type">VARCHAR</span></div>
+        <div class="er-col"><span>offer_sent_at, manager_approved_at</span><span class="type">DATETIME</span></div>
+        <div class="er-col"><span class="fk">→ loan_request_id</span><span class="type">FK loan_requests</span></div>
+      </div>
+    </div>
+    <div class="er-table">
+      <div class="er-header" style="background:#5b21b6; color:#ddd6fe">🔨 auction_transactions</div>
+      <div class="er-cols">
+        <div class="er-col"><span class="pk">🔑 id</span><span class="type">INT PK</span></div>
+        <div class="er-col"><span>investor_name, investor_code</span><span class="type">VARCHAR</span></div>
+        <div class="er-col"><span>auction_status</span><span class="type">ENUM</span></div>
+        <div class="er-col"><span>selling_pledge_amount, interest_rate</span><span class="type">DECIMAL</span></div>
+        <div class="er-col"><span>transfer_slip</span><span class="type">VARCHAR</span></div>
+        <div class="er-col"><span class="fk">→ case_id</span><span class="type">FK cases</span></div>
+      </div>
+    </div>
+    <div class="er-table">
+      <div class="er-header" style="background:#5b21b6; color:#ddd6fe">💰 auction_bids</div>
+      <div class="er-cols">
+        <div class="er-col"><span class="pk">🔑 id</span><span class="type">INT PK</span></div>
+        <div class="er-col"><span>investor_name, investor_code</span><span class="type">VARCHAR</span></div>
+        <div class="er-col"><span>bid_amount, deposit_amount</span><span class="type">DECIMAL</span></div>
+        <div class="er-col"><span>deposit_slip</span><span class="type">VARCHAR</span></div>
+        <div class="er-col"><span>refund_status</span><span class="type">ENUM</span></div>
+        <div class="er-col"><span class="fk">→ case_id</span><span class="type">FK cases</span></div>
+      </div>
+    </div>
+    <div class="er-table">
+      <div class="er-header" style="background:#134e4a; color:#99f6e4">📄 issuing_transactions</div>
+      <div class="er-cols">
+        <div class="er-col"><span class="pk">🔑 id</span><span class="type">INT PK</span></div>
+        <div class="er-col"><span>issuing_status</span><span class="type">ENUM</span></div>
+        <div class="er-col"><span>commission_slip</span><span class="type">VARCHAR</span></div>
+        <div class="er-col"><span class="fk">→ case_id</span><span class="type">FK cases</span></div>
+      </div>
+    </div>
+    <div class="er-table">
+      <div class="er-header" style="background:#164e63; color:#a5f3fc">⚖️ legal_transactions</div>
+      <div class="er-cols">
+        <div class="er-col"><span class="pk">🔑 id</span><span class="type">INT PK</span></div>
+        <div class="er-col"><span>legal_status</span><span class="type">ENUM</span></div>
+        <div class="er-col"><span>transfer_date, visit_date</span><span class="type">DATE</span></div>
+        <div class="er-col"><span>officer_name, land_office</span><span class="type">VARCHAR</span></div>
+        <div class="er-col"><span class="fk">→ case_id</span><span class="type">FK cases</span></div>
+      </div>
+    </div>
+    <div class="er-table">
+      <div class="er-header" style="background:#0e7490; color:#cffafe">🏦 investors (นายทุน)</div>
+      <div class="er-cols">
+        <div class="er-col"><span class="pk">🔑 id</span><span class="type">INT PK</span></div>
+        <div class="er-col"><span>investor_code, full_name</span><span class="type">VARCHAR</span></div>
+        <div class="er-col"><span>deposit_slip</span><span class="type">VARCHAR</span></div>
+        <div class="er-col"><span>bank info</span><span class="type">VARCHAR</span></div>
+      </div>
+    </div>
+    <div class="er-table">
+      <div class="er-header" style="background:#854d0e; color:#fef08a">🤝 agents (นายหน้า)</div>
+      <div class="er-cols">
+        <div class="er-col"><span class="pk">🔑 id</span><span class="type">INT PK</span></div>
+        <div class="er-col"><span>agent_code, full_name</span><span class="type">VARCHAR</span></div>
+        <div class="er-col"><span>phone, id_card_image</span><span class="type">VARCHAR</span></div>
+      </div>
+    </div>
+    <div class="er-table">
+      <div class="er-header" style="background:#065f46; color:#a7f3d0">💳 debtor_accounting</div>
+      <div class="er-cols">
+        <div class="er-col"><span class="pk">🔑 id</span><span class="type">INT PK</span></div>
+        <div class="er-col"><span>appraisal_status, bag_fee_status</span><span class="type">ENUM</span></div>
+        <div class="er-col"><span>slips (appraisal, bag_fee, etc.)</span><span class="type">VARCHAR</span></div>
+        <div class="er-col"><span class="fk">→ case_id</span><span class="type">FK cases</span></div>
+      </div>
+    </div>
+    <div class="er-table">
+      <div class="er-header" style="background:#1e3a5f; color:#93c5fd">💬 chat_conversations</div>
+      <div class="er-cols">
+        <div class="er-col"><span class="pk">🔑 id</span><span class="type">INT PK</span></div>
+        <div class="er-col"><span>platform, platform_user_id</span><span class="type">VARCHAR</span></div>
+        <div class="er-col"><span>customer_name, status, tags</span><span class="type">VARCHAR</span></div>
+        <div class="er-col"><span class="fk">→ loan_request_id</span><span class="type">FK loan_requests</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ TAB 6: AUTH ============ -->
+<div id="auth" class="page">
+  <h1><span class="icon">🔐</span> Authentication & Authorization</h1>
+
+  <div class="card">
+    <h2 style="border:none; margin:0 0 12px; padding:0">JWT Authentication Flow</h2>
+    <div class="flow-container">
+      <div class="flow-row">
+        <div class="flow-node dept-sales">👤 Login<div class="flow-sub">username + password</div></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node dept-appraisal">🔐 /api/auth/login<div class="flow-sub">bcrypt verify</div></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node dept-approval">🎫 JWT Token<div class="flow-sub">id, dept, role, name</div></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node dept-accounting">💾 localStorage<div class="flow-sub">loandd_admin</div></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node dept-end">📡 Bearer Token<div class="flow-sub">Authorization header</div></div>
+      </div>
+    </div>
+  </div>
+
+  <h2>🏢 Department Access Matrix</h2>
+  <div class="card">
+    <table class="tbl">
+      <thead><tr><th>Department</th><th>ขาย</th><th>ประเมิน</th><th>อนุมัติ</th><th>ประมูล</th><th>ออกสัญญา</th><th>นิติ</th><th>บัญชี</th><th>จัดการ user</th></tr></thead>
+      <tbody>
+        <tr><td><span class="badge badge-red">super_admin</span></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td></tr>
+        <tr><td><span class="badge badge-blue">sales</span></td><td>✅</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+        <tr><td><span class="badge badge-orange">appraisal</span></td><td>-</td><td>✅</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+        <tr><td><span class="badge badge-purple">approval</span></td><td>-</td><td>-</td><td>✅</td><td>✅</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+        <tr><td><span class="badge badge-cyan">legal</span></td><td>-</td><td>-</td><td>-</td><td>-</td><td>✅</td><td>✅</td><td>-</td><td>-</td></tr>
+        <tr><td><span class="badge badge-green">accounting</span></td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>✅</td><td>-</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>🔑 JWT Payload</h2>
+  <div class="card" style="font-family: monospace; font-size: 13px; color: #a5f3fc;">
+    <pre style="white-space:pre-wrap">{
+  "id": 5,
+  "username": "sales01",
+  "full_name": "สมชาย ใจดี",
+  "nickname": "ชาย",
+  "department": "sales",
+  "role": "admin",
+  "iat": 1711440000,
+  "exp": 1711526400
+}</pre>
+  </div>
+
+  <h2>🛡️ Middleware Stack</h2>
+  <div class="flow-container">
+    <div class="flow-row">
+      <div class="flow-node dept-end">📡 Request<div class="flow-sub">Authorization: Bearer xxx</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node dept-sales">🔐 authMiddleware<div class="flow-sub">jwt.verify → req.user</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node dept-approval">🏢 requireDept<div class="flow-sub">check department</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node dept-accounting">✅ Controller<div class="flow-sub">business logic</div></div>
+    </div>
+  </div>
+
+  <h2>👤 Sales Data Isolation</h2>
+  <div class="card" style="font-size: 12px; color: #94a3b8">
+    <p style="margin-bottom: 8px"><strong style="color:#60a5fa">ฝ่ายขาย (department=sales)</strong> จะเห็นเฉพาะข้อมูลของตัวเอง:</p>
+    <p>• ID ลูกหนี้ที่ตัวเองสร้าง → <code style="color:#fbbf24">loan_requests.created_by_id = user.id</code></p>
+    <p>• ID เคสที่ถูก assign → <code style="color:#fbbf24">cases.assigned_sales_id = user.id</code></p>
+    <p style="margin-top: 8px"><strong style="color:#ef4444">super_admin</strong> เห็นทุกอย่าง (ไม่มี WHERE filter)</p>
+  </div>
+</div>
+
+<script>
+function showTab(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'))
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
+  document.getElementById(id).classList.add('active')
+  event.target.classList.add('active')
+}
+</script>
+</body>
+</html>

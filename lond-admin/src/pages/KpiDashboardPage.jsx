@@ -96,12 +96,17 @@ function SLABadge({ seconds }) {
 export default function KpiDashboardPage() {
   const [kpi, setKpi] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState('overview') // overview | weekly | per_sales | funnel | sla
+  const [tab, setTab] = useState('overview') // overview | weekly | per_sales | funnel | sla | journey
 
   // SLA state
   const [sla, setSla] = useState(null)
   const [slaLoading, setSlaLoading] = useState(false)
   const [slaRange, setSlaRange] = useState('week') // today | week | month
+
+  // Case Journey state
+  const [journey, setJourney] = useState(null)
+  const [journeyLoading, setJourneyLoading] = useState(false)
+  const [journeySearch, setJourneySearch] = useState('')
 
   useEffect(() => {
     setLoading(true)
@@ -121,9 +126,22 @@ export default function KpiDashboardPage() {
       .finally(() => setSlaLoading(false))
   }, [])
 
+  const loadJourney = useCallback(() => {
+    setJourneyLoading(true)
+    fetch(`${API}/case-journey`, { headers: { Authorization: `Bearer ${token()}` } })
+      .then(r => r.json())
+      .then(d => { if (d.success) setJourney(d.cases) })
+      .catch(() => {})
+      .finally(() => setJourneyLoading(false))
+  }, [])
+
   useEffect(() => {
     if (tab === 'sla') loadSla(slaRange)
   }, [tab, slaRange, loadSla])
+
+  useEffect(() => {
+    if (tab === 'journey' && !journey) loadJourney()
+  }, [tab, journey, loadJourney])
 
   if (loading) {
     return (
@@ -169,6 +187,7 @@ export default function KpiDashboardPage() {
     { key: 'per_sales', label: 'รายเซลล์', icon: 'fa-users' },
     { key: 'funnel', label: 'สาเหตุดีดออก', icon: 'fa-filter' },
     { key: 'sla', label: 'SLA แชท', icon: 'fa-stopwatch' },
+    { key: 'journey', label: 'สรุปเคส', icon: 'fa-route' },
   ]
 
   return (
@@ -640,6 +659,217 @@ export default function KpiDashboardPage() {
               )
             })}
           </div>
+        </div>
+      )}
+
+      {/* ===== Tab: สรุปเคส (Journey) ===== */}
+      {tab === 'journey' && (
+        <div>
+          {/* Search + Refresh */}
+          <div style={{ display: 'flex', gap: 10, marginBottom: 20, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', flex: '1 1 260px', maxWidth: 360 }}>
+              <i className="fas fa-search" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#aaa', fontSize: 13 }}></i>
+              <input
+                type="text"
+                placeholder="ค้นหา case code, ชื่อลูกหนี้, debtor code..."
+                value={journeySearch}
+                onChange={e => setJourneySearch(e.target.value)}
+                style={{ width: '100%', padding: '8px 12px 8px 34px', borderRadius: 8, border: '1.5px solid #e0e0e0', fontSize: 13, outline: 'none' }}
+              />
+            </div>
+            <button onClick={loadJourney} style={{
+              padding: '8px 16px', borderRadius: 8, border: '1px solid #e0e0e0', cursor: 'pointer',
+              fontSize: 13, background: '#fff', color: '#555', fontWeight: 600,
+            }}>
+              <i className="fas fa-sync-alt" style={{ marginRight: 6 }}></i>รีเฟรช
+            </button>
+            <span style={{ fontSize: 12, color: '#aaa' }}>
+              {journey ? `${journey.length} เคส (ล่าสุด 200)` : ''}
+            </span>
+          </div>
+
+          {journeyLoading ? (
+            <div style={{ textAlign: 'center', padding: 60 }}>
+              <i className="fas fa-spinner fa-spin" style={{ fontSize: 28, color: 'var(--primary)' }}></i>
+              <p style={{ color: '#888', marginTop: 10 }}>กำลังโหลดข้อมูลสรุปเคส...</p>
+            </div>
+          ) : !journey || journey.length === 0 ? (
+            <div style={{ color: '#aaa', padding: 40, textAlign: 'center' }}>ยังไม่มีข้อมูลเคส</div>
+          ) : (() => {
+            const searchLower = journeySearch.toLowerCase().trim()
+            const filtered = searchLower
+              ? journey.filter(c =>
+                  (c.case_code || '').toLowerCase().includes(searchLower) ||
+                  (c.contact_name || '').toLowerCase().includes(searchLower) ||
+                  (c.debtor_code || '').toLowerCase().includes(searchLower)
+                )
+              : journey
+
+            // สถานะ → ขั้นตอนที่สำเร็จ
+            const STATUS_LABEL = {
+              pending_approve: 'รอประเมิน',
+              incomplete: 'เอกสารไม่ครบ',
+              appraisal_passed: 'ประเมินผ่าน',
+              appraisal_not_passed: 'ประเมินไม่ผ่าน',
+              credit_approved: 'อนุมัติสินเชื่อ',
+              pending_auction: 'รอประมูล',
+              preparing_docs: 'เตรียมเอกสาร',
+              legal_scheduled: 'นัดนิติกรรม',
+              legal_completed: 'นิติกรรมเสร็จ',
+              completed: 'ปิดเคส',
+              cancelled: 'ยกเลิก',
+              rejected: 'ไม่ผ่าน',
+              auction_completed: 'โอนทรัพย์เสร็จสิ้น',
+            }
+
+            const STATUS_COLOR = {
+              pending_approve: '#f57f17',
+              incomplete: '#e65100',
+              appraisal_passed: '#2e7d32',
+              appraisal_not_passed: '#c62828',
+              credit_approved: '#1565c0',
+              pending_auction: '#7b1fa2',
+              preparing_docs: '#0097a7',
+              legal_scheduled: '#00838f',
+              legal_completed: '#2e7d32',
+              completed: '#1b5e20',
+              cancelled: '#757575',
+              rejected: '#c62828',
+              auction_completed: '#16a34a',
+            }
+
+            // ฟังก์ชัน format วันเวลา
+            const fmtDT = (d) => {
+              if (!d) return null
+              const dt = new Date(d)
+              if (isNaN(dt.getTime())) return null
+              return dt.toLocaleString('th-TH', { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' })
+            }
+
+            // สร้าง timeline steps ให้แต่ละ case
+            const buildSteps = (c) => {
+              const steps = []
+              // 1. สร้างลูกหนี้
+              steps.push({ label: 'สร้างลูกหนี้', dept: 'ฝ่ายขาย', time: fmtDT(c.debtor_created_at), done: true, icon: 'fa-user-plus', color: '#1976d2' })
+              // 2. สร้างเคส
+              steps.push({ label: 'สร้างเคส', dept: 'ฝ่ายขาย', time: fmtDT(c.case_created_at), done: true, icon: 'fa-folder-plus', color: '#1976d2' })
+              // 3. ฝ่ายอนุมัติ
+              if (c.approval_id) {
+                steps.push({ label: 'ส่งอนุมัติ', dept: 'ฝ่ายอนุมัติ', time: fmtDT(c.approval_created_at), done: true, icon: 'fa-clipboard-check', color: '#e65100' })
+                if (c.manager_approved_at) {
+                  steps.push({ label: 'ผจก.อนุมัติ', dept: 'ฝ่ายอนุมัติ', time: fmtDT(c.manager_approved_at), done: true, icon: 'fa-user-tie', color: '#e65100' })
+                }
+              } else {
+                steps.push({ label: 'ส่งอนุมัติ', dept: 'ฝ่ายอนุมัติ', time: null, done: false, icon: 'fa-clipboard-check', color: '#e0e0e0' })
+              }
+              // 4. ฝ่ายประมูล
+              if (c.auction_id) {
+                steps.push({ label: 'เข้าประมูล', dept: 'ฝ่ายประมูล', time: fmtDT(c.auction_created_at), done: true, icon: 'fa-gavel', color: '#7b1fa2' })
+                if (c.auction_status === 'completed' || c.auction_status === 'auction_completed') {
+                  steps.push({ label: 'ประมูลสำเร็จ', dept: 'ฝ่ายประมูล', time: fmtDT(c.auction_updated_at), done: true, icon: 'fa-check-double', color: '#7b1fa2' })
+                }
+              } else {
+                steps.push({ label: 'เข้าประมูล', dept: 'ฝ่ายประมูล', time: null, done: false, icon: 'fa-gavel', color: '#e0e0e0' })
+              }
+              // 5. ฝ่ายออกสัญญา
+              if (c.issuing_id) {
+                steps.push({ label: 'ออกสัญญา', dept: 'ฝ่ายออกสัญญา', time: fmtDT(c.issuing_created_at), done: true, icon: 'fa-file-signature', color: '#0097a7' })
+                if (c.issuing_status === 'sent') {
+                  steps.push({ label: 'ส่งสัญญาแล้ว', dept: 'ฝ่ายออกสัญญา', time: fmtDT(c.issuing_updated_at), done: true, icon: 'fa-paper-plane', color: '#0097a7' })
+                }
+              } else {
+                steps.push({ label: 'ออกสัญญา', dept: 'ฝ่ายออกสัญญา', time: null, done: false, icon: 'fa-file-signature', color: '#e0e0e0' })
+              }
+              // 6. ฝ่ายนิติกรรม
+              if (c.legal_id) {
+                steps.push({ label: 'นิติกรรม', dept: 'ฝ่ายนิติกรรม', time: fmtDT(c.legal_created_at), done: true, icon: 'fa-balance-scale', color: '#00838f' })
+                if (c.legal_status === 'completed') {
+                  steps.push({ label: 'โอนทรัพย์', dept: 'ฝ่ายนิติกรรม', time: fmtDT(c.transfer_date || c.legal_updated_at), done: true, icon: 'fa-exchange-alt', color: '#00838f' })
+                }
+              } else {
+                steps.push({ label: 'นิติกรรม', dept: 'ฝ่ายนิติกรรม', time: null, done: false, icon: 'fa-balance-scale', color: '#e0e0e0' })
+              }
+              // 7. ปิดเคส
+              if (['completed', 'legal_completed', 'auction_completed'].includes(c.case_status)) {
+                steps.push({ label: 'ปิดเคส ✓', dept: '', time: fmtDT(c.case_updated_at), done: true, icon: 'fa-flag-checkered', color: '#1b5e20' })
+              } else if (c.case_status === 'cancelled') {
+                steps.push({ label: 'ยกเลิก ✗', dept: '', time: fmtDT(c.case_updated_at), done: true, icon: 'fa-times-circle', color: '#c62828' })
+              }
+              return steps
+            }
+
+            return (
+              <>
+                {filtered.length === 0 ? (
+                  <div style={{ color: '#aaa', padding: 40, textAlign: 'center' }}>ไม่พบเคสที่ค้นหา</div>
+                ) : filtered.map((c, idx) => {
+                  const steps = buildSteps(c)
+                  const statusColor = STATUS_COLOR[c.case_status] || '#888'
+                  const statusText = STATUS_LABEL[c.case_status] || c.case_status
+                  return (
+                    <div key={c.case_id} className="card" style={{ padding: '18px 22px', marginBottom: 14, border: '1.5px solid #f0f0f0' }}>
+                      {/* Header */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                            <span style={{ fontWeight: 800, fontSize: 15, color: '#1a1a2e' }}>{c.case_code}</span>
+                            <span style={{
+                              padding: '3px 12px', borderRadius: 20, fontSize: 11, fontWeight: 700,
+                              background: `${statusColor}18`, color: statusColor, border: `1px solid ${statusColor}30`,
+                            }}>{statusText}</span>
+                          </div>
+                          <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
+                            {c.debtor_code && <span style={{ marginRight: 12 }}><i className="fas fa-id-card" style={{ marginRight: 4 }}></i>{c.debtor_code}</span>}
+                            <span style={{ fontWeight: 600, color: '#555' }}>{c.contact_name || '-'}</span>
+                            {c.sales_name && <span style={{ marginLeft: 12, color: '#1976d2' }}><i className="fas fa-user" style={{ marginRight: 4 }}></i>{c.sales_name}</span>}
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right', fontSize: 11, color: '#aaa' }}>
+                          {c.property_type && <div>{c.property_type}</div>}
+                          {c.loan_amount > 0 && <div style={{ fontWeight: 700, color: '#e65100' }}>฿{Number(c.loan_amount).toLocaleString('th-TH')}</div>}
+                          {c.approved_amount > 0 && <div style={{ color: '#2e7d32' }}>อนุมัติ ฿{Number(c.approved_amount).toLocaleString('th-TH')}</div>}
+                        </div>
+                      </div>
+
+                      {/* Timeline */}
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 0, overflowX: 'auto', paddingBottom: 6 }}>
+                        {steps.map((step, si) => (
+                          <div key={si} style={{ display: 'flex', alignItems: 'flex-start', minWidth: 0 }}>
+                            {/* Step node */}
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 80, maxWidth: 100 }}>
+                              <div style={{
+                                width: 32, height: 32, borderRadius: '50%',
+                                background: step.done ? step.color : '#f5f5f5',
+                                color: step.done ? '#fff' : '#ccc',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: 13, border: step.done ? 'none' : '2px dashed #ddd',
+                                boxShadow: step.done ? `0 2px 6px ${step.color}40` : 'none',
+                              }}>
+                                <i className={`fas ${step.icon}`}></i>
+                              </div>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: step.done ? '#333' : '#ccc', marginTop: 5, textAlign: 'center', lineHeight: 1.3 }}>
+                                {step.label}
+                              </div>
+                              {step.dept && <div style={{ fontSize: 9, color: step.done ? '#999' : '#ddd', textAlign: 'center' }}>{step.dept}</div>}
+                              {step.time && <div style={{ fontSize: 9, color: '#1976d2', textAlign: 'center', marginTop: 2, fontWeight: 600 }}>{step.time}</div>}
+                            </div>
+                            {/* Connector line */}
+                            {si < steps.length - 1 && (
+                              <div style={{
+                                width: 28, height: 2, marginTop: 15, flexShrink: 0,
+                                background: steps[si + 1].done ? steps[si + 1].color : '#e0e0e0',
+                                borderRadius: 2,
+                              }} />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </>
+            )
+          })()}
         </div>
       )}
     </div>

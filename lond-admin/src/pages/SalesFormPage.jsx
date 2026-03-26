@@ -3280,6 +3280,33 @@ export default function SalesFormPage() {
                       {uploadingSlip ? <><i className="fas fa-spinner fa-spin"></i> กำลังอัพโหลด...</> : <><i className="fas fa-upload" style={{ marginRight: 4 }}></i>อัพโหลด</>}
                     </button>
                     {slipMsg && <p style={{ marginTop: 6, fontSize: 12, color: slipMsg.includes('✅') ? '#2e7d32' : '#c62828', margin: '6px 0 0' }}>{slipMsg}</p>}
+
+                    {/* ★ สถานะชำระ — dropdown ให้ฝ่ายขายติ๊กเองได้ */}
+                    <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 12px', background: caseInfo?.payment_status === 'paid' ? '#e8f5e9' : '#fff8e1', borderRadius: 8, border: `1.5px solid ${caseInfo?.payment_status === 'paid' ? '#66bb6a' : '#ffcc02'}` }}>
+                      <label style={{ fontSize: 12, fontWeight: 700, color: caseInfo?.payment_status === 'paid' ? '#2e7d32' : '#e65100', whiteSpace: 'nowrap' }}>
+                        <i className={`fas ${caseInfo?.payment_status === 'paid' ? 'fa-check-circle' : 'fa-exclamation-circle'}`} style={{ marginRight: 5 }}></i>สถานะชำระ:
+                      </label>
+                      <select
+                        value={caseInfo?.payment_status || 'unpaid'}
+                        onChange={e => updateCaseField('payment_status', e.target.value)}
+                        style={{
+                          padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                          border: `1.5px solid ${caseInfo?.payment_status === 'paid' ? '#66bb6a' : '#ffcc02'}`,
+                          background: caseInfo?.payment_status === 'paid' ? '#c8e6c9' : '#fff9c4',
+                          color: caseInfo?.payment_status === 'paid' ? '#1b5e20' : '#e65100',
+                        }}
+                      >
+                        {paymentOptions.map(o => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                      {caseInfo?.payment_status === 'paid' && (
+                        <span style={{ fontSize: 11, color: '#2e7d32', fontWeight: 600 }}>
+                          <i className="fas fa-check" style={{ marginRight: 3 }}></i>ชำระเรียบร้อย
+                        </span>
+                      )}
+                    </div>
+
                     {/* วันที่ชำระ — ฝ่ายขายเป็นคนตั้ง (บันทึกลง lr.payment_date ก่อนมีเคส / cases.payment_date หลังมีเคส) */}
                     <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                       <label style={{ fontSize: 12, fontWeight: 700, color: '#e65100', whiteSpace: 'nowrap' }}>

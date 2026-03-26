@@ -277,6 +277,14 @@ function CaseModal({ caseRow, onClose }) {
   }
   const investorSlips = docs?.investor_slips ? docs.investor_slips.split('|').filter(Boolean) : []
 
+  // สลิปมัดจำจาก auction_bids (deposit_slip ที่อัพโหลดตอนประมูล)
+  const bidDepositSlips = docs?.bid_deposit_slips
+    ? docs.bid_deposit_slips.split(';;').filter(Boolean).map(row => {
+        const [name, slip, amount, status] = row.split('||')
+        return { name: name || '', slip: slip || '', amount: amount || '', status: status || '' }
+      }).filter(b => b.slip)
+    : []
+
   const auctionParse = (val) => { try { const a = JSON.parse(val || '[]'); return Array.isArray(a) ? a : [] } catch { return [] } }
 
   const baseV = parseFloat(docs?.appraisal_result || docs?.estimated_value || 0)
@@ -285,7 +293,7 @@ function CaseModal({ caseRow, onClose }) {
 
   const hasProperty = docs && (docs.province || docs.district || docs.deed_number || docs.estimated_value || propImgs.length > 0 || deedImgs.length > 0 || idCardImgs.length > 0)
   const hasAgent = docs?.agent_name
-  const hasInvestor = investorName || investorSlips.length > 0
+  const hasInvestor = investorName || investorSlips.length > 0 || bidDepositSlips.length > 0
 
   return (
     <>
@@ -547,6 +555,38 @@ function CaseModal({ caseRow, onClose }) {
                       </div>
                       <DocGroup title="สลิปถอนเงินนายทุน" icon="fa-money-bill-wave" color="#2e7d32"
                         docs={investorSlips.map((src, i) => ({ label: `สลิปนายทุน #${i + 1}`, src }))} onPreview={setPreview} />
+                      {/* ★ สลิปมัดจำนายทุนจากฝ่ายประมูล (auction_bids.deposit_slip) */}
+                      {bidDepositSlips.length > 0 && (
+                        <div style={{ marginTop: 12, padding: '10px 14px', background: '#fef3c7', border: '1.5px solid #f59e0b', borderRadius: 10 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: '#92400e', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <i className="fas fa-gavel"></i> สลิปมัดจำนายทุน (จากฝ่ายประมูล) — {bidDepositSlips.length} รายการ
+                          </div>
+                          <div style={{ display: 'grid', gap: 8 }}>
+                            {bidDepositSlips.map((b, i) => {
+                              const slipSrc = b.slip.startsWith('/') ? b.slip : `/${b.slip}`
+                              const statusLabel = b.status === 'refunded' ? '✅ คืนแล้ว' : b.status === 'winner' ? '🏆 ผู้ชนะ' : '⏳ รอคืน'
+                              const statusColor = b.status === 'refunded' ? '#16a34a' : b.status === 'winner' ? '#7c3aed' : '#d97706'
+                              return (
+                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px', background: '#fffbeb', borderRadius: 8, border: '1px solid #fde68a' }}>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ fontSize: 12, fontWeight: 700, color: '#92400e' }}>
+                                      <i className="fas fa-user-tie" style={{ marginRight: 4 }}></i>{b.name || `นายทุน #${i + 1}`}
+                                    </div>
+                                    <div style={{ fontSize: 11, color: '#78716c', display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 2 }}>
+                                      {b.amount && <span>มัดจำ: ฿{Number(b.amount).toLocaleString('th-TH')}</span>}
+                                      <span style={{ color: statusColor, fontWeight: 700 }}>{statusLabel}</span>
+                                    </div>
+                                  </div>
+                                  <button onClick={() => setPreview(slipSrc)}
+                                    style={{ padding: '4px 12px', background: '#f59e0b', color: '#fff', border: 'none', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                                    <i className="fas fa-receipt" style={{ marginRight: 3 }}></i>ดูสลิป
+                                  </button>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
                       {docs.transfer_slip && (
                         <DocGroup title="สลิปโอนเงิน (กรมที่ดิน)" icon="fa-receipt" color="#1565c0"
                           docs={[{ label: 'สลิปโอนเงินหลังนัดโอน', src: docs.transfer_slip }]} onPreview={setPreview} />
@@ -630,6 +670,7 @@ function CaseModal({ caseRow, onClose }) {
                         { label: 'สลิปทรัพย์หลุด', src: docs.property_for_feited_slip },
                         { label: 'สลิปค่าคอม (บัญชีนายหน้า)', src: docs.agent_commission_slip },
                         ...parseJsonArr(docs.investor_slips).map((src, i) => ({ label: `สลิปนายทุน #${i + 1}`, src })),
+                        ...bidDepositSlips.map((b, i) => ({ label: `สลิปมัดจำประมูล: ${b.name || `#${i + 1}`}`, src: b.slip })),
                       ]} onPreview={setPreview} />
                   </SectionCard>
 
