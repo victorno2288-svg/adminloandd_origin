@@ -8,6 +8,7 @@ import CaseInfoSummary from '../components/CaseInfoSummary'
 import ChecklistDocsPanel from '../components/ChecklistDocsPanel'
 import PropertyVideoPanel from '../components/PropertyVideoPanel'
 import LandOfficeInput from '../components/LandOfficeInput'
+import SlipVerifier from '../components/SlipVerifier'
 
 
 const token = () => localStorage.getItem('loandd_admin')
@@ -613,6 +614,11 @@ export default function LegalEditPage() {
   const legalDocRef = useRef(null)
   const [legalDocFileName, setLegalDocFileName] = useState('')
   const [isSmallScreen, setIsSmallScreen] = useState(window.innerWidth < 640)
+  // ★ Land office map toggle
+  const [showLandOfficeMap, setShowLandOfficeMap] = useState(false)
+  const [landOfficeMapType, setLandOfficeMapType] = useState('h')
+  // ★ EasySlip — เก็บไฟล์สลิปที่ผ่านการยืนยันแล้วจาก SlipVerifier
+  const [verifiedSlips, setVerifiedSlips] = useState({})
   // VDO — managed by PropertyVideoPanel
   useEffect(() => {
     const onResize = () => setIsSmallScreen(window.innerWidth < 640)
@@ -865,7 +871,10 @@ export default function LegalEditPage() {
         debtor_bank_book: debtorBankBookRef,
         investor_bank_book: investorBankBookRef,
       }
-      Object.entries(docRefs).forEach(([k, ref]) => { if (ref.current?.files[0]) fd.append(k, ref.current.files[0]) })
+      Object.entries(docRefs).forEach(([k, ref]) => {
+        const file = verifiedSlips[k] || ref.current?.files[0]
+        if (file) fd.append(k, file)
+      })
       // เพิ่ม notify_types
       const notifyTypes = []
       if (notifySalesScheduled) notifyTypes.push('legal_scheduled_to_sales')
@@ -1235,87 +1244,36 @@ export default function LegalEditPage() {
                 </div>
 
                 {/* สลิปค่านายหน้า */}
-                <label style={{ fontSize: 12, color: '#92400e', fontWeight: 600, display: 'block', marginBottom: 6 }}>
+                <label style={{ fontSize: 12, color: '#92400e', fontWeight: 600, display: 'block', marginBottom: 8 }}>
                   <i className="fas fa-receipt" style={{ marginRight: 4 }}></i>สลิปค่านายหน้า
                 </label>
-                {/* preview + open + delete */}
-                {(localPreviews.agent_payment_slip || caseData.agent_payment_slip) && (() => {
-                  const previewSrc = localPreviews.agent_payment_slip
-                  const savedSrc = caseData.agent_payment_slip
-                    ? (caseData.agent_payment_slip.startsWith('/') ? caseData.agent_payment_slip : `/${caseData.agent_payment_slip}`)
-                    : null
-                  const displaySrc = previewSrc || savedSrc
-                  const isPdf = !previewSrc && savedSrc && /\.pdf$/i.test(savedSrc)
-                  return (
-                    <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-                      {/* thumbnail */}
-                      <div style={{ position: 'relative', flexShrink: 0 }}>
-                        {isPdf ? (
-                          <div style={{ width: 90, height: 60, borderRadius: 6, border: '2px solid #fcd34d', background: '#fff7ed',
-                            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-                            <i className="fas fa-file-pdf" style={{ fontSize: 22, color: '#e53935' }}></i>
-                            <span style={{ fontSize: 9, color: '#92400e' }}>PDF</span>
-                          </div>
-                        ) : (
-                          <img src={displaySrc} alt="สลิปนายหน้า"
-                            style={{ width: 90, height: 60, objectFit: 'cover', borderRadius: 6, border: `2px solid ${previewSrc ? '#f59e0b' : '#fcd34d'}`, display: 'block' }}
-                            onError={e => { e.target.style.display='none' }} />
-                        )}
-                        {previewSrc && <span style={{ position: 'absolute', top: -6, right: -6, background: '#f59e0b', color: '#fff', fontSize: 9, borderRadius: 10, padding: '1px 5px', fontWeight: 700 }}>ใหม่</span>}
-                      </div>
-                      {/* open button */}
-                      <a href={displaySrc} target="_blank" rel="noreferrer"
-                        style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #fcd34d', background: '#fffbeb', color: '#92400e', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
-                        <i className="fas fa-external-link-alt"></i> เปิด
-                      </a>
-                      {/* ยกเลิก — เฉพาะไฟล์ที่เพิ่งเลือก (ยังไม่ save) */}
-                      {previewSrc && (
-                        <button type="button" title="ยกเลิกการเลือกไฟล์"
-                          onClick={() => {
-                            setLocalPreviews(prev => ({ ...prev, agent_payment_slip: null }))
-                            if (agentPaymentSlipRef.current) agentPaymentSlipRef.current.value = ''
-                            const lbl = document.getElementById('agentSlipLabel')
-                            if (lbl) lbl.textContent = caseData.agent_payment_slip ? 'เปลี่ยนสลิปค่านายหน้า' : 'อัพโหลดสลิปค่านายหน้า'
-                          }}
-                          style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #d1d5db', background: '#f3f4f6', color: '#374151', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                          <i className="fas fa-times"></i> ยกเลิก
-                        </button>
-                      )}
-                      {/* ลบ — เฉพาะไฟล์ที่ save แล้ว */}
-                      {!previewSrc && savedSrc && (
-                        <button type="button"
-                          onClick={async () => {
-                            if (!window.confirm('ยืนยันลบสลิปค่านายหน้า?')) return
-                            const r = await fetch(`${LEGAL_API}/delete-document`, {
-                              method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
-                              body: JSON.stringify({ case_id: caseData.id, column: 'agent_payment_slip' })
-                            })
-                            const d = await r.json()
-                            if (d.success) setCaseData(prev => ({ ...prev, agent_payment_slip: null }))
-                            else alert('ลบไม่สำเร็จ: ' + (d.message || ''))
-                          }}
-                          style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #fca5a5', background: '#fee2e2', color: '#b91c1c', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                          <i className="fas fa-trash-alt"></i> ลบ
-                        </button>
-                      )}
-                    </div>
-                  )
-                })()}
-                <label style={{
-                  display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px',
-                  background: '#fff', border: '1.5px dashed #fbbf24', borderRadius: 8, cursor: 'pointer',
-                  fontSize: 13, color: '#92400e', fontWeight: 500
-                }}>
-                  <i className="fas fa-upload" style={{ color: '#f59e0b' }}></i>
-                  <span id="agentSlipLabel">{caseData.agent_payment_slip ? 'เปลี่ยนสลิปค่านายหน้า' : 'อัพโหลดสลิปค่านายหน้า'}</span>
-                  <input ref={agentPaymentSlipRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }}
-                    onChange={e => {
-                      const f = e.target.files[0]
-                      const lbl = document.getElementById('agentSlipLabel')
-                      if (lbl) lbl.textContent = f ? `✓ ${f.name}` : (caseData.agent_payment_slip ? 'เปลี่ยนสลิปค่านายหน้า' : 'อัพโหลดสลิปค่านายหน้า')
-                      setLocalPreview('agent_payment_slip', f)
-                    }} />
-                </label>
+                <SlipVerifier
+                  slipType="agent_fee"
+                  caseId={caseData.id}
+                  currentSrc={caseData.agent_payment_slip ? (caseData.agent_payment_slip.startsWith('/') ? caseData.agent_payment_slip : `/${caseData.agent_payment_slip}`) : null}
+                  onConfirm={(file) => {
+                    setVerifiedSlips(prev => ({ ...prev, agent_payment_slip: file || undefined }))
+                    setLocalPreviews(prev => ({ ...prev, agent_payment_slip: file ? URL.createObjectURL(file) : null }))
+                  }}
+                  label="อัพโหลดสลิปค่านายหน้า"
+                />
+                {/* ลบไฟล์เดิม */}
+                {caseData.agent_payment_slip && !verifiedSlips.agent_payment_slip && (
+                  <button type="button"
+                    onClick={async () => {
+                      if (!window.confirm('ยืนยันลบสลิปค่านายหน้า?')) return
+                      const r = await fetch(`${LEGAL_API}/delete-document`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+                        body: JSON.stringify({ case_id: caseData.id, column: 'agent_payment_slip' })
+                      })
+                      const d = await r.json()
+                      if (d.success) setCaseData(prev => ({ ...prev, agent_payment_slip: null }))
+                      else alert('ลบไม่สำเร็จ: ' + (d.message || ''))
+                    }}
+                    style={{ marginTop: 6, fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #fca5a5', background: '#fee2e2', color: '#b91c1c', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <i className="fas fa-trash-alt"></i> ลบ
+                  </button>
+                )}
               </div>}
 
               {/* ★ บัญชีธนาคารลูกหนี้ + สมุดบัญชี */}
@@ -1456,170 +1414,258 @@ export default function LegalEditPage() {
 
             </div>
 
-            {/* ข้อมูลทรัพย์ */}
-            <div className="card" style={{ padding: 24, marginBottom: 20, borderTop: '3px solid #16a34a' }}>
-              <h3 style={{ margin: '0 0 20px', fontSize: 16, fontWeight: 700, color: '#15803d' }}>
-                <i className="fas fa-map-marked-alt" style={{ marginRight: 8 }}></i>ข้อมูลทรัพย์
-              </h3>
-              <div style={{ marginBottom: 16 }}>
-                <label style={{ fontWeight: 600, fontSize: 12, color: '#6b7280', display: 'block', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.4px' }}>ทรัพย์ติดภาระหรือไม่</label>
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 18px', borderRadius: 10, fontWeight: 700, fontSize: 14,
-                  background: caseData.has_obligation === 'yes' ? '#fee2e2' : '#dcfce7',
-                  color: caseData.has_obligation === 'yes' ? '#b91c1c' : '#15803d',
-                  border: `2px solid ${caseData.has_obligation === 'yes' ? '#fca5a5' : '#86efac'}`,
-                }}>
-                  <i className={`fas ${caseData.has_obligation === 'yes' ? 'fa-exclamation-circle' : 'fa-check-circle'}`}></i>
-                  {caseData.has_obligation === 'yes'
-                    ? `ติดภาระ${caseData.obligation_count ? ` (${caseData.obligation_count} รายการ)` : ''}`
-                    : 'ไม่ติดภาระ'}
+            {/* ★ สถานที่ทำนิติกรรม (กรมที่ดิน) */}
+            {legalForm.land_office && (() => {
+              const loEmbedUrl = `https://maps.google.com/maps?q=${encodeURIComponent(legalForm.land_office)}&t=${landOfficeMapType}&z=16&output=embed`
+              const loMapsUrl = `https://www.google.com/maps/search/${encodeURIComponent(legalForm.land_office)}`
+              const MAP_TYPES = [
+                { key: 'h', label: 'ดาวเทียม+ถนน', icon: 'fa-satellite' },
+                { key: 'k', label: 'ดาวเทียม', icon: 'fa-satellite-dish' },
+                { key: 'm', label: 'แผนที่', icon: 'fa-map' },
+              ]
+              return (
+                <div style={{ marginBottom: 20 }}>
+                  {/* Header row */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'linear-gradient(135deg,#e0f2fe,#f0f9ff)', borderRadius: showLandOfficeMap ? '10px 10px 0 0' : 10, border: '1.5px solid #38bdf8', borderBottom: showLandOfficeMap ? '1px solid #bae6fd' : undefined }}>
+                    <i className="fas fa-landmark" style={{ color: '#0284c7', fontSize: 15, flexShrink: 0 }}></i>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 10, color: '#0369a1', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>สถานที่ทำนิติกรรม</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#0c4a6e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{legalForm.land_office}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                      <a href={loMapsUrl} target="_blank" rel="noreferrer"
+                        style={{ padding: '5px 10px', background: '#1a73e8', color: '#fff', borderRadius: 6, fontSize: 11, fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <i className="fab fa-google" style={{ fontSize: 10 }}></i> Google Maps
+                      </a>
+                      <button type="button" onClick={() => setShowLandOfficeMap(v => !v)}
+                        style={{ padding: '5px 10px', background: showLandOfficeMap ? '#fef9c3' : '#fefce8', color: '#a16207', border: `1.5px solid ${showLandOfficeMap ? '#fde047' : '#fef08a'}`, borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <i className={`fas fa-${showLandOfficeMap ? 'eye-slash' : 'satellite'}`} style={{ fontSize: 10 }}></i>
+                        {showLandOfficeMap ? 'ซ่อนแผนที่' : 'ดูดาวเทียม'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Map embed */}
+                  {showLandOfficeMap && (
+                    <div style={{ borderRadius: '0 0 10px 10px', overflow: 'hidden', border: '1.5px solid #fde047', borderTop: 'none', boxShadow: '0 2px 10px rgba(0,0,0,0.12)' }}>
+                      {/* map header */}
+                      <div style={{ background: 'linear-gradient(135deg,#1c1917,#292524)', padding: '6px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, flexWrap: 'wrap', borderBottom: '1px solid #44403c' }}>
+                        <span style={{ fontSize: 11, color: '#fef9c3', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <i className="fas fa-map-marker-alt" style={{ color: '#f87171' }}></i>
+                          {legalForm.land_office}
+                        </span>
+                        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                          {MAP_TYPES.map(t => (
+                            <button key={t.key} type="button" onClick={() => setLandOfficeMapType(t.key)}
+                              style={{ padding: '3px 9px', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer', border: 'none', background: landOfficeMapType === t.key ? '#fde047' : 'rgba(255,255,255,0.12)', color: landOfficeMapType === t.key ? '#1c1917' : '#d6d3d1', transition: 'background 0.15s' }}>
+                              <i className={`fas ${t.icon}`} style={{ marginRight: 3 }} />{t.label}
+                            </button>
+                          ))}
+                          <span style={{ color: '#57534e', fontSize: 10, marginLeft: 4 }}>|</span>
+                          <a href={loMapsUrl} target="_blank" rel="noreferrer"
+                            style={{ fontSize: 10, color: '#93c5fd', textDecoration: 'none', fontWeight: 600 }}>
+                            <i className="fab fa-google" /> Maps ↗
+                          </a>
+                        </div>
+                      </div>
+                      {/* iframe */}
+                      <iframe
+                        key={loEmbedUrl}
+                        src={loEmbedUrl}
+                        title={legalForm.land_office}
+                        style={{ width: '100%', height: 280, border: 'none', display: 'block' }}
+                        loading="lazy"
+                        referrerPolicy="no-referrer-when-downgrade"
+                      />
+                      {/* footer */}
+                      <div style={{ background: '#1c1917', padding: '4px 10px', borderTop: '1px solid #44403c', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: 10, color: '#78716c' }}>© Google Maps</span>
+                        <span style={{ fontSize: 10, color: '#78716c' }}>สำนักงานที่ดิน — กรมที่ดิน</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 16 }}>
-                <div className="form-group"><label>จังหวัด</label><input type="text" value={caseData.province || '-'} readOnly style={{ background: '#f5f5f5' }} /></div>
-                <div className="form-group"><label>อำเภอ</label><input type="text" value={caseData.district || '-'} readOnly style={{ background: '#f5f5f5' }} /></div>
-                <div className="form-group"><label>ตำบล</label><input type="text" value={caseData.subdistrict || '-'} readOnly style={{ background: '#f5f5f5' }} /></div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-                <div className="form-group"><label>บ้านเลขที่</label><input type="text" value={caseData.house_no || '-'} readOnly style={{ background: '#f5f5f5' }} /></div>
-                <div className="form-group"><label>ชื่อหมู่บ้าน / โครงการ</label><input type="text" value={caseData.village_name || '-'} readOnly style={{ background: '#f5f5f5' }} /></div>
-              </div>
-              <div className="form-group">
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                  <i className="fas fa-map-marker-alt" style={{ color: '#e53935', fontSize: 13 }}></i>
-                  โลเคชั่น
-                  <span style={{ fontSize: 10, color: '#6b7280', fontWeight: 400 }}>(กรอกโดยฝ่ายขาย)</span>
-                  <button type="button"
-                    onClick={() => window.open('https://landsmaps.dol.go.th/#', '_blank')}
-                    style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, border: 'none', background: 'linear-gradient(135deg,#0369a1,#0284c7)', color: '#fff', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                    <i className="fas fa-map"></i> ค้นหา landsmaps
-                  </button>
-                </label>
-                <input type="url" value={caseData.location_url || ''} readOnly
-                  style={{ background: '#f9fafb', color: caseData.location_url ? '#111827' : '#9ca3af', cursor: 'default' }}
-                  placeholder="ฝ่ายขายยังไม่ได้กรอกโลเคชั่น" />
-                <MapPreview url={caseData.location_url} label="โลเคชั่นทรัพย์" />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
-                <div className="form-group"><label>เลขโฉนด</label><input type="text" value={caseData.deed_number || '-'} readOnly style={{ background: '#f5f5f5' }} /></div>
-                <div className="form-group"><label>ประเภทโฉนด</label><input type="text" value={{ chanote: 'โฉนดที่ดิน (น.ส.4)', ns4k: 'น.ส.4ก.', ns3: 'นส.3', ns3k: 'นส.3ก.', spk: 'ที่ดิน ส.ป.ก.' }[caseData.deed_type] || caseData.deed_type || '-'} readOnly style={{ background: '#f5f5f5' }} /></div>
-                <div className="form-group"><label>พื้นที่</label><input type="text" value={caseData.land_area ? `${caseData.land_area} ตร.วา` : '-'} readOnly style={{ background: '#f5f5f5' }} /></div>
-              </div>
-              {/* ===== เปรียบเทียบรูปทรัพย์ ===== */}
-              <div style={{ marginTop: 16, padding: 16, background: '#f8faff', borderRadius: 10, border: '1.5px solid #c7d2fe' }}>
-                <h4 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 700, color: '#3730a3', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <i className="fas fa-images"></i> เปรียบเทียบรูปทรัพย์
-                  <span style={{ fontSize: 11, fontWeight: 400, color: '#6b7280' }}>— ทุกแผนกมองเห็น</span>
+              )
+            })()}
+
+            {/* ★ ผลอนุมัติจากฝ่ายอนุมัติสินเชื่อ */}
+            {(caseData.approved_credit || caseData.approval_status) && (
+              <div className="card" style={{ padding: 20, marginBottom: 20, borderTop: '3px solid #1565c0', border: '1px solid #b3d9f7', background: '#f0f9ff' }}>
+                <h4 style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 700, color: '#1565c0' }}>
+                  <i className="fas fa-check-circle" style={{ marginRight: 8 }}></i>ผลอนุมัติจากฝ่ายอนุมัติสินเชื่อ
                 </h4>
+                <p style={{ margin: '0 0 14px', fontSize: 12, color: '#888' }}>ข้อมูลที่ฝ่ายอนุมัติกรอกไว้ — แก้ไขได้ที่ฝ่ายอนุมัติเท่านั้น</p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div style={{ background: '#f0fdf4', borderRadius: 8, padding: 12, border: '1px solid #86efac' }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: '#15803d', marginBottom: 8 }}>
-                      <i className="fas fa-user-tie" style={{ marginRight: 5 }}></i>รูปจากฝ่ายขาย ({salesPropertyPhotos.length} รูป)
+                  {caseData.approval_status && (
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#888' }}>สถานะอนุมัติ</div>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: caseData.approval_status === 'approved' ? '#2e7d32' : caseData.approval_status === 'cancelled' ? '#c62828' : '#f57c00' }}>
+                        {caseData.approval_status === 'approved' ? '✓ อนุมัติแล้ว' : caseData.approval_status === 'cancelled' ? '✗ ยกเลิก' : '⏳ รอพิจารณา'}
+                      </span>
                     </div>
-                    {salesPropertyPhotos.length > 0 ? (
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 6 }}>
-                        {salesPropertyPhotos.map((src, i) => { const f = src.startsWith('/') ? src : `/${src}`; const isPdf = src.toLowerCase().includes('.pdf'); return (
-                          <div key={i} style={{ border: '1.5px solid #86efac', borderRadius: 8, overflow: 'hidden', cursor: 'pointer' }} onClick={() => window.open(f, '_blank')}>
-                            {isPdf ? <div style={{ width: '100%', height: 90, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#fff5f5', gap: 4 }}><i className="fas fa-file-pdf" style={{ fontSize: 24, color: '#e53935' }}></i><span style={{ fontSize: 9, color: '#e53935', fontWeight: 600 }}>PDF</span></div>
-                              : <img src={f} alt={`s-${i}`} style={{ width: '100%', height: 90, objectFit: 'cover' }} onError={e => { e.target.style.display = 'none' }} />}
-                          </div>
-                        )})}
-                      </div>
-                    ) : <span style={{ fontSize: 12, color: '#999' }}>ยังไม่มีรูปจากฝ่ายขาย</span>}
-                  </div>
-                  <div style={{ background: '#f3e5f5', borderRadius: 8, padding: 12, border: '1px solid #ce93d8' }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: '#7b1fa2', marginBottom: 8 }}>
-                      <i className="fas fa-search-location" style={{ marginRight: 5 }}></i>รูปจากฝ่ายประเมิน – เข้าพื้นที่ ({appraisalImages.length} รูป)
+                  )}
+                  {caseData.approved_credit && (
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#888' }}>วงเงินที่อนุมัติ</div>
+                      <span style={{ fontSize: 16, fontWeight: 700, color: '#1565c0' }}>
+                        {Number(caseData.approved_credit).toLocaleString('th-TH')} บาท
+                      </span>
                     </div>
-                    {appraisalImages.length > 0 ? (
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 6 }}>
-                        {appraisalImages.map((src, i) => { const f = src.startsWith('/') ? src : `/${src}`; const isPdf = src.toLowerCase().includes('.pdf'); return (
-                          <div key={i} style={{ border: '1.5px solid #ce93d8', borderRadius: 8, overflow: 'hidden', cursor: 'pointer' }} onClick={() => window.open(f, '_blank')}>
-                            {isPdf ? <div style={{ width: '100%', height: 90, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#fff5f5', gap: 4 }}><i className="fas fa-file-pdf" style={{ fontSize: 24, color: '#e53935' }}></i><span style={{ fontSize: 9, color: '#e53935', fontWeight: 600 }}>PDF</span></div>
-                              : <img src={f} alt={`a-${i}`} style={{ width: '100%', height: 90, objectFit: 'cover' }} onError={e => { e.target.style.display = 'none' }} />}
-                          </div>
-                        )})}
-                      </div>
-                    ) : <span style={{ fontSize: 12, color: '#999' }}>ยังไม่มีรูปจากฝ่ายประเมิน</span>}
-                  </div>
+                  )}
+                  {caseData.interest_per_year && (
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#888' }}>ดอกเบี้ย/ปี</div>
+                      <span style={{ fontSize: 13, fontWeight: 600 }}>{caseData.interest_per_year}%</span>
+                    </div>
+                  )}
+                  {caseData.operation_fee && (
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#888' }}>ค่าดำเนินการ</div>
+                      <span style={{ fontSize: 13, fontWeight: 600 }}>{Number(caseData.operation_fee).toLocaleString('th-TH')} บาท</span>
+                    </div>
+                  )}
                 </div>
               </div>
-
-              {caseData.appraisal_book_image && (
-                <div style={{ marginTop: 12 }}>
-                  <label style={{ fontSize: 13, fontWeight: 600, color: '#e65100' }}>
-                    <i className="fas fa-book" style={{ marginRight: 4 }}></i>
-                    เล่มประเมิน
-                  </label>
-                  <div style={{ marginTop: 6 }}>
-                    <a href={caseData.appraisal_book_image.startsWith('/') ? caseData.appraisal_book_image : `/${caseData.appraisal_book_image}`}
-                      target="_blank" rel="noreferrer"
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', background: '#e65100', color: '#fff', borderRadius: 6, fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>
-                      <i className="fas fa-file-alt"></i> เปิดดูเล่มประเมิน
-                    </a>
-                  </div>
-                </div>
-              )}
-
-              {/* ===== VDO ทรัพย์สิน ===== */}
-              <PropertyVideoPanel lrId={caseData?.loan_request_id} token={token()} canUpload={false} />
-              {caseData.preliminary_terms && (
-                <div style={{ marginTop: 16 }}>
-                  <label style={{ fontSize: 13, fontWeight: 600 }}>
-                    <i className="fas fa-file-alt" style={{ color: '#e67e22', marginRight: 5 }}></i>
-                    เงื่อนไขเบื้องต้น (เอกสาร 13) <span style={{ fontSize: 11, fontWeight: 400, color: '#999' }}>จากฝ่ายขาย</span>
-                  </label>
-                  <textarea readOnly value={caseData.preliminary_terms} rows={3}
-                    style={{ background: '#fffbf0', width: '100%', padding: '8px 12px', borderRadius: 8, marginTop: 6,
-                      border: '1px solid #f0c040', fontSize: 13, fontFamily: 'inherit', resize: 'none', boxSizing: 'border-box' }} />
-                </div>
-              )}
-            </div>
+            )}
 
             {/* ★ Checklist เอกสารทรัพย์ */}
             <div className="card" style={{ padding: 24, marginBottom: 20, borderTop: '3px solid #16a34a' }}>
               <ChecklistDocsPanel caseData={caseData} lrId={caseData.loan_request_id} token={token()} onDocsUpdated={(field, paths) => setCaseData(prev => ({ ...prev, [field]: JSON.stringify(paths) }))} canUpload={true} />
             </div>
 
-            {/* ★ สรุปอนุมัติ + ผลประเมิน (compact) */}
-            <div className="card" style={{ padding: 16, marginBottom: 20, borderTop: '3px solid #27ae60' }}>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
-                {/* ประเภทสินเชื่อ */}
-                {(() => {
-                  const lType = caseData.legal_approval_type || caseData.loan_type_detail
-                  const lMap = {
-                    selling_pledge: { color: '#6a1b9a', bg: '#f3e5f5', border: '#d8b4fe', icon: 'fa-handshake', label: 'ขายฝาก' },
-                    mortgage:       { color: '#1565c0', bg: '#e3f2fd', border: '#93c5fd', icon: 'fa-home',       label: 'จำนอง'  },
-                  }
-                  const lt = lMap[lType]
-                  return lt ? (
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 14px', borderRadius: 20, background: lt.bg, border: `2px solid ${lt.border}`, fontWeight: 700, fontSize: 13, color: lt.color }}>
-                      <i className={`fas ${lt.icon}`} style={{ fontSize: 12 }}></i>{lt.label}
-                    </div>
-                  ) : null
-                })()}
-                {/* วงเงินอนุมัติ */}
-                {caseData.approved_credit && (
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 14px', borderRadius: 20, background: '#dcfce7', border: '2px solid #86efac', fontWeight: 800, fontSize: 14, color: '#15803d' }}>
-                    <i className="fas fa-check-circle" style={{ fontSize: 12 }}></i>
-                    อนุมัติ ฿{Number(caseData.approved_credit).toLocaleString()}
-                    {caseData.approval_date && <span style={{ fontSize: 11, fontWeight: 500, color: '#4ade80', marginLeft: 4 }}>({formatDate(caseData.approval_date)})</span>}
+            {/* ★ PDF รวมเอกสารทั้งหมด */}
+            <div className="card" style={{ padding: isSmallScreen ? '16px 14px' : 24, marginBottom: 20, borderTop: '3px solid #7c3aed', background: 'linear-gradient(135deg, #faf5ff 0%, #fff 60%)' }}>
+              <h3 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 700, color: '#7c3aed', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <i className="fas fa-file-pdf"></i>
+                PDF รวมเอกสารทั้งหมด
+              </h3>
+              <p style={{ margin: '0 0 14px', fontSize: 12, color: '#9ca3af' }}>
+                อัพโหลดไฟล์ PDF ที่รวมสัญญา บัตรประชาชน และเอกสารทุกชิ้นของเคสนี้ไว้ในฉบับเดียว
+              </p>
+
+              {/* Zone อัพโหลด */}
+              <div style={{ background: '#f5f3ff', border: '2px dashed #c4b5fd', borderRadius: 14, padding: isSmallScreen ? '14px 12px' : '18px 20px', marginBottom: 16 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+                  {/* ปุ่มเลือกไฟล์ — เต็มแถว */}
+                  <label style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    padding: '11px 16px', width: '100%', boxSizing: 'border-box',
+                    background: legalDocFileName ? 'linear-gradient(135deg, #7c3aed, #6d28d9)' : '#fff',
+                    border: `2px solid ${legalDocFileName ? '#7c3aed' : '#c4b5fd'}`,
+                    borderRadius: 10, cursor: 'pointer', fontSize: 14, fontWeight: 700,
+                    color: legalDocFileName ? '#fff' : '#7c3aed',
+                    boxShadow: legalDocFileName ? '0 3px 10px rgba(124,58,237,0.25)' : 'none',
+                    transition: 'all 0.2s',
+                  }}>
+                    <i className={`fas ${legalDocFileName ? 'fa-file-pdf' : 'fa-folder-open'}`}></i>
+                    {legalDocFileName
+                      ? legalDocFileName.slice(0, isSmallScreen ? 22 : 34) + (legalDocFileName.length > (isSmallScreen ? 22 : 34) ? '…' : '')
+                      : 'แตะเพื่อเลือกไฟล์ PDF'}
+                    <input type="file" accept=".pdf,application/pdf" ref={legalDocRef} style={{ display: 'none' }}
+                      onChange={e => setLegalDocFileName(e.target.files[0]?.name || '')} />
+                  </label>
+
+                  {/* ช่องหมายเหตุ — เต็มแถว */}
+                  <input
+                    type="text" placeholder="หมายเหตุ เช่น ชุดเอกสารนิติกรรม (ไม่บังคับ)"
+                    value={legalDocNote} onChange={e => setLegalDocNote(e.target.value)}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: 10, border: '1.5px solid #c4b5fd', fontSize: 14, outline: 'none', background: '#fff', color: '#374151' }}
+                  />
+
+                  {/* ปุ่มอัพโหลด + ยกเลิก — แถวเดียวกัน */}
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button type="button" onClick={handleLegalDocUpload}
+                      disabled={!legalDocFileName || legalDocUploading}
+                      style={{
+                        flex: 1, padding: '11px 0', borderRadius: 10, border: 'none',
+                        cursor: legalDocFileName ? 'pointer' : 'not-allowed',
+                        background: legalDocFileName ? 'linear-gradient(135deg, #16a34a, #15803d)' : '#e5e7eb',
+                        color: legalDocFileName ? '#fff' : '#9ca3af', fontWeight: 700, fontSize: 14,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                        boxShadow: legalDocFileName ? '0 3px 10px rgba(22,163,74,0.3)' : 'none',
+                        transition: 'all 0.2s', minHeight: 46,
+                      }}>
+                      {legalDocUploading
+                        ? <><i className="fas fa-spinner fa-spin"></i> กำลังอัพโหลด...</>
+                        : <><i className="fas fa-cloud-upload-alt"></i> อัพโหลด</>}
+                    </button>
+                    {legalDocFileName && (
+                      <button type="button"
+                        onClick={() => { setLegalDocFileName(''); setLegalDocNote(''); if (legalDocRef.current) legalDocRef.current.value = '' }}
+                        style={{ padding: '11px 16px', borderRadius: 10, border: '1.5px solid #fca5a5', background: '#fef2f2', color: '#dc2626', fontWeight: 600, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, minHeight: 46 }}>
+                        <i className="fas fa-times"></i>
+                      </button>
+                    )}
                   </div>
-                )}
-                {/* ผลประเมิน */}
-                {(() => {
-                  const r = caseData.inside_result || caseData.outside_result
-                  if (!r) return null
-                  const passed = r === 'passed'
-                  return (
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 14px', borderRadius: 20, fontWeight: 700, fontSize: 12,
-                      background: passed ? '#f0fdf4' : '#fff1f2', border: `2px solid ${passed ? '#86efac' : '#fca5a5'}`, color: passed ? '#16a34a' : '#dc2626' }}>
-                      <i className={`fas ${passed ? 'fa-home' : 'fa-times-circle'}`} style={{ fontSize: 11 }}></i>
-                      ประเมิน{passed ? 'ผ่าน' : 'ไม่ผ่าน'}
-                      {(caseData.check_price_value) && <span style={{ marginLeft: 4, fontSize: 11 }}>• เช็คราคา ฿{Number(caseData.check_price_value).toLocaleString()}</span>}
-                    </div>
-                  )
-                })()}
+                </div>
               </div>
+
+              {/* รายการไฟล์ที่อัพโหลดแล้ว */}
+              {legalDocs.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '20px 0', color: '#c4b5fd', fontSize: 13 }}>
+                  <i className="fas fa-inbox" style={{ fontSize: 30, display: 'block', marginBottom: 6 }}></i>
+                  ยังไม่มีไฟล์ที่อัพโหลด
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {legalDocs.map((doc) => (
+                    <div key={doc.id} style={{
+                      background: '#fff', border: '1.5px solid #e9d5ff', borderRadius: 12,
+                      padding: '12px 14px', boxShadow: '0 1px 4px rgba(124,58,237,0.06)',
+                    }}>
+                      {/* แถวบน: ไอคอน + ชื่อไฟล์ + ปุ่ม */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ width: 40, height: 40, background: 'linear-gradient(135deg, #7c3aed, #a78bfa)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <i className="fas fa-file-pdf" style={{ color: '#fff', fontSize: 17 }}></i>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: '#4c1d95', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {doc.file_name || doc.file_path?.split('/').pop()}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3, flexWrap: 'wrap' }}>
+                            {doc.file_size && (
+                              <span style={{ fontSize: 11, color: '#9ca3af' }}>
+                                {(doc.file_size / 1024 / 1024).toFixed(2)} MB
+                              </span>
+                            )}
+                            <span style={{ fontSize: 11, color: '#9ca3af' }}>
+                              <i className="fas fa-clock" style={{ marginRight: 3 }}></i>
+                              {new Date(doc.created_at).toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </span>
+                          </div>
+                        </div>
+                        {/* ปุ่มด้านขวา */}
+                        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                          <a href={`/${doc.file_path}`} target="_blank" rel="noreferrer"
+                            style={{ padding: '7px 14px', background: 'linear-gradient(135deg, #7c3aed, #6d28d9)', color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5, boxShadow: '0 2px 6px rgba(124,58,237,0.3)', minHeight: 36 }}>
+                            <i className="fas fa-eye"></i>{!isSmallScreen && ' เปิด'}
+                          </a>
+                          <button type="button" onClick={() => handleLegalDocDelete(doc.id)}
+                            style={{ padding: '7px 12px', background: '#fef2f2', color: '#dc2626', border: '1.5px solid #fca5a5', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5, minHeight: 36 }}>
+                            <i className="fas fa-trash-alt"></i>
+                          </button>
+                        </div>
+                      </div>
+                      {/* หมายเหตุ (ถ้ามี) */}
+                      {doc.note && (
+                        <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #f3e8ff' }}>
+                          <span style={{ fontSize: 12, color: '#7c3aed', background: '#f3e8ff', padding: '2px 10px', borderRadius: 20, fontWeight: 600 }}>
+                            <i className="fas fa-tag" style={{ marginRight: 4, fontSize: 10 }}></i>{doc.note}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {legalDocs.length > 0 && (
+                <div style={{ marginTop: 10, textAlign: 'right', fontSize: 12, color: '#7c3aed', fontWeight: 600 }}>
+                  <i className="fas fa-layer-group" style={{ marginRight: 5 }}></i>
+                  {legalDocs.length} ไฟล์ทั้งหมด
+                </div>
+              )}
             </div>
 
           </div>
@@ -2139,198 +2185,6 @@ export default function LegalEditPage() {
 
             </div>
 
-            {/* ===== Checklist ก่อนนัดกรมที่ดิน ===== */}
-            {(() => {
-              const checks = [
-                { key: 'closing_check_schedule', label: 'ยืนยันวัน-เวลา-สำนักงานที่ดินกับลูกหนี้แล้ว', icon: 'fa-calendar-check' },
-                { key: 'closing_check_personal', label: 'ยืนยันสถานะบุคคลลูกหนี้ (โสด / สมรส / หย่า) ครบถ้วน', icon: 'fa-user-check' },
-                { key: 'closing_check_legal',    label: 'ยืนยันสถานะทางกฎหมายทรัพย์ (ไม่ติดอายัด / จำนอง)', icon: 'fa-landmark' },
-                { key: 'closing_check_docs',     label: 'เอกสารและสำเนาครบถ้วน พร้อมนำไปกรมที่ดิน', icon: 'fa-folder-check' },
-              ]
-              const doneCount = checks.filter(c => legalForm[c.key] == 1 || legalForm[c.key] === '1').length
-              const allDone = doneCount === checks.length
-              return (
-                <div className="card" style={{ padding: 24, marginBottom: 20, border: `2px solid ${allDone ? '#16a34a' : '#f59e0b'}`, background: allDone ? '#f0fdf4' : '#fffbeb' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                    <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: allDone ? '#15803d' : '#b45309' }}>
-                      <i className="fas fa-clipboard-list" style={{ marginRight: 8 }}></i>
-                      Checklist ก่อนนัดกรมที่ดิน
-                    </h3>
-                    <span style={{ padding: '3px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700, background: allDone ? '#16a34a' : '#f59e0b', color: '#fff' }}>
-                      {allDone ? <><i className="fas fa-check"></i> ครบทุกข้อ</> : `${doneCount} / ${checks.length}`}
-                    </span>
-                  </div>
-                  {!allDone && (
-                    <div style={{ fontSize: 12, color: '#92400e', background: '#fef3c7', borderRadius: 6, padding: '8px 12px', marginBottom: 14 }}>
-                      <i className="fas fa-exclamation-triangle" style={{ marginRight: 6 }}></i>
-                      กรุณายืนยันทุกข้อก่อนนัดลูกหนี้ไปกรมที่ดิน เพื่อป้องกันปัญหาวันจริง
-                    </div>
-                  )}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {checks.map(({ key, label, icon }) => {
-                      const checked = legalForm[key] == 1 || legalForm[key] === '1'
-                      return (
-                        <label key={key} style={{
-                          display: 'flex', alignItems: 'center', gap: 12,
-                          padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
-                          background: checked ? '#dcfce7' : '#fff',
-                          border: `1px solid ${checked ? '#86efac' : '#e5e7eb'}`,
-                          transition: 'all 0.15s'
-                        }}>
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={e => setL(key, e.target.checked ? 1 : 0)}
-                            style={{ width: 18, height: 18, cursor: 'pointer', accentColor: '#16a34a' }}
-                          />
-                          <i className={`fas ${icon}`} style={{ fontSize: 14, color: checked ? '#16a34a' : '#9ca3af', width: 16, textAlign: 'center' }}></i>
-                          <span style={{ fontSize: 13, fontWeight: checked ? 600 : 400, color: checked ? '#15803d' : '#374151' }}>
-                            {label}
-                          </span>
-                          {checked && <i className="fas fa-check-circle" style={{ marginLeft: 'auto', color: '#16a34a', fontSize: 15 }}></i>}
-                        </label>
-                      )
-                    })}
-                  </div>
-                </div>
-              )
-            })()}
-
-            {/* ---- ★ สลิปค่าปากถุง + สลิปค่าหักล่วงหน้า ---- */}
-            {/* ★ PDF รวมเอกสารทั้งหมด */}
-            <div className="card" style={{ padding: isSmallScreen ? '16px 14px' : 24, marginBottom: 20, borderTop: '3px solid #7c3aed', background: 'linear-gradient(135deg, #faf5ff 0%, #fff 60%)' }}>
-              <h3 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 700, color: '#7c3aed', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <i className="fas fa-file-pdf"></i>
-                PDF รวมเอกสารทั้งหมด
-              </h3>
-              <p style={{ margin: '0 0 14px', fontSize: 12, color: '#9ca3af' }}>
-                อัพโหลดไฟล์ PDF ที่รวมสัญญา บัตรประชาชน และเอกสารทุกชิ้นของเคสนี้ไว้ในฉบับเดียว
-              </p>
-
-              {/* Zone อัพโหลด */}
-              <div style={{ background: '#f5f3ff', border: '2px dashed #c4b5fd', borderRadius: 14, padding: isSmallScreen ? '14px 12px' : '18px 20px', marginBottom: 16 }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-
-                  {/* ปุ่มเลือกไฟล์ — เต็มแถว */}
-                  <label style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                    padding: '11px 16px', width: '100%', boxSizing: 'border-box',
-                    background: legalDocFileName ? 'linear-gradient(135deg, #7c3aed, #6d28d9)' : '#fff',
-                    border: `2px solid ${legalDocFileName ? '#7c3aed' : '#c4b5fd'}`,
-                    borderRadius: 10, cursor: 'pointer', fontSize: 14, fontWeight: 700,
-                    color: legalDocFileName ? '#fff' : '#7c3aed',
-                    boxShadow: legalDocFileName ? '0 3px 10px rgba(124,58,237,0.25)' : 'none',
-                    transition: 'all 0.2s',
-                  }}>
-                    <i className={`fas ${legalDocFileName ? 'fa-file-pdf' : 'fa-folder-open'}`}></i>
-                    {legalDocFileName
-                      ? legalDocFileName.slice(0, isSmallScreen ? 22 : 34) + (legalDocFileName.length > (isSmallScreen ? 22 : 34) ? '…' : '')
-                      : 'แตะเพื่อเลือกไฟล์ PDF'}
-                    <input type="file" accept=".pdf,application/pdf" ref={legalDocRef} style={{ display: 'none' }}
-                      onChange={e => setLegalDocFileName(e.target.files[0]?.name || '')} />
-                  </label>
-
-                  {/* ช่องหมายเหตุ — เต็มแถว */}
-                  <input
-                    type="text" placeholder="หมายเหตุ เช่น ชุดเอกสารนิติกรรม (ไม่บังคับ)"
-                    value={legalDocNote} onChange={e => setLegalDocNote(e.target.value)}
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: 10, border: '1.5px solid #c4b5fd', fontSize: 14, outline: 'none', background: '#fff', color: '#374151' }}
-                  />
-
-                  {/* ปุ่มอัพโหลด + ยกเลิก — แถวเดียวกัน */}
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button type="button" onClick={handleLegalDocUpload}
-                      disabled={!legalDocFileName || legalDocUploading}
-                      style={{
-                        flex: 1, padding: '11px 0', borderRadius: 10, border: 'none',
-                        cursor: legalDocFileName ? 'pointer' : 'not-allowed',
-                        background: legalDocFileName ? 'linear-gradient(135deg, #16a34a, #15803d)' : '#e5e7eb',
-                        color: legalDocFileName ? '#fff' : '#9ca3af', fontWeight: 700, fontSize: 14,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                        boxShadow: legalDocFileName ? '0 3px 10px rgba(22,163,74,0.3)' : 'none',
-                        transition: 'all 0.2s', minHeight: 46,
-                      }}>
-                      {legalDocUploading
-                        ? <><i className="fas fa-spinner fa-spin"></i> กำลังอัพโหลด...</>
-                        : <><i className="fas fa-cloud-upload-alt"></i> อัพโหลด</>}
-                    </button>
-                    {legalDocFileName && (
-                      <button type="button"
-                        onClick={() => { setLegalDocFileName(''); setLegalDocNote(''); if (legalDocRef.current) legalDocRef.current.value = '' }}
-                        style={{ padding: '11px 16px', borderRadius: 10, border: '1.5px solid #fca5a5', background: '#fef2f2', color: '#dc2626', fontWeight: 600, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, minHeight: 46 }}>
-                        <i className="fas fa-times"></i>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* รายการไฟล์ที่อัพโหลดแล้ว */}
-              {legalDocs.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '20px 0', color: '#c4b5fd', fontSize: 13 }}>
-                  <i className="fas fa-inbox" style={{ fontSize: 30, display: 'block', marginBottom: 6 }}></i>
-                  ยังไม่มีไฟล์ที่อัพโหลด
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {legalDocs.map((doc) => (
-                    <div key={doc.id} style={{
-                      background: '#fff', border: '1.5px solid #e9d5ff', borderRadius: 12,
-                      padding: '12px 14px', boxShadow: '0 1px 4px rgba(124,58,237,0.06)',
-                    }}>
-                      {/* แถวบน: ไอคอน + ชื่อไฟล์ + ปุ่ม */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{ width: 40, height: 40, background: 'linear-gradient(135deg, #7c3aed, #a78bfa)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <i className="fas fa-file-pdf" style={{ color: '#fff', fontSize: 17 }}></i>
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: '#4c1d95', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {doc.file_name || doc.file_path?.split('/').pop()}
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3, flexWrap: 'wrap' }}>
-                            {doc.file_size && (
-                              <span style={{ fontSize: 11, color: '#9ca3af' }}>
-                                {(doc.file_size / 1024 / 1024).toFixed(2)} MB
-                              </span>
-                            )}
-                            <span style={{ fontSize: 11, color: '#9ca3af' }}>
-                              <i className="fas fa-clock" style={{ marginRight: 3 }}></i>
-                              {new Date(doc.created_at).toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: 'numeric' })}
-                            </span>
-                          </div>
-                        </div>
-                        {/* ปุ่มด้านขวา */}
-                        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                          <a href={`/${doc.file_path}`} target="_blank" rel="noreferrer"
-                            style={{ padding: '7px 14px', background: 'linear-gradient(135deg, #7c3aed, #6d28d9)', color: '#fff', borderRadius: 8, fontSize: 13, fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5, boxShadow: '0 2px 6px rgba(124,58,237,0.3)', minHeight: 36 }}>
-                            <i className="fas fa-eye"></i>{!isSmallScreen && ' เปิด'}
-                          </a>
-                          <button type="button" onClick={() => handleLegalDocDelete(doc.id)}
-                            style={{ padding: '7px 12px', background: '#fef2f2', color: '#dc2626', border: '1.5px solid #fca5a5', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5, minHeight: 36 }}>
-                            <i className="fas fa-trash-alt"></i>
-                          </button>
-                        </div>
-                      </div>
-                      {/* หมายเหตุ (ถ้ามี) */}
-                      {doc.note && (
-                        <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #f3e8ff' }}>
-                          <span style={{ fontSize: 12, color: '#7c3aed', background: '#f3e8ff', padding: '2px 10px', borderRadius: 20, fontWeight: 600 }}>
-                            <i className="fas fa-tag" style={{ marginRight: 4, fontSize: 10 }}></i>{doc.note}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {legalDocs.length > 0 && (
-                <div style={{ marginTop: 10, textAlign: 'right', fontSize: 12, color: '#7c3aed', fontWeight: 600 }}>
-                  <i className="fas fa-layer-group" style={{ marginRight: 5 }}></i>
-                  {legalDocs.length} ไฟล์ทั้งหมด
-                </div>
-              )}
-            </div>
 
             <div className="card" style={{ padding: 24, marginBottom: 20, borderTop: '3px solid #e65100' }}>
               <h3 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 700, color: '#e65100', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -2340,115 +2194,39 @@ export default function LegalEditPage() {
               </h3>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 {[
-                  { label: 'สลิปโอนเงินค่าปากถุง',   field: 'transaction_slip', ref: transactionSlipRef },
-                  { label: 'สลิปค่าหักล่วงหน้า',      field: 'advance_slip',     ref: advanceSlipRef },
-                ].map(({ label, field, ref }) => {
-                  const existingFile = caseData[field]
-                  const newFileName = fileNames[field]
-                  const hasExisting = !!existingFile
-                  const hasNew = !!newFileName
-                  return (
-                    <div key={field} style={{ background: '#fffbf7', border: '1.5px solid #ffe0b2', borderRadius: 12, padding: 16 }}>
-                      {/* Label */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 12 }}>
-                        <div style={{
-                          background: 'linear-gradient(135deg, #ff6d00, #e65100)', color: '#fff',
-                          borderRadius: 7, padding: '4px 12px', fontSize: 12, fontWeight: 700,
-                          display: 'flex', alignItems: 'center', gap: 6,
-                          boxShadow: '0 2px 6px rgba(230,81,0,0.3)'
-                        }}>
-                          <i className="fas fa-receipt" style={{ fontSize: 11 }}></i>
-                          {label}
-                        </div>
-                      </div>
-
-                      {/* ไฟล์ที่มีอยู่ */}
-                      {hasExisting && !hasNew && (
-                        <div style={{
-                          display: 'flex', alignItems: 'center', gap: 10,
-                          padding: '10px 12px', background: '#fff8f0',
-                          borderRadius: 10, border: '1.5px solid #ffcc80', marginBottom: 10
-                        }}>
-                          {existingFile.match(/\.(jpg|jpeg|png|webp)$/i) ? (
-                            <a href={existingFile.startsWith('/') ? existingFile : `/${existingFile}`} target="_blank" rel="noreferrer">
-                              <img
-                                src={existingFile.startsWith('/') ? existingFile : `/${existingFile}`}
-                                alt={label}
-                                style={{ width: 60, height: 44, objectFit: 'cover', borderRadius: 6, border: '1.5px solid #ffcc80', cursor: 'pointer' }}
-                              />
-                            </a>
-                          ) : (
-                            <div style={{ width: 44, height: 44, background: '#fff3e0', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.5px solid #ffcc80', flexShrink: 0 }}>
-                              <i className="fas fa-file-pdf" style={{ color: '#e65100', fontSize: 20 }}></i>
-                            </div>
-                          )}
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 12, fontWeight: 700, color: '#e65100', marginBottom: 2 }}>
-                              <i className="fas fa-check-circle" style={{ fontSize: 12, marginRight: 4 }}></i>อัพโหลดแล้ว
-                            </div>
-                            <div style={{ fontSize: 10, color: '#aaa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {existingFile.split('/').pop()}
-                            </div>
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 5, flexShrink: 0 }}>
-                            <a href={existingFile.startsWith('/') ? existingFile : `/${existingFile}`} target="_blank" rel="noreferrer"
-                              style={{ padding: '4px 10px', background: '#e65100', color: '#fff', borderRadius: 6, fontSize: 11, fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                              <i className="fas fa-eye"></i> ดู
-                            </a>
-                            <button type="button" onClick={() => deleteDocument(field)}
-                              style={{ padding: '4px 10px', background: '#fef2f2', color: '#dc2626', border: '1.5px solid #fca5a5', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                              <i className="fas fa-trash-alt"></i> ลบ
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* ไฟล์ใหม่ที่เลือก */}
-                      {hasNew && (
-                        <div style={{
-                          display: 'flex', alignItems: 'center', gap: 10,
-                          padding: '10px 12px', background: '#f0fdf4',
-                          borderRadius: 10, border: '1.5px solid #86efac', marginBottom: 10
-                        }}>
-                          <div style={{ width: 38, height: 38, background: '#dcfce7', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            <i className="fas fa-file-check" style={{ color: '#16a34a', fontSize: 16 }}></i>
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 12, fontWeight: 700, color: '#16a34a', marginBottom: 2 }}>
-                              <i className="fas fa-check-circle" style={{ marginRight: 4 }}></i>เลือกไฟล์แล้ว
-                            </div>
-                            <div style={{ fontSize: 10, color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {newFileName}
-                            </div>
-                          </div>
-                          <button type="button"
-                            onClick={() => { setFileName(field, ''); if (ref.current) ref.current.value = '' }}
-                            style={{ padding: '4px 10px', background: '#fef2f2', color: '#dc2626', border: '1.5px solid #fca5a5', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                            <i className="fas fa-times"></i> ยกเลิก
-                          </button>
-                        </div>
-                      )}
-
-                      {/* ปุ่มอัพโหลด */}
-                      <label style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 8,
-                        padding: '7px 16px', background: hasNew ? '#f0fdf4' : '#fff8f0',
-                        border: `1.5px dashed ${hasNew ? '#86efac' : '#ffb74d'}`,
-                        borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600,
-                        color: hasNew ? '#16a34a' : '#e65100', transition: 'all 0.2s'
+                  { label: 'สลิปโอนเงินค่าปากถุง', field: 'transaction_slip', slipType: 'bag_fee' },
+                  { label: 'สลิปค่าหักล่วงหน้า',    field: 'advance_slip',    slipType: 'advance' },
+                ].map(({ label, field, slipType }) => (
+                  <div key={field} style={{ background: '#fffbf7', border: '1.5px solid #ffe0b2', borderRadius: 12, padding: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>
+                      <div style={{
+                        background: 'linear-gradient(135deg, #ff6d00, #e65100)', color: '#fff',
+                        borderRadius: 7, padding: '4px 12px', fontSize: 12, fontWeight: 700,
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        boxShadow: '0 2px 6px rgba(230,81,0,0.3)'
                       }}>
-                        <i className={`fas ${hasNew ? 'fa-exchange-alt' : 'fa-cloud-upload-alt'}`}></i>
-                        {hasNew ? 'เปลี่ยนไฟล์' : hasExisting ? 'อัพโหลดไฟล์ใหม่แทน' : 'เลือกไฟล์สลิป'}
-                        <input type="file" accept="image/*,.pdf" ref={ref} style={{ display: 'none' }}
-                          onChange={e => {
-                            const f = e.target.files[0]
-                            setFileName(field, f?.name || '')
-                          }} />
-                      </label>
-                      <span style={{ fontSize: 10, color: '#9ca3af', marginLeft: 6 }}>รูปภาพ / PDF</span>
+                        <i className="fas fa-receipt" style={{ fontSize: 11 }}></i>
+                        {label}
+                      </div>
                     </div>
-                  )
-                })}
+                    <SlipVerifier
+                      slipType={slipType}
+                      caseId={caseData.id}
+                      currentSrc={caseData[field] ? (caseData[field].startsWith('/') ? caseData[field] : `/${caseData[field]}`) : null}
+                      onConfirm={(file) => {
+                        setVerifiedSlips(prev => ({ ...prev, [field]: file || undefined }))
+                      }}
+                      label={label}
+                    />
+                    {/* ลบไฟล์เดิม */}
+                    {caseData[field] && !verifiedSlips[field] && (
+                      <button type="button" onClick={() => deleteDocument(field)}
+                        style={{ marginTop: 6, padding: '3px 10px', background: '#fef2f2', color: '#dc2626', border: '1.5px solid #fca5a5', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <i className="fas fa-trash-alt"></i> ลบไฟล์เดิม
+                      </button>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
 

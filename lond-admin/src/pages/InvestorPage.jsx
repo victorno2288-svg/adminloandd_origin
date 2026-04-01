@@ -529,14 +529,23 @@ function InvestorModal({ isOpen, onClose, onSaved, editData }) {
               {!isEdit && <span style={{ fontSize: 11, fontWeight: 400, color: '#aaa', marginLeft: 6 }}>(อัพโหลดหลังบันทึกอัตโนมัติ)</span>}
             </div>
             {isEdit && editData?.id_card_image && (
-              <div style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
-                <a href={editData.id_card_image} target="_blank" rel="noopener noreferrer"
-                  style={{ fontSize: 12, color: '#8e44ad', textDecoration: 'underline' }}>
-                  <i className="fas fa-paperclip" style={{ marginRight: 4 }}></i>ดูไฟล์ปัจจุบัน
-                </a>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, background: '#faf5ff', border: '1.5px solid #e9d5ff', borderRadius: 10, marginBottom: 10 }}>
+                <div style={{ width: 56, height: 56, flexShrink: 0, borderRadius: 8, overflow: 'hidden', border: '1px solid #d8b4fe', background: '#ede9fe', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                  onClick={() => window.open(editData.id_card_image.startsWith('/') ? editData.id_card_image : `/${editData.id_card_image}`, '_blank')}>
+                  {editData.id_card_image.toLowerCase().includes('.pdf')
+                    ? <i className="fas fa-file-pdf" style={{ fontSize: 22, color: '#e53935' }}></i>
+                    : <img src={editData.id_card_image.startsWith('/') ? editData.id_card_image : `/${editData.id_card_image}`} alt="id card" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.target.style.display = 'none' }} />}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 600 }}><i className="fas fa-check-circle" style={{ marginRight: 4 }}></i>มีไฟล์แล้ว</div>
+                  <a href={editData.id_card_image.startsWith('/') ? editData.id_card_image : `/${editData.id_card_image}`} target="_blank" rel="noopener noreferrer"
+                    style={{ fontSize: 10, color: '#8e44ad', textDecoration: 'underline' }}>
+                    <i className="fas fa-external-link-alt" style={{ marginRight: 3 }}></i>ดูไฟล์
+                  </a>
+                </div>
                 <button type="button" onClick={() => handleDeleteDoc('id_card_image')}
-                  style={{ fontSize: 11, padding: '2px 8px', background: '#fef2f2', color: '#e74c3c', border: '1px solid #fca5a5', borderRadius: 5, cursor: 'pointer' }}>
-                  <i className="fas fa-trash"></i> ลบ
+                  style={{ padding: '5px 10px', background: '#fef2f2', color: '#e74c3c', border: '1.5px solid #fca5a5', borderRadius: 7, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600, flexShrink: 0 }}>
+                  <i className="fas fa-trash-alt"></i>
                 </button>
               </div>
             )}
@@ -627,14 +636,23 @@ function InvestorModal({ isOpen, onClose, onSaved, editData }) {
               {!isEdit && <span style={{ fontSize: 11, fontWeight: 400, color: '#aaa', marginLeft: 6 }}>(อัพโหลดหลังบันทึก)</span>}
             </div>
             {isEdit && editData?.house_registration_image && (
-              <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
-                <a href={editData.house_registration_image} target="_blank" rel="noopener noreferrer"
-                  style={{ fontSize: 12, color: '#c0392b', textDecoration: 'underline' }}>
-                  <i className="fas fa-paperclip" style={{ marginRight: 4 }}></i>ดูไฟล์ปัจจุบัน
-                </a>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, background: '#fff5f5', border: '1.5px solid #fca5a5', borderRadius: 10, marginBottom: 10 }}>
+                <div style={{ width: 56, height: 56, flexShrink: 0, borderRadius: 8, overflow: 'hidden', border: '1px solid #fca5a5', background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                  onClick={() => window.open(editData.house_registration_image.startsWith('/') ? editData.house_registration_image : `/${editData.house_registration_image}`, '_blank')}>
+                  {editData.house_registration_image.toLowerCase().includes('.pdf')
+                    ? <i className="fas fa-file-pdf" style={{ fontSize: 22, color: '#e53935' }}></i>
+                    : <img src={editData.house_registration_image.startsWith('/') ? editData.house_registration_image : `/${editData.house_registration_image}`} alt="house reg" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.target.style.display = 'none' }} />}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 600 }}><i className="fas fa-check-circle" style={{ marginRight: 4 }}></i>มีไฟล์แล้ว</div>
+                  <a href={editData.house_registration_image.startsWith('/') ? editData.house_registration_image : `/${editData.house_registration_image}`} target="_blank" rel="noopener noreferrer"
+                    style={{ fontSize: 10, color: '#c0392b', textDecoration: 'underline' }}>
+                    <i className="fas fa-external-link-alt" style={{ marginRight: 3 }}></i>ดูไฟล์
+                  </a>
+                </div>
                 <button type="button" onClick={() => handleDeleteDoc('house_registration_image')}
-                  style={{ fontSize: 11, padding: '2px 8px', background: '#fef2f2', color: '#e74c3c', border: '1px solid #fca5a5', borderRadius: 5, cursor: 'pointer' }}>
-                  <i className="fas fa-trash"></i> ลบ
+                  style={{ padding: '5px 10px', background: '#fef2f2', color: '#e74c3c', border: '1.5px solid #fca5a5', borderRadius: 7, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600, flexShrink: 0 }}>
+                  <i className="fas fa-trash-alt"></i>
                 </button>
               </div>
             )}
@@ -719,14 +737,23 @@ function InvestorModal({ isOpen, onClose, onSaved, editData }) {
               {!isEdit && <span style={{ fontSize: 11, fontWeight: 400, color: '#aaa', marginLeft: 6 }}>(อัพโหลดหลังบันทึก)</span>}
             </div>
             {isEdit && editData?.passbook_image && (
-              <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
-                <a href={editData.passbook_image} target="_blank" rel="noopener noreferrer"
-                  style={{ fontSize: 12, color: '#1565c0', textDecoration: 'underline' }}>
-                  <i className="fas fa-paperclip" style={{ marginRight: 4 }}></i>ดูไฟล์ปัจจุบัน
-                </a>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, background: '#eff6ff', border: '1.5px solid #93c5fd', borderRadius: 10, marginBottom: 10 }}>
+                <div style={{ width: 56, height: 56, flexShrink: 0, borderRadius: 8, overflow: 'hidden', border: '1px solid #93c5fd', background: '#dbeafe', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                  onClick={() => window.open(editData.passbook_image.startsWith('/') ? editData.passbook_image : `/${editData.passbook_image}`, '_blank')}>
+                  {editData.passbook_image.toLowerCase().includes('.pdf')
+                    ? <i className="fas fa-file-pdf" style={{ fontSize: 22, color: '#e53935' }}></i>
+                    : <img src={editData.passbook_image.startsWith('/') ? editData.passbook_image : `/${editData.passbook_image}`} alt="passbook" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.target.style.display = 'none' }} />}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 600 }}><i className="fas fa-check-circle" style={{ marginRight: 4 }}></i>มีไฟล์แล้ว</div>
+                  <a href={editData.passbook_image.startsWith('/') ? editData.passbook_image : `/${editData.passbook_image}`} target="_blank" rel="noopener noreferrer"
+                    style={{ fontSize: 10, color: '#1565c0', textDecoration: 'underline' }}>
+                    <i className="fas fa-external-link-alt" style={{ marginRight: 3 }}></i>ดูไฟล์
+                  </a>
+                </div>
                 <button type="button" onClick={() => handleDeleteDoc('passbook_image')}
-                  style={{ fontSize: 11, padding: '2px 8px', background: '#fef2f2', color: '#e74c3c', border: '1px solid #fca5a5', borderRadius: 5, cursor: 'pointer' }}>
-                  <i className="fas fa-trash"></i> ลบ
+                  style={{ padding: '5px 10px', background: '#fef2f2', color: '#e74c3c', border: '1.5px solid #fca5a5', borderRadius: 7, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600, flexShrink: 0 }}>
+                  <i className="fas fa-trash-alt"></i>
                 </button>
               </div>
             )}
@@ -810,14 +837,23 @@ function InvestorModal({ isOpen, onClose, onSaved, editData }) {
               {!isEdit && <span style={{ fontSize: 11, fontWeight: 400, color: '#aaa', marginLeft: 6 }}>(อัพโหลดหลังบันทึก)</span>}
             </div>
             {isEdit && editData?.investor_contract && (
-              <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
-                <a href={editData.investor_contract} target="_blank" rel="noopener noreferrer"
-                  style={{ fontSize: 12, color: '#6d28d9', textDecoration: 'underline' }}>
-                  <i className="fas fa-paperclip" style={{ marginRight: 4 }}></i>ดูไฟล์ปัจจุบัน
-                </a>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, background: '#f5f3ff', border: '1.5px solid #c4b5fd', borderRadius: 10, marginBottom: 10 }}>
+                <div style={{ width: 56, height: 56, flexShrink: 0, borderRadius: 8, overflow: 'hidden', border: '1px solid #c4b5fd', background: '#ede9fe', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                  onClick={() => window.open(editData.investor_contract.startsWith('/') ? editData.investor_contract : `/${editData.investor_contract}`, '_blank')}>
+                  {editData.investor_contract.toLowerCase().includes('.pdf')
+                    ? <i className="fas fa-file-pdf" style={{ fontSize: 22, color: '#e53935' }}></i>
+                    : <img src={editData.investor_contract.startsWith('/') ? editData.investor_contract : `/${editData.investor_contract}`} alt="contract" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.target.style.display = 'none' }} />}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 600 }}><i className="fas fa-check-circle" style={{ marginRight: 4 }}></i>มีไฟล์แล้ว</div>
+                  <a href={editData.investor_contract.startsWith('/') ? editData.investor_contract : `/${editData.investor_contract}`} target="_blank" rel="noopener noreferrer"
+                    style={{ fontSize: 10, color: '#6d28d9', textDecoration: 'underline' }}>
+                    <i className="fas fa-external-link-alt" style={{ marginRight: 3 }}></i>ดูไฟล์
+                  </a>
+                </div>
                 <button type="button" onClick={() => handleDeleteDoc('investor_contract')}
-                  style={{ fontSize: 11, padding: '2px 8px', background: '#fef2f2', color: '#e74c3c', border: '1px solid #fca5a5', borderRadius: 5, cursor: 'pointer' }}>
-                  <i className="fas fa-trash"></i> ลบ
+                  style={{ padding: '5px 10px', background: '#fef2f2', color: '#e74c3c', border: '1.5px solid #fca5a5', borderRadius: 7, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600, flexShrink: 0 }}>
+                  <i className="fas fa-trash-alt"></i>
                 </button>
               </div>
             )}

@@ -683,3 +683,109 @@ exports.markOfferSentToCustomer = (req, res) => {
     }
   )
 }
+
+// ============================================================
+// GET /api/admin/approval/dashboard
+// แดชบอร์ดฝ่ายอนุมัติ — สรุปรายสัปดาห์/เดือน/ปี
+// ?period=week|month|year
+// ============================================================
+exports.getApprovalDashboard = (req, res) => {
+  const period = req.query.period || 'week'
+
+  let dateExpr, groupExpr, labelExpr
+  if (period === 'year') {
+    dateExpr = `DATE(at2.created_at) >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)`
+    groupExpr = `DATE_FORMAT(at2.created_at, '%Y-%m')`
+    labelExpr = groupExpr
+  } else if (period === 'month') {
+    dateExpr = `DATE(at2.created_at) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)`
+    groupExpr = `DATE(at2.created_at)`
+    labelExpr = groupExpr
+  } else {
+    dateExpr = `DATE(at2.created_at) >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)`
+    groupExpr = `DATE(at2.created_at)`
+    labelExpr = groupExpr
+  }
+
+  const queries = []
+
+  // 1. Trend
+  queries.push(new Promise(resolve => {
+    db.query(`
+      SELECT ${labelExpr} AS label, COUNT(*) AS cnt
+      FROM approval_transactions at2
+      WHERE ${dateExpr}
+      GROUP BY ${groupExpr} ORDER BY label ASC
+    `, (err, rows) => resolve({ key: 'approval_trend', data: err ? [] : rows }))
+  }))
+
+  // 2. Summary
+  queries.push(new Promise(resolve => {
+    db.query(`
+      SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN at2.approval_status = 'approved' THEN 1 ELSE 0 END) AS approved,
+        SUM(CASE WHEN at2.approval_status = 'pending' THEN 1 ELSE 0 END) AS pending,
+        SUM(CASE WHEN at2.approval_status = 'cancelled' OR at2.is_cancelled = 1 THEN 1 ELSE 0 END) AS cancelled,
+        COALESCE(SUM(at2.approved_credit), 0) AS total_approved_credit,
+        COALESCE(AVG(at2.approved_credit), 0) AS avg_approved_credit,
+        COALESCE(SUM(at2.operation_fee), 0) AS total_operation_fee,
+        COALESCE(SUM(at2.advance_interest), 0) AS total_advance_interest
+      FROM approval_transactions at2
+      WHERE ${dateExpr}
+    `, (err, rows) => resolve({ key: 'summary', data: err ? {} : (rows[0] || {}) }))
+  }))
+
+  // 3. Status distribution
+  queries.push(new Promise(resolve => {
+    db.query(`
+      SELECT COALESCE(at2.approval_status, 'unknown') AS status, COUNT(*) AS cnt
+      FROM approval_transactions at2
+      WHERE ${dateExpr}
+      GROUP BY at2.approval_status ORDER BY cnt DESC
+    `, (err, rows) => resolve({ key: 'status_dist', data: err ? [] : rows }))
+  }))
+
+  // 4. วงเงินอนุมัติ trend
+  queries.push(new Promise(resolve => {
+    db.query(`
+      SELECT ${labelExpr} AS label,
+        COALESCE(SUM(at2.approved_credit), 0) AS total_credit,
+        COUNT(*) AS cnt
+      FROM approval_transactions at2
+      WHERE at2.approval_status = 'approved' AND ${dateExpr}
+      GROUP BY ${groupExpr} ORDER BY label ASC
+    `, (err, rows) => resolve({ key: 'credit_trend', data: err ? [] : rows }))
+  }))
+
+  // 5. แยกตามประเภททรัพย์
+  queries.push(new Promise(resolve => {
+    db.query(`
+      SELECT COALESCE(lr.property_type, 'other') AS property_type, COUNT(*) AS cnt,
+        COALESCE(SUM(at2.approved_credit), 0) AS total_credit
+      FROM approval_transactions at2
+      LEFT JOIN loan_requests lr ON lr.id = at2.loan_request_id
+      WHERE at2.approval_status = 'approved' AND ${dateExpr}
+      GROUP BY lr.property_type ORDER BY cnt DESC
+    `, (err, rows) => resolve({ key: 'by_property', data: err ? [] : rows }))
+  }))
+
+  // 6. Recent approved
+  queries.push(new Promise(resolve => {
+    db.query(`
+      SELECT at2.id, c.case_code, lr.contact_name, at2.approved_credit,
+        at2.interest_per_year, at2.approval_status, at2.updated_at
+      FROM approval_transactions at2
+      LEFT JOIN loan_requests lr ON lr.id = at2.loan_request_id
+      LEFT JOIN cases c ON c.loan_request_id = lr.id
+      WHERE at2.approval_status = 'approved' AND ${dateExpr}
+      ORDER BY at2.updated_at DESC LIMIT 20
+    `, (err, rows) => resolve({ key: 'recent_approved', data: err ? [] : rows }))
+  }))
+
+  Promise.all(queries).then(results => {
+    const out = {}
+    results.forEach(r => { out[r.key] = r.data })
+    res.json({ success: true, period, dashboard: out })
+  }).catch(e => res.status(500).json({ success: false, message: e.message }))
+}

@@ -115,6 +115,19 @@ router.post('/blacklist', chatController.addBlacklist)
 router.delete('/blacklist/:phone', chatController.removeBlacklist)
 router.get('/blacklist/check/:phone', chatController.checkBlacklist)
 
+// ── ★ Analytics ─────────────────────────────────────────────────────────────
+router.get('/analytics/quality-monitor', chatController.getQualityMonitor)
+
+// ── ★ AI/Manual reply mode toggle ────────────────────────────────────────────
+router.patch('/conversations/:id/reply-mode', chatController.setReplyMode)
+
+// ── ★ AI Flow ─────────────────────────────────────────────────────────────────
+router.patch('/conversations/:id/active-flow', chatController.setActiveFlow)
+router.get  ('/flows/list-active',             chatController.listActiveFlows)
+
+// ── ★ DocSlots upload ─────────────────────────────────────────────────────────
+router.post('/conversations/:id/upload-doc', chatController.docSlotUpload.single('doc_file'), chatController.uploadDocToLoanRequest)
+
 module.exports = router;
 
 // ===== Webhook routes (ต้อง mount แยก ไม่ผ่าน authMiddleware) =====
@@ -124,4 +137,3 @@ module.exports = router;
 //   app.post('/api/chat/webhook/facebook', chatWebhookController.handleFacebookWebhook);
 //   app.get('/api/chat/webhook/line', chatWebhookController.verifyLineWebhook);
 //   app.post('/api/chat/webhook/line', chatWebhookController.handleLineWebhook);
-router.get('/analytics/quality-monitor', chatController.getQualityMonitor)

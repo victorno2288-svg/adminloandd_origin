@@ -5,6 +5,7 @@ const legalController = require('../controllers/legalController')
 
 // ฝ่ายนิติกรรม
 router.get('/stats', legalController.getStats)
+router.get('/dashboard', legalController.getLegalDashboard)
 router.get('/cases', legalController.getLegalCases)
 router.get('/cases/:caseId', legalController.getLegalDetail)
 

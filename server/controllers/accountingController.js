@@ -703,7 +703,8 @@ exports.getCaseDocs = (req, res) => {
     LEFT JOIN debtor_accounting da ON da.case_id = c.id
     LEFT JOIN legal_transactions lt ON lt.case_id = c.id
     LEFT JOIN issuing_transactions it ON it.case_id = c.id
-    LEFT JOIN auction_transactions auc ON auc.case_id = c.id
+    LEFT JOIN auction_transactions auc ON auc.case_id = c.id AND auc.is_cancelled = 0
+    LEFT JOIN investors inv ON (inv.id = auc.investor_id OR inv.investor_code = auc.investor_code OR inv.full_name = auc.investor_name)
     LEFT JOIN investor_withdrawals iw ON iw.case_id = c.id AND iw.slip_path IS NOT NULL
     WHERE lr.id = ? GROUP BY lr.id LIMIT 1`
   const otherFields = `
@@ -733,6 +734,12 @@ exports.getCaseDocs = (req, res) => {
       auc.marriage_cert, auc.spouse_name_change_doc,
       auc.bank_name AS auc_bank_name, auc.bank_account_no AS auc_bank_account_no,
       auc.bank_account_name AS auc_bank_account_name, auc.bank_book_file AS auc_bank_book_file, auc.transfer_slip,
+      COALESCE(
+        inv.id_card_image,
+        (SELECT i2.id_card_image FROM investors i2 WHERE i2.investor_code = auc.investor_code AND auc.investor_code IS NOT NULL AND auc.investor_code != '' LIMIT 1),
+        (SELECT i3.id_card_image FROM investors i3 WHERE i3.full_name = auc.investor_name AND auc.investor_name IS NOT NULL AND auc.investor_name != '' LIMIT 1),
+        (SELECT i4.id_card_image FROM investors i4 JOIN auction_bids ab ON ab.investor_id = i4.id WHERE ab.case_id = c.id AND ab.refund_status = 'winner' LIMIT 1)
+      ) AS investor_id_card_image,
       GROUP_CONCAT(DISTINCT iw.slip_path ORDER BY iw.id SEPARATOR '|') AS investor_slips,
       (SELECT CONCAT(COALESCE(i.investor_code,''), '|', COALESCE(i.full_name,''), '|', COALESCE(i.phone,''))
         FROM investors i
@@ -771,7 +778,8 @@ exports.getCaseDocs = (req, res) => {
       NULL AS auc_bank_name, NULL AS auc_bank_account_no,
       NULL AS auc_bank_account_name, NULL AS auc_bank_book_file, NULL AS transfer_slip,
       NULL AS investor_slips, NULL AS investor_info,
-      NULL AS bid_deposit_slips`
+      NULL AS bid_deposit_slips,
+      NULL AS investor_id_card_image`
   // joinsSafe — ไม่มี auction_transactions (ปลอดภัยเมื่อ table นั้นเสีย) แต่มี legal_transactions
   const joinsSafe = `
     FROM loan_requests lr
@@ -1088,4 +1096,97 @@ exports.getAgentsDocs = (req, res) => {
     }
     res.json({ success: true, data: results || [] })
   })
+}
+
+// ============================================================
+// GET /api/admin/accounting/dashboard
+// แดชบอร์ดฝ่ายบัญชี — สรุปรายสัปดาห์/เดือน/ปี
+// ============================================================
+exports.getAccountingDashboard = (req, res) => {
+  const period = req.query.period || 'week'
+  let dateExpr, groupExpr, labelExpr
+  if (period === 'year') {
+    dateExpr = `DATE(da.updated_at) >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)`
+    groupExpr = `DATE_FORMAT(da.updated_at, '%Y-%m')`; labelExpr = groupExpr
+  } else if (period === 'month') {
+    dateExpr = `DATE(da.updated_at) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)`
+    groupExpr = `DATE(da.updated_at)`; labelExpr = groupExpr
+  } else {
+    dateExpr = `DATE(da.updated_at) >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)`
+    groupExpr = `DATE(da.updated_at)`; labelExpr = groupExpr
+  }
+  const queries = []
+  // 1. Revenue trend (appraisal fees collected)
+  queries.push(new Promise(resolve => {
+    db.query(`SELECT ${labelExpr} AS label,
+      COALESCE(SUM(da.appraisal_amount), 0) AS appraisal_total,
+      COALESCE(SUM(da.bag_fee_amount), 0) AS bag_fee_total,
+      COALESCE(SUM(da.contract_sale_amount), 0) AS contract_sale_total,
+      COUNT(*) AS cnt
+    FROM debtor_accounting da WHERE ${dateExpr}
+    GROUP BY ${groupExpr} ORDER BY label ASC`,
+    (err, rows) => resolve({ key: 'revenue_trend', data: err ? [] : rows }))
+  }))
+  // 2. Summary
+  queries.push(new Promise(resolve => {
+    db.query(`SELECT
+      COUNT(*) AS total_records,
+      SUM(CASE WHEN da.appraisal_status = 'paid' THEN 1 ELSE 0 END) AS appraisal_paid,
+      COALESCE(SUM(CASE WHEN da.appraisal_status = 'paid' THEN da.appraisal_amount ELSE 0 END), 0) AS appraisal_revenue,
+      SUM(CASE WHEN da.bag_fee_status = 'paid' THEN 1 ELSE 0 END) AS bag_fee_paid,
+      COALESCE(SUM(CASE WHEN da.bag_fee_status = 'paid' THEN da.bag_fee_amount ELSE 0 END), 0) AS bag_fee_revenue,
+      SUM(CASE WHEN da.contract_sale_status = 'paid' THEN 1 ELSE 0 END) AS contract_sale_paid,
+      COALESCE(SUM(CASE WHEN da.contract_sale_status = 'paid' THEN da.contract_sale_amount ELSE 0 END), 0) AS contract_sale_revenue,
+      SUM(CASE WHEN da.redemption_status = 'paid' THEN 1 ELSE 0 END) AS redemption_paid,
+      COALESCE(SUM(CASE WHEN da.redemption_status = 'paid' THEN da.redemption_amount ELSE 0 END), 0) AS redemption_revenue,
+      COALESCE(SUM(da.additional_service_amount), 0) AS additional_revenue
+    FROM debtor_accounting da WHERE ${dateExpr}`,
+    (err, rows) => resolve({ key: 'summary', data: err ? {} : (rows[0] || {}) }))
+  }))
+  // 3. Payment status breakdown
+  queries.push(new Promise(resolve => {
+    db.query(`SELECT
+      SUM(CASE WHEN da.appraisal_status = 'paid' THEN 1 ELSE 0 END) AS appraisal_paid,
+      SUM(CASE WHEN da.appraisal_status = 'unpaid' OR da.appraisal_status IS NULL THEN 1 ELSE 0 END) AS appraisal_unpaid,
+      SUM(CASE WHEN da.bag_fee_status = 'paid' THEN 1 ELSE 0 END) AS bag_paid,
+      SUM(CASE WHEN da.bag_fee_status = 'unpaid' OR da.bag_fee_status IS NULL THEN 1 ELSE 0 END) AS bag_unpaid,
+      SUM(CASE WHEN da.contract_sale_status = 'paid' THEN 1 ELSE 0 END) AS contract_paid,
+      SUM(CASE WHEN da.contract_sale_status = 'unpaid' OR da.contract_sale_status IS NULL THEN 1 ELSE 0 END) AS contract_unpaid
+    FROM debtor_accounting da WHERE ${dateExpr}`,
+    (err, rows) => resolve({ key: 'payment_breakdown', data: err ? {} : (rows[0] || {}) }))
+  }))
+  // 4. Agent commission summary
+  queries.push(new Promise(resolve => {
+    const agentDate = dateExpr.replace(/da\./g, 'aa.')
+    db.query(`SELECT COUNT(*) AS total_agents,
+      COALESCE(SUM(aa.commission_amount), 0) AS total_commission,
+      SUM(CASE WHEN aa.payment_status = 'paid' THEN 1 ELSE 0 END) AS paid_agents
+    FROM agent_accounting aa WHERE ${agentDate}`,
+    (err, rows) => resolve({ key: 'agent_summary', data: err ? {} : (rows[0] || {}) }))
+  }))
+  // 5. Investor deposit summary
+  queries.push(new Promise(resolve => {
+    const invDate = dateExpr.replace(/da\./g, 'ia.')
+    db.query(`SELECT COUNT(*) AS total_investors,
+      COALESCE(SUM(ia.auction_deposit), 0) AS total_deposits
+    FROM investor_accounting ia WHERE ${invDate}`,
+    (err, rows) => resolve({ key: 'investor_summary', data: err ? {} : (rows[0] || {}) }))
+  }))
+  // 6. Recent paid items
+  queries.push(new Promise(resolve => {
+    db.query(`SELECT da.case_id, c.case_code, lr.contact_name,
+      da.appraisal_amount, da.appraisal_status,
+      da.bag_fee_amount, da.bag_fee_status,
+      da.updated_at
+    FROM debtor_accounting da
+    LEFT JOIN cases c ON c.id = da.case_id
+    LEFT JOIN loan_requests lr ON lr.id = c.loan_request_id
+    WHERE da.appraisal_status = 'paid' AND ${dateExpr}
+    ORDER BY da.updated_at DESC LIMIT 20`,
+    (err, rows) => resolve({ key: 'recent_paid', data: err ? [] : rows }))
+  }))
+  Promise.all(queries).then(results => {
+    const out = {}; results.forEach(r => { out[r.key] = r.data })
+    res.json({ success: true, period, dashboard: out })
+  }).catch(e => res.status(500).json({ success: false, message: e.message }))
 }

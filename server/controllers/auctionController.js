@@ -242,6 +242,13 @@ function fetchAuctionDetail(caseId, res) {
       auc.created_at AS auction_created_at, auc.updated_at AS auction_updated_at,
       auc.house_reg_book_legal,
       auc.spouse_consent_doc, auc.spouse_name_change_doc,
+      COALESCE(
+        inv.id_card_image,
+        (SELECT i2.id_card_image FROM investors i2 WHERE i2.investor_code = auc.investor_code AND auc.investor_code IS NOT NULL AND auc.investor_code != '' LIMIT 1),
+        (SELECT i3.id_card_image FROM investors i3 WHERE i3.full_name = auc.investor_name AND auc.investor_name IS NOT NULL AND auc.investor_name != '' LIMIT 1),
+        (SELECT i4.id_card_image FROM investors i4 JOIN auction_bids ab ON ab.investor_id = i4.id WHERE ab.case_id = c.id AND ab.refund_status = 'winner' LIMIT 1)
+      ) AS investor_id_card_image,
+      COALESCE(inv.full_name, auc.investor_name) AS investor_full_name,
       lr.borrower_id_card, lr.house_reg_book, lr.name_change_doc, lr.divorce_doc,
       lr.spouse_id_card, lr.spouse_reg_copy, lr.marriage_cert,
       lr.single_cert, lr.death_cert, lr.will_court_doc, lr.testator_house_reg,
@@ -260,7 +267,8 @@ function fetchAuctionDetail(caseId, res) {
     FROM cases c
     LEFT JOIN loan_requests lr ON lr.id = c.loan_request_id
     LEFT JOIN agents a ON a.id = c.agent_id
-    LEFT JOIN auction_transactions auc ON auc.case_id = c.id
+    LEFT JOIN auction_transactions auc ON auc.case_id = c.id AND auc.is_cancelled = 0
+    LEFT JOIN investors inv ON (inv.id = auc.investor_id OR inv.investor_code = auc.investor_code OR inv.full_name = auc.investor_name)
     LEFT JOIN legal_transactions lt ON lt.case_id = c.id
     WHERE c.id = ?
   `
@@ -298,7 +306,8 @@ function fetchAuctionDetail(caseId, res) {
           NULL AS bank_name, NULL AS bank_account_no, NULL AS bank_account_name, NULL AS transfer_slip,
           NULL AS recorded_by, NULL AS recorded_at,
           NULL AS auction_created_at, NULL AS auction_updated_at,
-          NULL AS house_reg_book_legal, NULL AS spouse_consent_doc, NULL AS spouse_name_change_doc
+          NULL AS house_reg_book_legal, NULL AS spouse_consent_doc, NULL AS spouse_name_change_doc,
+          NULL AS investor_id_card_image, NULL AS investor_full_name
         FROM cases c
         LEFT JOIN loan_requests lr ON lr.id = c.loan_request_id
         LEFT JOIN agents a ON a.id = c.agent_id
@@ -868,4 +877,117 @@ exports.registerInvestor = (req, res) => {
       )
     }
   )
+}
+
+// ============================================================
+// GET /api/admin/auction/dashboard
+// แดชบอร์ดฝ่ายประมูล — สรุปรายสัปดาห์/เดือน/ปี
+// ?period=week|month|year
+// ============================================================
+exports.getAuctionDashboard = (req, res) => {
+  const period = req.query.period || 'week'
+
+  let dateExpr, groupExpr, labelExpr
+  if (period === 'year') {
+    dateExpr = `DATE(auc.created_at) >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)`
+    groupExpr = `DATE_FORMAT(auc.created_at, '%Y-%m')`
+    labelExpr = groupExpr
+  } else if (period === 'month') {
+    dateExpr = `DATE(auc.created_at) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)`
+    groupExpr = `DATE(auc.created_at)`
+    labelExpr = groupExpr
+  } else {
+    dateExpr = `DATE(auc.created_at) >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)`
+    groupExpr = `DATE(auc.created_at)`
+    labelExpr = groupExpr
+  }
+
+  const queries = []
+
+  // 1. Trend
+  queries.push(new Promise(resolve => {
+    db.query(`
+      SELECT ${labelExpr} AS label, COUNT(*) AS cnt
+      FROM auction_transactions auc
+      WHERE ${dateExpr}
+      GROUP BY ${groupExpr} ORDER BY label ASC
+    `, (err, rows) => resolve({ key: 'auction_trend', data: err ? [] : rows }))
+  }))
+
+  // 2. Summary
+  queries.push(new Promise(resolve => {
+    db.query(`
+      SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN auc.auction_status = 'pending' THEN 1 ELSE 0 END) AS pending,
+        SUM(CASE WHEN auc.auction_status = 'auctioned' THEN 1 ELSE 0 END) AS auctioned,
+        SUM(CASE WHEN auc.auction_status = 'auction_completed' THEN 1 ELSE 0 END) AS completed,
+        SUM(CASE WHEN auc.auction_status = 'cancelled' OR auc.is_cancelled = 1 THEN 1 ELSE 0 END) AS cancelled
+      FROM auction_transactions auc
+      WHERE ${dateExpr}
+    `, (err, rows) => resolve({ key: 'summary', data: err ? {} : (rows[0] || {}) }))
+  }))
+
+  // 3. Bids summary
+  queries.push(new Promise(resolve => {
+    const bidDate = period === 'year'
+      ? `DATE(ab.created_at) >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)`
+      : period === 'month'
+        ? `DATE(ab.created_at) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)`
+        : `DATE(ab.created_at) >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)`
+    db.query(`
+      SELECT
+        COUNT(*) AS total_bids,
+        COUNT(DISTINCT ab.case_id) AS cases_with_bids,
+        COALESCE(SUM(ab.bid_amount), 0) AS total_bid_amount,
+        COALESCE(SUM(ab.deposit_amount), 0) AS total_deposit
+      FROM auction_bids ab
+      WHERE ${bidDate}
+    `, (err, rows) => resolve({ key: 'bids_summary', data: err ? {} : (rows[0] || {}) }))
+  }))
+
+  // 4. Status distribution
+  queries.push(new Promise(resolve => {
+    db.query(`
+      SELECT COALESCE(auc.auction_status, 'unknown') AS status, COUNT(*) AS cnt
+      FROM auction_transactions auc
+      WHERE ${dateExpr}
+      GROUP BY auc.auction_status ORDER BY cnt DESC
+    `, (err, rows) => resolve({ key: 'status_dist', data: err ? [] : rows }))
+  }))
+
+  // 5. Top investors (by number of bids)
+  queries.push(new Promise(resolve => {
+    const bidDate = period === 'year'
+      ? `DATE(ab.created_at) >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)`
+      : period === 'month'
+        ? `DATE(ab.created_at) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)`
+        : `DATE(ab.created_at) >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)`
+    db.query(`
+      SELECT ab.investor_name, COUNT(*) AS bid_count,
+        COALESCE(SUM(ab.bid_amount), 0) AS total_bid
+      FROM auction_bids ab
+      WHERE ab.investor_name IS NOT NULL AND ${bidDate}
+      GROUP BY ab.investor_name ORDER BY bid_count DESC LIMIT 10
+    `, (err, rows) => resolve({ key: 'top_investors', data: err ? [] : rows }))
+  }))
+
+  // 6. Recent completed
+  queries.push(new Promise(resolve => {
+    db.query(`
+      SELECT auc.id, c.case_code, lr.contact_name, auc.investor_name,
+        auc.auction_status, auc.updated_at
+      FROM auction_transactions auc
+      LEFT JOIN cases c ON c.id = auc.case_id
+      LEFT JOIN loan_requests lr ON lr.id = c.loan_request_id
+      WHERE auc.auction_status IN ('auctioned','auction_completed') AND ${dateExpr}
+      ORDER BY auc.updated_at DESC LIMIT 20
+    `, (err, rows) => resolve({ key: 'recent_completed', data: err ? [] : rows }))
+  }))
+
+  Promise.all(queries).then(results => {
+    const out = {}
+    results.forEach(r => { out[r.key] = r.data })
+    res.json({ success: true, period, dashboard: out })
+  }).catch(e => res.status(500).json({ success: false, message: e.message }))
 }

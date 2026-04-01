@@ -165,6 +165,7 @@ export default function AdminLayout() {
     // — ภาพรวม —
     { type: 'section', label: 'ภาพรวม' },
     { path: '/dashboard', icon: 'fas fa-chart-pie', label: dashLabel },
+    { path: '/sales/dashboard', icon: 'fas fa-chart-bar', label: 'แดชบอร์ดฝ่าย' },
     { path: '/ceo-dashboard', icon: 'fas fa-crown', label: 'CEO Dashboard' },
     { path: '/calendar', icon: 'fas fa-calendar-alt', label: 'ปฏิทินนัดหมาย' },
     { path: '/weekly-report', icon: 'fas fa-calendar-week', label: 'รายงานประจำสัปดาห์' },
@@ -187,6 +188,7 @@ export default function AdminLayout() {
     { path: '/investors', icon: 'fas fa-hand-holding-usd', label: 'จัดการนายทุน' },
     { path: '/cancellation', icon: 'fas fa-times-circle', label: 'ยกเลิกเคส' },
     { path: '/account-user', icon: 'fas fa-shield-alt', label: 'จัดการแอคเคาท์' },
+    { path: '/chat-flow-builder', icon: 'fas fa-robot', label: 'Chat Flow Builder', superAdminOnly: true },
   ]
 
   // กรองตามสิทธิ์ department

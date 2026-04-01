@@ -6,6 +6,7 @@ const emailController = require('../controllers/emailController');
 const issuingDocController = require('../controllers/issuingDocController');
 
 router.get('/stats', issuingController.getStats);
+router.get('/dashboard', issuingController.getIssuingDashboard);
 router.get('/cases', issuingController.getIssuingCases);
 router.get('/cases/:caseId', issuingController.getIssuingDetail);
 

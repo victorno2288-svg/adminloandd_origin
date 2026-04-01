@@ -162,6 +162,8 @@ function fetchLegalDetail(caseId, res) {
       c.broker_contract_file AS issuing_broker_contract,
       c.broker_id_file AS issuing_broker_id,
       at2.approval_type AS legal_approval_type, at2.approved_credit, at2.approval_date,
+      at2.approval_status, at2.credit_table_file, at2.interest_per_year, at2.interest_per_month,
+      at2.operation_fee, at2.land_tax_estimate, at2.advance_interest,
       a.full_name AS agent_name, a.phone AS agent_phone, a.agent_code,
       a.national_id AS agent_national_id,
       a.national_id_expiry AS agent_national_id_expiry,
@@ -191,7 +193,12 @@ function fetchLegalDetail(caseId, res) {
       inv.spouse_national_id AS investor_spouse_national_id,
       inv.address AS investor_address,
       inv.phone AS investor_phone_profile,
-      inv.id_card_image AS investor_id_card_image,
+      COALESCE(
+        inv.id_card_image,
+        (SELECT i2.id_card_image FROM investors i2 WHERE i2.investor_code = auc.investor_code AND auc.investor_code IS NOT NULL AND auc.investor_code != '' LIMIT 1),
+        (SELECT i3.id_card_image FROM investors i3 WHERE i3.full_name = auc.investor_name AND auc.investor_name IS NOT NULL AND auc.investor_name != '' LIMIT 1),
+        (SELECT i4.id_card_image FROM investors i4 JOIN auction_bids ab ON ab.investor_id = i4.id WHERE ab.case_id = c.id AND ab.refund_status = 'winner' LIMIT 1)
+      ) AS investor_id_card_image,
       -- Checklist docs (marital)
       lr.marital_status,
       c.investor_marital_status,
@@ -209,8 +216,8 @@ function fetchLegalDetail(caseId, res) {
     LEFT JOIN legal_transactions lt ON lt.case_id = c.id
     LEFT JOIN approval_transactions at2 ON at2.loan_request_id = c.loan_request_id
     LEFT JOIN agents a ON a.id = c.agent_id
-    LEFT JOIN auction_transactions auc ON auc.case_id = c.id
-    LEFT JOIN investors inv ON inv.id = auc.investor_id
+    LEFT JOIN auction_transactions auc ON auc.case_id = c.id AND auc.is_cancelled = 0
+    LEFT JOIN investors inv ON (inv.id = auc.investor_id OR inv.investor_code = auc.investor_code OR inv.full_name = auc.investor_name)
     WHERE c.id = ?
   `
   const isTableError = (e) => e && (
@@ -220,10 +227,11 @@ function fetchLegalDetail(caseId, res) {
     if (isTableError(err)) {
       // Fallback: ตัด auction_transactions + investors ออก
       const sqlSafe = sql
-        .replace('LEFT JOIN auction_transactions auc ON auc.case_id = c.id', '')
-        .replace('LEFT JOIN investors inv ON inv.id = auc.investor_id', '')
+        .replace(/LEFT JOIN auction_transactions auc[^\n]*/g, '')
+        .replace(/LEFT JOIN investors inv[^\n]*/g, '')
         .replace(/auc\.\w+(\s+AS\s+\w+)?/g, 'NULL$1')
         .replace(/inv\.\w+(\s+AS\s+\w+)?/g, 'NULL$1')
+        .replace(/\(SELECT i[23]\.id_card_image FROM investors[^)]+\)/g, 'NULL')
       return db.query(sqlSafe, [caseId], (err2, results2) => {
         if (err2) {
           console.error('fetchLegalDetail fallback error:', err2)
@@ -238,6 +246,9 @@ function fetchLegalDetail(caseId, res) {
       return res.status(500).json({ success: false, message: 'Server Error' })
     }
     if (results.length === 0) return res.status(404).json({ success: false, message: 'ไม่พบข้อมูลเคส' })
+    // DEBUG: ดู investor data ที่ query ได้
+    const r = results[0]
+    console.log(`[LEGAL DEBUG case=${caseId}] investor_id_card_image=${r.investor_id_card_image}, investor_name=${r.investor_name}, investor_code=${r.investor_code}, investor_full_name=${r.investor_full_name}`)
     res.json({ success: true, caseData: results[0] })
   })
 }
@@ -817,4 +828,71 @@ exports.mergeCaseDocs = async (req, res) => {
   } catch (e) {
     res.status(500).json({ success: false, message: e.message })
   }
+}
+
+// ============================================================
+// GET /api/admin/legal/dashboard
+// แดชบอร์ดฝ่ายนิติกรรม — สรุปรายสัปดาห์/เดือน/ปี
+// ============================================================
+exports.getLegalDashboard = (req, res) => {
+  const period = req.query.period || 'week'
+  let dateExpr, groupExpr, labelExpr
+  if (period === 'year') {
+    dateExpr = `DATE(lt.created_at) >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)`
+    groupExpr = `DATE_FORMAT(lt.created_at, '%Y-%m')`; labelExpr = groupExpr
+  } else if (period === 'month') {
+    dateExpr = `DATE(lt.created_at) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)`
+    groupExpr = `DATE(lt.created_at)`; labelExpr = groupExpr
+  } else {
+    dateExpr = `DATE(lt.created_at) >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)`
+    groupExpr = `DATE(lt.created_at)`; labelExpr = groupExpr
+  }
+  const queries = []
+  queries.push(new Promise(resolve => {
+    db.query(`SELECT ${labelExpr} AS label, COUNT(*) AS cnt FROM legal_transactions lt WHERE ${dateExpr} GROUP BY ${groupExpr} ORDER BY label ASC`,
+    (err, rows) => resolve({ key: 'legal_trend', data: err ? [] : rows }))
+  }))
+  queries.push(new Promise(resolve => {
+    db.query(`SELECT COUNT(*) AS total,
+      SUM(CASE WHEN lt.legal_status = 'pending' THEN 1 ELSE 0 END) AS pending,
+      SUM(CASE WHEN lt.legal_status = 'completed' THEN 1 ELSE 0 END) AS completed,
+      SUM(CASE WHEN lt.legal_status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled,
+      COUNT(DISTINCT lt.officer_name) AS total_officers,
+      COUNT(DISTINCT lt.land_office) AS total_offices
+    FROM legal_transactions lt WHERE ${dateExpr}`,
+    (err, rows) => resolve({ key: 'summary', data: err ? {} : (rows[0] || {}) }))
+  }))
+  queries.push(new Promise(resolve => {
+    db.query(`SELECT COALESCE(lt.legal_status, 'unknown') AS status, COUNT(*) AS cnt
+    FROM legal_transactions lt WHERE ${dateExpr}
+    GROUP BY lt.legal_status ORDER BY cnt DESC`,
+    (err, rows) => resolve({ key: 'status_dist', data: err ? [] : rows }))
+  }))
+  queries.push(new Promise(resolve => {
+    db.query(`SELECT COALESCE(lt.officer_name, 'ไม่ระบุ') AS officer_name, COUNT(*) AS cnt,
+      SUM(CASE WHEN lt.legal_status = 'completed' THEN 1 ELSE 0 END) AS completed
+    FROM legal_transactions lt WHERE ${dateExpr}
+    GROUP BY lt.officer_name ORDER BY cnt DESC`,
+    (err, rows) => resolve({ key: 'by_officer', data: err ? [] : rows }))
+  }))
+  queries.push(new Promise(resolve => {
+    db.query(`SELECT COALESCE(lt.land_office, 'ไม่ระบุ') AS land_office, COUNT(*) AS cnt
+    FROM legal_transactions lt WHERE ${dateExpr}
+    GROUP BY lt.land_office ORDER BY cnt DESC LIMIT 10`,
+    (err, rows) => resolve({ key: 'by_office', data: err ? [] : rows }))
+  }))
+  queries.push(new Promise(resolve => {
+    db.query(`SELECT lt.id, c.case_code, lr.contact_name, lt.legal_status,
+      lt.officer_name, lt.visit_date, lt.land_office, lt.updated_at
+    FROM legal_transactions lt
+    LEFT JOIN cases c ON c.id = lt.case_id
+    LEFT JOIN loan_requests lr ON lr.id = c.loan_request_id
+    WHERE lt.legal_status = 'completed' AND ${dateExpr}
+    ORDER BY lt.updated_at DESC LIMIT 20`,
+    (err, rows) => resolve({ key: 'recent_completed', data: err ? [] : rows }))
+  }))
+  Promise.all(queries).then(results => {
+    const out = {}; results.forEach(r => { out[r.key] = r.data })
+    res.json({ success: true, period, dashboard: out })
+  }).catch(e => res.status(500).json({ success: false, message: e.message }))
 }

@@ -17,4 +17,7 @@ router.get('/ceo', dashboardController.getCeoDashboard);
 // GET /api/admin/dashboard/my-stats — แดชบอร์ดส่วนตัว เฉพาะเคสที่ account ตัวเองสร้าง
 router.get('/my-stats', dashboardController.getMyDashboard);
 
+// GET /api/admin/dashboard/unified — แดชบอร์ดรวมทุกฝ่าย (แสดงตาม department)
+router.get('/unified', dashboardController.getUnifiedDashboard);
+
 module.exports = router;

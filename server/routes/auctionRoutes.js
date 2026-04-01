@@ -25,6 +25,7 @@ const auctionChecklistUpload = upload.fields([
 ])
 
 router.get('/stats', auctionController.getStats)
+router.get('/dashboard', auctionController.getAuctionDashboard)
 router.get('/cases', auctionController.getAuctionCases)
 router.get('/cases/:caseId', auctionController.getAuctionDetail)
 router.put('/cases/:caseId', auctionController.updateAuction)

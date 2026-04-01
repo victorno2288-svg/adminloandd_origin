@@ -360,20 +360,6 @@ function CaseModal({ caseRow, onClose }) {
                       {docs.location_url && (
                         <MapPreview url={docs.location_url} label="โลเคชั่นทรัพย์" />
                       )}
-                      {(docs.estimated_value || docs.appraisal_result || docs.approved_amount || docs.loan_amount) && (
-                        <div style={{ background: '#f3e8ff', borderRadius: 10, padding: '12px 14px', marginBottom: 14, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12 }}>
-                          <InfoRow label="ราคาประเมิน (เบื้องต้น)" value={fmt(docs.estimated_value)} />
-                          <InfoRow label="ราคาประเมิน (จริง)" value={fmt(docs.appraisal_result)} />
-                          <InfoRow label="วงเงินอนุมัติ" value={fmt(docs.approved_amount || docs.loan_amount)} />
-                          {ltv && (
-                            <div>
-                              <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, marginBottom: 2, textTransform: 'uppercase' }}>LTV</div>
-                              <div style={{ fontSize: 20, fontWeight: 800, color: parseFloat(ltv) <= 40 ? '#2e7d32' : '#e65100' }}>{ltv}%</div>
-                              <div style={{ fontSize: 10, color: '#94a3b8' }}>เกณฑ์ 30–40%</div>
-                            </div>
-                          )}
-                        </div>
-                      )}
                       <DocGroup title="รูปทรัพย์" icon="fa-images" color="#7b1fa2" docs={propImgs.map((src, i) => ({ label: `รูปทรัพย์ #${i + 1}`, src }))} onPreview={setPreview} />
                       <DocGroup title="บัตรประชาชนลูกหนี้" icon="fa-id-card" color="#1565c0" docs={idCardImgs.map((src, i) => ({ label: `บัตร ปชช. #${i + 1}`, src }))} onPreview={setPreview} />
                       <DocGroup title="เอกสารโฉนด / สำเนาโฉนด" icon="fa-file-alt" color="#6a1b9a" docs={deedImgs.map((src, i) => ({ label: `โฉนด #${i + 1}`, src }))} onPreview={setPreview} />
@@ -503,6 +489,26 @@ function CaseModal({ caseRow, onClose }) {
                           <InfoRow label="ชื่อ-สกุล" value={investorName} />
                           <InfoRow label="เบอร์โทร" value={investorPhone} />
                           <InfoRow label="รหัสนายทุน" value={investorCode} mono />
+                        </div>
+                      )}
+                      {/* บัตรประชาชนนายทุน */}
+                      {docs.investor_id_card_image && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: '#eff6ff', border: '1.5px solid #93c5fd', borderRadius: 10, marginBottom: 14 }}>
+                          <div
+                            onClick={() => setPreview(docs.investor_id_card_image.startsWith('/') ? docs.investor_id_card_image : `/${docs.investor_id_card_image}`)}
+                            style={{ width: 56, height: 56, borderRadius: 8, background: '#dbeafe', border: '1.5px solid #93c5fd', overflow: 'hidden', flexShrink: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {/\.(pdf)$/i.test(docs.investor_id_card_image)
+                              ? <i className="fas fa-file-pdf" style={{ fontSize: 24, color: '#1d4ed8' }}></i>
+                              : <img src={docs.investor_id_card_image.startsWith('/') ? docs.investor_id_card_image : `/${docs.investor_id_card_image}`} alt="id card" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: '#1d4ed8', marginBottom: 2 }}>
+                              <i className="fas fa-id-card" style={{ marginRight: 5 }}></i>บัตรประชาชนนายทุน
+                            </div>
+                            <a href={docs.investor_id_card_image.startsWith('/') ? docs.investor_id_card_image : `/${docs.investor_id_card_image}`}
+                              target="_blank" rel="noreferrer"
+                              style={{ fontSize: 12, color: '#2563eb', textDecoration: 'underline' }}>ดูไฟล์</a>
+                          </div>
                         </div>
                       )}
                       {/* ★ ยอดเงินนายทุน + วันสัญญา (editable) */}
@@ -743,10 +749,13 @@ function Pagination({ total, page, setPage }) {
 // ============================================================
 // CASES TAB
 // ============================================================
+const PENDING_STATUSES_DONE = ['completed', 'cancelled']
+
 function CasesTab({ q, searchField, onOpenCase }) {
   const [cases, setCases] = useState([])
   const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(1)
+  const [pendingOnly, setPendingOnly] = useState(true) // ★ งานค้าง default ON
 
   const fetchCases = useCallback(() => {
     setLoading(true)
@@ -756,9 +765,11 @@ function CasesTab({ q, searchField, onOpenCase }) {
   }, [])
 
   useEffect(() => { fetchCases() }, [fetchCases])
-  useEffect(() => { setPage(1) }, [q, searchField])
+  useEffect(() => { setPage(1) }, [q, searchField, pendingOnly])
 
   const filtered = cases.filter(c => {
+    // ★ งานค้าง filter: ซ่อน completed/cancelled เมื่อเลือก "งานค้าง"
+    if (pendingOnly && PENDING_STATUSES_DONE.includes(c.case_status)) return false
     if (!q) return true
     const lq = q.toLowerCase()
     if (searchField === 'debtor_name') return c.debtor_name?.toLowerCase().includes(lq)
@@ -773,8 +784,29 @@ function CasesTab({ q, searchField, onOpenCase }) {
 
   if (loading) return <div className="empty-state"><i className="fas fa-spinner fa-spin"></i><p>กำลังโหลด...</p></div>
 
+  const pendingCount = cases.filter(c => !PENDING_STATUSES_DONE.includes(c.case_status)).length
+  const allCount = cases.length
+
   return (
     <div>
+      {/* ★ งานค้าง / ทั้งหมด toggle */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+        <button
+          onClick={() => setPendingOnly(true)}
+          style={{ padding: '7px 20px', borderRadius: 20, border: `2px solid ${pendingOnly ? '#e53935' : '#e2e8f0'}`, background: pendingOnly ? '#fdecea' : '#fff', color: pendingOnly ? '#e53935' : '#64748b', fontSize: 13, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <i className="fas fa-clock"></i> งานค้าง
+          <span style={{ background: pendingOnly ? '#e53935' : '#e2e8f0', color: pendingOnly ? '#fff' : '#64748b', borderRadius: 10, padding: '1px 8px', fontSize: 11, fontWeight: 800, marginLeft: 2 }}>{pendingCount}</span>
+        </button>
+        <button
+          onClick={() => setPendingOnly(false)}
+          style={{ padding: '7px 20px', borderRadius: 20, border: `2px solid ${!pendingOnly ? '#2e7d32' : '#e2e8f0'}`, background: !pendingOnly ? '#f0fdf4' : '#fff', color: !pendingOnly ? '#2e7d32' : '#64748b', fontSize: 13, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <i className="fas fa-list"></i> ทั้งหมด
+          <span style={{ background: !pendingOnly ? '#2e7d32' : '#e2e8f0', color: !pendingOnly ? '#fff' : '#64748b', borderRadius: 10, padding: '1px 8px', fontSize: 11, fontWeight: 800, marginLeft: 2 }}>{allCount}</span>
+        </button>
+        <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 4 }}>
+          {pendingOnly ? 'แสดงเฉพาะเคสที่ยังดำเนินการอยู่' : 'แสดงทุกสถานะรวมสำเร็จและยกเลิก'}
+        </span>
+      </div>
       <div style={{ fontSize: 13, color: '#888', marginBottom: 10 }}>
         พบ <strong style={{ color: 'var(--primary)' }}>{filtered.length}</strong> รายการ
       </div>
@@ -1544,6 +1576,185 @@ function DepositRefundTab() {
 }
 
 // ============================================================
+// SLIP LOGS TAB — ประวัติการตรวจสลิป EasySlip ทุกฝ่าย
+// ============================================================
+const SLIP_TYPE_LABEL = {
+  appraisal_fee: 'ค่าประเมิน',
+  bag_fee:       'ค่าปากถุง',
+  advance:       'ค่าหักล่วงหน้า',
+  agent_fee:     'ค่านายหน้า',
+  deposit:       'มัดจำประมูล',
+  general:       'ทั่วไป',
+}
+const BANK_COLOR = {
+  KBANK: '#1a5276', SCB: '#4a148c', KTB: '#1565c0', BBL: '#1b4f8a',
+  BAY: '#f57f17', GSB: '#ec407a', BAAC: '#388e3c', TMB: '#0277bd',
+  CIMB: '#b71c1c', TTB: '#00838f', UOB: '#283593', LH: '#ff6f00',
+}
+
+function SlipLogsTab() {
+  const [logs, setLogs]       = useState([])
+  const [loading, setLoading] = useState(false)
+  const [page, setPage]       = useState(1)
+  const [total, setTotal]     = useState(0)
+  const [filter, setFilter]   = useState('')   // slip_type filter
+  const [preview, setPreview] = useState(null)
+  const LIMIT = 20
+
+  const fetchLogs = useCallback(async (pg = 1, slipType = '') => {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams({ page: pg, limit: LIMIT })
+      if (slipType) params.set('slip_type', slipType)
+      const r = await fetch(`/api/admin/slip/logs?${params}`, { headers: { Authorization: `Bearer ${token()}` } })
+      const d = await r.json()
+      if (d.success) {
+        setLogs(d.logs || [])
+        setTotal(d.total || 0)
+      }
+    } catch (e) { /* ignore */ }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { fetchLogs(page, filter) }, [page, filter, fetchLogs])
+
+  const totalPages = Math.ceil(total / LIMIT)
+
+  const fmtAmount = (n) => n != null ? Number(n).toLocaleString('th-TH', { minimumFractionDigits: 2 }) : '—'
+  const fmtDate = (s) => {
+    if (!s) return '—'
+    try { return new Date(s).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }) } catch { return s }
+  }
+
+  return (
+    <div style={{ padding: '16px 0' }}>
+      {/* Filter row */}
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: '#1e3a5f' }}>
+          <i className="fas fa-history" style={{ marginRight: 6 }}></i>ประวัติสลิปทุกฝ่าย
+          <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 400, color: '#888' }}>({total} รายการ)</span>
+        </div>
+        <select value={filter} onChange={e => { setFilter(e.target.value); setPage(1) }}
+          style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, background: '#fff' }}>
+          <option value="">ประเภทสลิปทั้งหมด</option>
+          {Object.entries(SLIP_TYPE_LABEL).map(([k, v]) => (
+            <option key={k} value={k}>{v}</option>
+          ))}
+        </select>
+        <button onClick={() => fetchLogs(page, filter)}
+          style={{ padding: '6px 14px', background: '#1e3a5f', color: '#fff', border: 'none', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>
+          <i className="fas fa-sync-alt"></i> รีเฟรช
+        </button>
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
+          <i className="fas fa-spinner fa-spin" style={{ fontSize: 24, display: 'block', marginBottom: 8 }}></i>กำลังโหลด...
+        </div>
+      ) : logs.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
+          <i className="fas fa-receipt" style={{ fontSize: 28, display: 'block', marginBottom: 8 }}></i>
+          ยังไม่มีประวัติสลิป
+        </div>
+      ) : (
+        <div>
+          <div className="table-responsive">
+            <table className="table-green" style={{ minWidth: 900 }}>
+              <thead>
+                <tr>
+                  <th style={{ width: 120 }}>วันที่</th>
+                  <th style={{ width: 90 }}>ประเภท</th>
+                  <th style={{ width: 110 }}>ยอด (บาท)</th>
+                  <th>ผู้โอน</th>
+                  <th>ผู้รับ</th>
+                  <th style={{ width: 130 }}>ลูกหนี้ / เคส</th>
+                  <th style={{ width: 110 }}>อัพโหลดโดย</th>
+                  <th style={{ width: 90 }}>TransRef</th>
+                </tr>
+              </thead>
+              <tbody>
+                {logs.map(log => {
+                  const senderBank = (log.sender_bank || '').toUpperCase()
+                  const receiverBank = (log.receiver_bank || '').toUpperCase()
+                  return (
+                    <tr key={log.id}>
+                      <td style={{ fontSize: 12 }}>
+                        <div>{fmtDate(log.transaction_date || log.created_at)}</div>
+                      </td>
+                      <td>
+                        <span style={{
+                          display: 'inline-block', padding: '2px 9px', borderRadius: 12,
+                          background: '#fff3e0', color: '#e65100', fontSize: 11, fontWeight: 700,
+                          border: '1px solid #ffe0b2'
+                        }}>
+                          {SLIP_TYPE_LABEL[log.slip_type] || log.slip_type}
+                        </span>
+                      </td>
+                      <td style={{ fontWeight: 700, color: '#1b5e20', fontSize: 14 }}>
+                        {fmtAmount(log.amount)}
+                        {log.currency && log.currency !== 'THB' && (
+                          <span style={{ fontSize: 10, color: '#888', marginLeft: 4 }}>{log.currency}</span>
+                        )}
+                      </td>
+                      <td style={{ fontSize: 12 }}>
+                        <div style={{ fontWeight: 600 }}>{log.sender_name || '—'}</div>
+                        {senderBank && (
+                          <span style={{ display: 'inline-block', marginTop: 2, padding: '1px 7px', borderRadius: 8, background: BANK_COLOR[senderBank] || '#555', color: '#fff', fontSize: 10, fontWeight: 600 }}>
+                            {log.sender_bank}
+                          </span>
+                        )}
+                        {log.sender_account && <div style={{ fontSize: 10, color: '#999', marginTop: 1 }}>{log.sender_account}</div>}
+                      </td>
+                      <td style={{ fontSize: 12 }}>
+                        <div style={{ fontWeight: 600 }}>{log.receiver_name || '—'}</div>
+                        {receiverBank && (
+                          <span style={{ display: 'inline-block', marginTop: 2, padding: '1px 7px', borderRadius: 8, background: BANK_COLOR[receiverBank] || '#555', color: '#fff', fontSize: 10, fontWeight: 600 }}>
+                            {log.receiver_bank}
+                          </span>
+                        )}
+                        {log.receiver_account && <div style={{ fontSize: 10, color: '#999', marginTop: 1 }}>{log.receiver_account}</div>}
+                      </td>
+                      <td style={{ fontSize: 12 }}>
+                        {log.debtor_name && <div style={{ fontWeight: 600, color: '#1e3a5f' }}>{log.debtor_name}</div>}
+                        {log.case_code && <div style={{ color: '#888', fontSize: 11 }}>เคส: {log.case_code}</div>}
+                        {log.loan_request_id && !log.debtor_name && <div style={{ color: '#aaa', fontSize: 11 }}>LR#{log.loan_request_id}</div>}
+                      </td>
+                      <td style={{ fontSize: 12, color: '#555' }}>{log.uploaded_by_name || '—'}</td>
+                      <td>
+                        {log.trans_ref ? (
+                          <span style={{ fontSize: 10, color: '#7c3aed', background: '#ede9fe', borderRadius: 6, padding: '2px 6px', fontWeight: 600, wordBreak: 'break-all' }}>
+                            {log.trans_ref}
+                          </span>
+                        ) : '—'}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 16 }}>
+              <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}
+                style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #d1d5db', background: page <= 1 ? '#f9fafb' : '#fff', cursor: page <= 1 ? 'not-allowed' : 'pointer', fontSize: 13 }}>
+                ← ก่อนหน้า
+              </button>
+              <span style={{ lineHeight: '32px', fontSize: 13, color: '#555' }}>หน้า {page}/{totalPages}</span>
+              <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}
+                style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #d1d5db', background: page >= totalPages ? '#f9fafb' : '#fff', cursor: page >= totalPages ? 'not-allowed' : 'pointer', fontSize: 13 }}>
+                ถัดไป →
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ============================================================
 // MAIN PAGE
 // ============================================================
 export default function AccountingPage() {
@@ -1564,6 +1775,7 @@ export default function AccountingPage() {
     { id: 'investors', label: 'นายทุน', icon: 'fa-hand-holding-usd' },
     { id: 'expiry', label: 'ครบกำหนดสัญญา', icon: 'fa-calendar-exclamation' },
     { id: 'deposit_refund', label: 'สลิปมัดจำรอคืน', icon: 'fa-receipt' },
+    { id: 'slip_logs',     label: 'ประวัติสลิป',    icon: 'fa-history' },
   ]
 
   const statCards = [
@@ -1639,6 +1851,7 @@ export default function AccountingPage() {
       {tab === 'investors' && <InvestorsTab q={q} searchField={searchField} onOpenCase={setSelectedCase} />}
       {tab === 'expiry' && <ContractExpiryTab q={q} onOpenCase={setSelectedCase} />}
       {tab === 'deposit_refund' && <DepositRefundTab />}
+      {tab === 'slip_logs'     && <SlipLogsTab />}
 
       {/* Case Modal */}
       {selectedCase && <CaseModal caseRow={selectedCase} onClose={() => setSelectedCase(null)} />}

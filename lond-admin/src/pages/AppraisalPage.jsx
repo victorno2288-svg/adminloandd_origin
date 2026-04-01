@@ -437,11 +437,40 @@ export default function AppraisalPage() {
   }
 
   // stat card click → filter
+  // 3 กลุ่มงานค้าง ตาม transcript: รอเช็กราคา / รอตรวจเล่ม / รอประเมิน + ประวัติทั้งหมด
   const statCards = [
-    { key: 'outside', label: 'ประเมินนอก', value: stats.outside_count || 0, color: '#888', icon: 'fa-file-alt' },
-    { key: 'inside', label: 'ประเมินใน', value: stats.inside_count || 0, color: '#27ae60', icon: 'fa-file-alt' },
-    { key: 'check_price', label: 'รอเช็คราคา', value: stats.check_price_count || 0, color: '#f39c12', icon: 'fa-file-alt' },
-    { key: '', label: 'ประวัติงาน', value: stats.total_count || 0, color: '#e74c3c', icon: 'fa-file-alt' },
+    {
+      key: 'check_price',
+      label: 'รอเช็กราคา',
+      desc: 'check price ยังไม่มีผล',
+      value: stats.check_price_count || 0,
+      color: '#f39c12',
+      icon: 'fa-search-dollar'
+    },
+    {
+      key: 'pending_review',
+      label: 'รอตรวจเล่ม',
+      desc: 'ส่งบริษัทประเมินแล้ว รอผลเล่ม',
+      value: stats.pending_review_count || 0,
+      color: '#8e44ad',
+      icon: 'fa-book-open'
+    },
+    {
+      key: 'appraisal_scheduled',
+      label: 'รอประเมิน',
+      desc: 'นัดลงพื้นที่แล้ว รอดำเนินการ',
+      value: stats.appraisal_scheduled_count || 0,
+      color: '#2980b9',
+      icon: 'fa-calendar-check'
+    },
+    {
+      key: '',
+      label: 'ประวัติทั้งหมด',
+      desc: 'งานทุกสถานะ',
+      value: stats.total_count || 0,
+      color: '#e74c3c',
+      icon: 'fa-history'
+    },
   ]
 
   return (

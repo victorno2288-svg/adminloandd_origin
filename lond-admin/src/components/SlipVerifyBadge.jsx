@@ -1,3 +1,3 @@
-// SlipVerifyBadge.jsx — QR scanning system removed
-export default function SlipVerifyBadge() { return null }
+// SlipVerifyBadge.jsx — re-exports จาก SlipVerifier.jsx
+export { default, SlipVerifier } from './SlipVerifier'
 export function useSlipVerify() { return { runVerify: () => {}, verifyResult: null, verifying: false } }

@@ -6,7 +6,7 @@ const PERMISSIONS = {
   super_admin: '*',
   manager: '*',
 
-  // ฝ่ายขาย — เห็น: แชท + รายการเคส + นายหน้า เท่านั้น
+  // ฝ่ายขาย — เห็น: แชท + รายการเคส + นายหน้า + แดชบอร์ดรวม
   sales: [
     '/dashboard',
     '/calendar',
@@ -15,54 +15,58 @@ const PERMISSIONS = {
     '/agents',
   ],
 
-  // ฝ่ายประเมิน — เห็น: หน้าประเมิน + ฟอร์มลูกหนี้ (edit only)
+  // ฝ่ายประเมิน — เห็น: หน้าประเมิน + ฟอร์มลูกหนี้ (edit only) + แดชบอร์ดรวม
   appraisal: [
     '/dashboard',
     '/calendar',
     '/appraisal',
-    '/sales',   // ★ เข้าฟอร์มลูกหนี้ได้ (อัพโหลดรูป + ดูนัด)
+    '/sales',   // ★ เข้าฟอร์มลูกหนี้ได้ (อัพโหลดรูป + ดูนัด) + แดชบอร์ดรวม (/sales/dashboard)
   ],
 
-  // ฝ่ายอนุมัติสินเชื่อ — เห็น: ผลประเมิน + อนุมัติ + นายทุน + ประมูล + ฟอร์มลูกหนี้
+  // ฝ่ายอนุมัติสินเชื่อ — เห็น: ผลประเมิน + อนุมัติ + นายทุน + ประมูล + ฟอร์มลูกหนี้ + แดชบอร์ดรวม
   approval: [
     '/dashboard',
     '/calendar',
     '/approval',
     '/appraisal',
-    '/sales',   // ★ เข้าฟอร์มลูกหนี้ได้ (ดูตารางวงเงิน + ผลประเมิน)
+    '/sales',   // ★ เข้าฟอร์มลูกหนี้ได้ (ดูตารางวงเงิน + ผลประเมิน) + แดชบอร์ดรวม (/sales/dashboard)
     '/investors', '/investor-auction-history',
     '/auction',
   ],
 
-  // ฝ่ายนิติกรรม — เห็น: นิติกรรม + นายทุน + ยกเลิกเคส
+  // ฝ่ายนิติกรรม — เห็น: นิติกรรม + นายทุน + ยกเลิกเคส + แดชบอร์ดรวม
   legal: [
     '/dashboard',
     '/calendar',
     '/legal',
+    '/sales',   // ★ แดชบอร์ดรวม (/sales/dashboard)
     '/investors',
     '/cancellation',
   ],
 
-  // ฝ่ายออกสัญญา — เห็น: ออกสัญญา + ยกเลิกเคส
+  // ฝ่ายออกสัญญา — เห็น: ออกสัญญา + ยกเลิกเคส + แดชบอร์ดรวม
   issuing: [
     '/dashboard',
     '/calendar',
     '/issuing',
+    '/sales',   // ★ แดชบอร์ดรวม (/sales/dashboard)
     '/cancellation',
   ],
 
-  // ฝ่ายบัญชี — เห็น: บัญชีเท่านั้น
+  // ฝ่ายบัญชี — เห็น: บัญชี + แดชบอร์ดรวม
   accounting: [
     '/dashboard',
     '/calendar',
     '/accounting',
+    '/sales',   // ★ แดชบอร์ดรวม (/sales/dashboard)
   ],
 
-  // ฝ่ายประมูลทรัพย์
+  // ฝ่ายประมูลทรัพย์ + แดชบอร์ดรวม
   auction: [
     '/dashboard',
     '/calendar',
     '/auction',
+    '/sales',   // ★ แดชบอร์ดรวม (/sales/dashboard)
     '/investors', '/investor-auction-history',
   ],
 }

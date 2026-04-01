@@ -420,6 +420,28 @@ export default function LegalPage() {
                       onMouseLeave={e => { e.currentTarget.style.background = '#eaf4fc'; e.currentTarget.style.color = '#2980b9' }}>
                       <i className="fas fa-file-alt"></i> เอกสาร
                     </button>
+                    {/* ── Google Maps: ทรัพย์ ── */}
+                    {d.location_url && (
+                      <button
+                        onClick={() => window.open(d.location_url, '_blank')}
+                        title="ดูแผนที่ทรัพย์"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 6, border: '1px solid #e53935', background: '#fdecea', color: '#e53935', fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = '#e53935'; e.currentTarget.style.color = '#fff' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = '#fdecea'; e.currentTarget.style.color = '#e53935' }}>
+                        <i className="fas fa-map-marker-alt"></i> ทรัพย์
+                      </button>
+                    )}
+                    {/* ── Google Maps: สำนักงานที่ดิน ── */}
+                    {d.land_office && (
+                      <button
+                        onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(d.land_office)}`, '_blank')}
+                        title={`นำทางไป${d.land_office}`}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 6, border: '1px solid #388e3c', background: '#e8f5e9', color: '#388e3c', fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = '#388e3c'; e.currentTarget.style.color = '#fff' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = '#e8f5e9'; e.currentTarget.style.color = '#388e3c' }}>
+                        <i className="fas fa-map"></i> ที่ดิน
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

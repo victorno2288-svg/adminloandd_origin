@@ -434,126 +434,85 @@ export default function IssuingEditPage() {
               </div>
             </div>
 
-            <div className="card" style={{ padding: 24, marginBottom: 20 }}>
-              <h3 style={{ margin: '0 0 20px', fontSize: 16, fontWeight: 700 }}>ข้อมูลทรัพย์</h3>
-
-              <div style={{ marginBottom: 16 }}>
-                <label style={{ fontWeight: 600, fontSize: 12, color: '#6b7280', display: 'block', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.4px' }}>ทรัพย์ติดภาระหรือไม่</label>
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 18px', borderRadius: 10, fontWeight: 700, fontSize: 14,
-                  background: caseData.has_obligation === 'yes' ? '#fee2e2' : '#dcfce7',
-                  color: caseData.has_obligation === 'yes' ? '#b91c1c' : '#15803d',
-                  border: `2px solid ${caseData.has_obligation === 'yes' ? '#fca5a5' : '#86efac'}`,
-                }}>
-                  <i className={`fas ${caseData.has_obligation === 'yes' ? 'fa-exclamation-circle' : 'fa-check-circle'}`}></i>
-                  {caseData.has_obligation === 'yes'
-                    ? `ติดภาระ${caseData.obligation_count ? ` (${caseData.obligation_count} รายการ)` : ''}`
-                    : 'ไม่ติดภาระ'}
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 16 }}>
-                <div className="form-group">
-                  <label>จังหวัด</label>
-                  <input type="text" value={caseData.province || '-'} readOnly style={{ background: '#f5f5f5' }} />
-                </div>
-                <div className="form-group">
-                  <label>อำเภอ</label>
-                  <input type="text" value={caseData.district || '-'} readOnly style={{ background: '#f5f5f5' }} />
-                </div>
-                <div className="form-group">
-                  <label>ตำบล</label>
-                  <input type="text" value={caseData.subdistrict || '-'} readOnly style={{ background: '#f5f5f5' }} />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                  <i className="fas fa-map-marker-alt" style={{ color: '#e53935', fontSize: 13 }}></i>
-                  โลเคชั่น
-                  <span style={{ fontSize: 10, color: '#6b7280', fontWeight: 400 }}>(กรอกโดยฝ่ายขาย)</span>
-                  <button type="button"
-                    onClick={() => window.open('https://landsmaps.dol.go.th/#', '_blank')}
-                    style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, border: 'none', background: 'linear-gradient(135deg,#0369a1,#0284c7)', color: '#fff', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                    <i className="fas fa-map"></i> ค้นหา landsmaps
-                  </button>
-                </label>
-                <input type="url" value={caseData.location_url || ''} readOnly
-                  style={{ background: '#f9fafb', color: caseData.location_url ? '#111827' : '#9ca3af', cursor: 'default' }}
-                  placeholder="ฝ่ายขายยังไม่ได้กรอกโลเคชั่น" />
-                <MapPreview url={caseData.location_url} label="โลเคชั่นทรัพย์" />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                <div className="form-group">
-                  <label>เลขโฉนด</label>
-                  <input type="text" value={caseData.deed_number || '-'} readOnly style={{ background: '#f5f5f5' }} />
-                </div>
-                <div className="form-group">
-                  <label>พื้นที่</label>
-                  <input type="text" value={caseData.land_area ? `${caseData.land_area} ตร.วา` : '-'} readOnly style={{ background: '#f5f5f5' }} />
-                </div>
-              </div>
-
-
-              {/* ===== เปรียบเทียบรูปทรัพย์ ===== */}
-              <div style={{ marginTop: 16, padding: 16, background: '#f8faff', borderRadius: 10, border: '1.5px solid #c7d2fe' }}>
-                <h4 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 700, color: '#3730a3', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <i className="fas fa-images"></i> เปรียบเทียบรูปทรัพย์
-                  <span style={{ fontSize: 11, fontWeight: 400, color: '#6b7280' }}>— ทุกแผนกมองเห็น</span>
+            {/* ★ ผลอนุมัติจากฝ่ายอนุมัติสินเชื่อ */}
+            {(caseData.approved_credit || caseData.approval_status) && (
+              <div className="card" style={{ padding: 20, marginBottom: 20, borderTop: '3px solid #1565c0', border: '1px solid #b3d9f7', background: '#f0f9ff' }}>
+                <h4 style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 700, color: '#1565c0' }}>
+                  <i className="fas fa-check-circle" style={{ marginRight: 8 }}></i>ผลอนุมัติจากฝ่ายอนุมัติสินเชื่อ
                 </h4>
+                <p style={{ margin: '0 0 14px', fontSize: 12, color: '#888' }}>ข้อมูลที่ฝ่ายอนุมัติกรอกไว้ — แก้ไขได้ที่ฝ่ายอนุมัติเท่านั้น</p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div style={{ background: '#f0fdf4', borderRadius: 8, padding: 12, border: '1px solid #86efac' }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: '#15803d', marginBottom: 8 }}>
-                      <i className="fas fa-user-tie" style={{ marginRight: 5 }}></i>รูปจากฝ่ายขาย ({salesPropertyPhotos.length} รูป)
+                  {caseData.approval_status && (
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#888' }}>สถานะอนุมัติ</div>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: caseData.approval_status === 'approved' ? '#2e7d32' : caseData.approval_status === 'cancelled' ? '#c62828' : '#f57c00' }}>
+                        {caseData.approval_status === 'approved' ? '✓ อนุมัติแล้ว' : caseData.approval_status === 'cancelled' ? '✗ ยกเลิก' : '⏳ รอพิจารณา'}
+                      </span>
                     </div>
-                    {salesPropertyPhotos.length > 0 ? (
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 6 }}>
-                        {salesPropertyPhotos.map((src, i) => { const f = src.startsWith('/') ? src : `/${src}`; const isPdf = src.toLowerCase().includes('.pdf'); return (
-                          <div key={i} style={{ border: '1.5px solid #86efac', borderRadius: 8, overflow: 'hidden', cursor: 'pointer' }} onClick={() => window.open(f, '_blank')}>
-                            {isPdf ? <div style={{ width: '100%', height: 90, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#fff5f5', gap: 4 }}><i className="fas fa-file-pdf" style={{ fontSize: 24, color: '#e53935' }}></i><span style={{ fontSize: 9, color: '#e53935', fontWeight: 600 }}>PDF</span></div>
-                              : <img src={f} alt={`s-${i}`} style={{ width: '100%', height: 90, objectFit: 'cover' }} onError={e => { e.target.style.display = 'none' }} />}
-                          </div>
-                        )})}
-                      </div>
-                    ) : <span style={{ fontSize: 12, color: '#999' }}>ยังไม่มีรูปจากฝ่ายขาย</span>}
-                  </div>
-                  <div style={{ background: '#f3e5f5', borderRadius: 8, padding: 12, border: '1px solid #ce93d8' }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: '#7b1fa2', marginBottom: 8 }}>
-                      <i className="fas fa-search-location" style={{ marginRight: 5 }}></i>รูปจากฝ่ายประเมิน – เข้าพื้นที่ ({appraisalImages.length} รูป)
+                  )}
+                  {caseData.approved_credit && (
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#888' }}>วงเงินที่อนุมัติ</div>
+                      <span style={{ fontSize: 16, fontWeight: 700, color: '#1565c0' }}>
+                        {Number(caseData.approved_credit).toLocaleString('th-TH')} บาท
+                      </span>
                     </div>
-                    {appraisalImages.length > 0 ? (
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 6 }}>
-                        {appraisalImages.map((src, i) => { const f = src.startsWith('/') ? src : `/${src}`; const isPdf = src.toLowerCase().includes('.pdf'); return (
-                          <div key={i} style={{ border: '1.5px solid #ce93d8', borderRadius: 8, overflow: 'hidden', cursor: 'pointer' }} onClick={() => window.open(f, '_blank')}>
-                            {isPdf ? <div style={{ width: '100%', height: 90, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#fff5f5', gap: 4 }}><i className="fas fa-file-pdf" style={{ fontSize: 24, color: '#e53935' }}></i><span style={{ fontSize: 9, color: '#e53935', fontWeight: 600 }}>PDF</span></div>
-                              : <img src={f} alt={`a-${i}`} style={{ width: '100%', height: 90, objectFit: 'cover' }} onError={e => { e.target.style.display = 'none' }} />}
-                          </div>
-                        )})}
-                      </div>
-                    ) : <span style={{ fontSize: 12, color: '#999' }}>ยังไม่มีรูปจากฝ่ายประเมิน</span>}
-                  </div>
+                  )}
+                  {caseData.interest_per_year && (
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#888' }}>ดอกเบี้ย/ปี</div>
+                      <span style={{ fontSize: 13, fontWeight: 600 }}>{caseData.interest_per_year}%</span>
+                    </div>
+                  )}
+                  {caseData.operation_fee && (
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#888' }}>ค่าดำเนินการ</div>
+                      <span style={{ fontSize: 13, fontWeight: 600 }}>{Number(caseData.operation_fee).toLocaleString('th-TH')} บาท</span>
+                    </div>
+                  )}
                 </div>
               </div>
+            )}
 
-              {caseData.appraisal_book_image && (
-                <div style={{ marginTop: 12 }}>
-                  <label style={{ fontSize: 13, fontWeight: 600, color: '#e65100' }}>
-                    <i className="fas fa-book" style={{ marginRight: 4 }}></i>
-                    เล่มประเมิน
-                  </label>
-                  <div style={{ marginTop: 6 }}>
-                    <a href={caseData.appraisal_book_image.startsWith('/') ? caseData.appraisal_book_image : `/${caseData.appraisal_book_image}`}
+            {/* ★ ตารางวงเงิน (จากฝ่ายอนุมัติ) */}
+            {caseData.credit_table_file && (
+              <div className="card" style={{ padding: '14px 16px', marginBottom: 20, background: 'linear-gradient(135deg, #e3f2fd, #f0f9ff)', border: '2px solid #1565c0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                  <i className="fas fa-table" style={{ color: '#1565c0', fontSize: 16 }}></i>
+                  <span style={{ fontWeight: 700, fontSize: 13, color: '#1565c0' }}>ตารางวงเงิน (จากฝ่ายอนุมัติ)</span>
+                  <span style={{ fontSize: 11, background: '#fff', color: '#1565c0', padding: '2px 8px', borderRadius: 10, border: '1px solid #90caf9', fontWeight: 500 }}>
+                    <i className="fas fa-share-alt" style={{ marginRight: 4 }}></i>โหลดส่งให้ลูกค้าในแชทได้เลย
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', padding: '8px 12px', borderRadius: 8, border: '1px solid #bbdefb' }}>
+                  <i className="fas fa-file-excel" style={{ color: '#1e7e34', fontSize: 20, flexShrink: 0 }}></i>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, color: '#555', wordBreak: 'break-all', fontWeight: 500 }}>
+                      {caseData.credit_table_file.split('/').pop()}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    <a
+                      href={caseData.credit_table_file.startsWith('/') ? caseData.credit_table_file : `/${caseData.credit_table_file}`}
                       target="_blank" rel="noreferrer"
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', background: '#e65100', color: '#fff', borderRadius: 6, fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>
-                      <i className="fas fa-file-alt"></i> เปิดดูเล่มประเมิน
+                      style={{ padding: '6px 12px', background: '#e3f2fd', color: '#1565c0', borderRadius: 6, fontSize: 12, fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap', border: '1px solid #90caf9' }}
+                    >
+                      <i className="fas fa-eye" style={{ marginRight: 4 }}></i>เปิดดู
+                    </a>
+                    <a
+                      href={caseData.credit_table_file.startsWith('/') ? caseData.credit_table_file : `/${caseData.credit_table_file}`}
+                      download
+                      style={{ padding: '6px 12px', background: '#1565c0', color: '#fff', borderRadius: 6, fontSize: 12, fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap' }}
+                    >
+                      <i className="fas fa-download" style={{ marginRight: 4 }}></i>โหลดไฟล์
                     </a>
                   </div>
                 </div>
-              )}
+              </div>
+            )}
 
-              {/* ===== VDO ทรัพย์สิน ===== */}
-              <PropertyVideoPanel lrId={caseData?.loan_request_id} token={token()} canUpload={false} />
-            </div>
+            {/* ★ สร้างเอกสารอัตโนมัติ (ย้ายมาคอลัมน์ซ้าย) */}
+            <DocGeneratorPanel ref={docPanelRef} caseData={caseData} caseId={id} />
 
           </div>
 
@@ -679,11 +638,6 @@ export default function IssuingEditPage() {
 
             {/* ★ เอกสารประกอบ */}
             <ChecklistDocsPanel caseData={caseData} lrId={caseData.loan_request_id} token={token()} onDocsUpdated={(field, paths) => setCaseData(prev => ({ ...prev, [field]: JSON.stringify(paths) }))} canUpload={true} />
-
-            {/* ★ สร้างเอกสารอัตโนมัติ */}
-            <DocGeneratorPanel ref={docPanelRef} caseData={caseData} caseId={id} />
-
-            {/* เอกสารออกสัญญาทั้งหมดอยู่ใน DocGeneratorPanel แล้ว */}
 
             {/* ★ กระดิ่งแจ้งฝ่ายต่างๆ */}
             <div style={{ marginBottom: 14 }}>

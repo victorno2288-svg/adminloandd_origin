@@ -5,6 +5,7 @@ import '../styles/sales.css'
 import CancelCaseButton from '../components/CancelCaseButton'
 import MapPreview from '../components/MapPreview'
 import PropertyVideoPanel from '../components/PropertyVideoPanel'
+import SlipVerifier from '../components/SlipVerifier'
 
 const token = () => localStorage.getItem('loandd_admin')
 const API = '/api/admin/sales'
@@ -3121,65 +3122,12 @@ export default function SalesFormPage() {
                     <div style={{ fontWeight: 700, fontSize: 13, color: '#e65100', marginBottom: 10 }}>
                       <i className="fas fa-receipt" style={{ marginRight: 6 }}></i> สลิปค่าประเมิน
                     </div>
-                    {/* แสดงชื่อไฟล์ที่เลือก */}
-                    {slipFiles.length > 0 && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, padding: '8px 12px', background: '#fff9c4', borderRadius: 8, border: '1px solid #fff176' }}>
-                        <i className="fas fa-file-image" style={{ color: '#f57f17', fontSize: 18 }}></i>
-                        <div style={{ flex: 1, minWidth: 0, fontSize: 12, color: '#555', wordBreak: 'break-all' }}>
-                          {slipFiles[0].name}
-                        </div>
-                        <button type="button"
-                          onClick={() => setSlipFiles([])}
-                          style={{ padding: '3px 8px', background: '#ffccbc', border: 'none', borderRadius: 5, fontSize: 11, cursor: 'pointer', color: '#bf360c' }}>
-                          ✕ ลบ
-                        </button>
-                      </div>
-                    )}
-                    <label style={{
-                      display: 'block', cursor: 'pointer',
-                      background: slipFiles.length > 0 ? '#fffde7' : '#fffff0',
-                      border: `2px dashed ${slipFiles.length > 0 ? '#f59e0b' : '#fde68a'}`,
-                      borderRadius: 10, padding: 10, transition: 'border-color 0.2s',
-                    }}>
-                      <input type="file" accept="image/*,.pdf" id="create-slip-file-input" style={{ display: 'none' }}
-                        onChange={e => {
-                          const f = e.target.files[0]
-                          if (f) { setSlipFiles([f]) }
-                          e.target.value = ''
-                        }} />
-                      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                        <div style={{
-                          width: 56, height: 56, flexShrink: 0, borderRadius: 8, overflow: 'hidden',
-                          background: '#fef3c7', border: '1px solid #fde68a',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
-                        }}>
-                          {slipFiles[0] && slipFiles[0].type !== 'application/pdf'
-                            ? <img src={URL.createObjectURL(slipFiles[0])} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            : slipFiles[0]
-                              ? <i className="fas fa-file-pdf" style={{ fontSize: 22, color: '#d97706' }}></i>
-                              : <i className="fas fa-receipt" style={{ fontSize: 22, color: '#d97706' }}></i>
-                          }
-                          {slipFiles.length > 0 && (
-                            <button type="button"
-                              onClick={e => { e.preventDefault(); e.stopPropagation(); setSlipFiles([]) }}
-                              style={{ position: 'absolute', top: 2, right: 2, width: 16, height: 16, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff', fontSize: 9, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, zIndex: 2 }}
-                              title="ลบ">✕</button>
-                          )}
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: '#92400e' }}>
-                            <i className="fas fa-paperclip" style={{ marginRight: 4 }}></i>
-                            {slipFiles.length > 0 ? 'เปลี่ยนสลิป' : 'แนบสลิปค่าประเมิน'}
-                          </div>
-                          <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>
-                            {slipFiles.length > 0
-                              ? <><span style={{ color: '#16a34a', fontWeight: 600 }}>✓ เลือกแล้ว</span> — {slipFiles[0].name}</>
-                              : 'รูปภาพ / PDF'
-                            }
-                          </div>
-                        </div>
-                      </div>
-                    </label>
+                    <SlipVerifier
+                      slipType="appraisal_fee"
+                      loanRequestId={id}
+                      onConfirm={file => setSlipFiles(file ? [file] : [])}
+                      label="แนบสลิปค่าประเมิน"
+                    />
                     {/* วันที่ชำระ */}
                     <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                       <label style={{ fontSize: 12, fontWeight: 700, color: '#e65100', whiteSpace: 'nowrap' }}>
@@ -3223,62 +3171,24 @@ export default function SalesFormPage() {
                     })() : (
                       <p style={{ margin: '0 0 10px', fontSize: 12, color: '#bbb' }}>ยังไม่มีสลิปค่าประเมิน</p>
                     )}
-                    <label style={{
-                      display: 'block', cursor: uploadingSlip ? 'default' : 'pointer', marginBottom: 8,
-                      background: slipFiles.length > 0 ? '#fffde7' : '#fffff0',
-                      border: `2px dashed ${slipFiles.length > 0 ? '#f59e0b' : '#fde68a'}`,
-                      borderRadius: 10, padding: 10, transition: 'border-color 0.2s',
-                    }}>
-                      <input type="file" accept="image/*,.pdf" multiple id="slip-file-input" style={{ display: 'none' }}
-                        disabled={uploadingSlip}
-                        onChange={e => {
-                          const files = Array.from(e.target.files)
-                          setSlipFiles(files)
-                          setSlipMsg('')
-                          e.target.value = ''
-                        }} />
-                      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                        <div style={{
-                          width: 56, height: 56, flexShrink: 0, borderRadius: 8, overflow: 'hidden',
-                          background: '#fef3c7', border: '1px solid #fde68a',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
-                        }}>
-                          {slipFiles[0] && slipFiles[0].type !== 'application/pdf'
-                            ? <img src={URL.createObjectURL(slipFiles[0])} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            : slipFiles[0]
-                              ? <i className="fas fa-file-pdf" style={{ fontSize: 22, color: '#d97706' }}></i>
-                              : <i className="fas fa-receipt" style={{ fontSize: 22, color: '#d97706' }}></i>
-                          }
-                          {slipFiles.length > 0 && !uploadingSlip && (
-                            <button type="button"
-                              onClick={e => { e.preventDefault(); e.stopPropagation(); setSlipFiles([]); setSlipMsg('') }}
-                              style={{ position: 'absolute', top: 2, right: 2, width: 16, height: 16, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff', fontSize: 9, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, zIndex: 2 }}
-                              title="ลบ">✕</button>
-                          )}
-                          {uploadingSlip && (
-                            <div style={{ position: 'absolute', inset: 0, background: 'rgba(245,127,23,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <i className="fas fa-spinner fa-spin" style={{ color: '#fff', fontSize: 18 }}></i>
-                            </div>
-                          )}
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: '#92400e' }}>
-                            <i className="fas fa-paperclip" style={{ marginRight: 4 }}></i>
-                            {uploadingSlip ? 'กำลังอัพโหลด...' : slipFiles.length > 0 ? `เลือกแล้ว ${slipFiles.length} ไฟล์ — คลิกเพื่อเปลี่ยน` : ((caseInfo.case_slip_image || caseInfo.slip_image) ? 'เปลี่ยนสลิป' : 'แนบสลิป')}
-                          </div>
-                          <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>
-                            {slipFiles.length > 0
-                              ? <span style={{ color: '#16a34a', fontWeight: 600 }}>✓ พร้อมอัพโหลด</span>
-                              : 'รูปภาพ / PDF'
-                            }
-                          </div>
-                        </div>
-                      </div>
-                    </label>
-                    <button onClick={handleUploadSlip} disabled={!slipFiles.length || uploadingSlip}
-                      style={{ padding: '6px 14px', background: slipFiles.length ? '#f57f17' : '#bdbdbd', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: slipFiles.length ? 'pointer' : 'not-allowed', opacity: slipFiles.length ? 1 : 0.6 }}>
-                      {uploadingSlip ? <><i className="fas fa-spinner fa-spin"></i> กำลังอัพโหลด...</> : <><i className="fas fa-upload" style={{ marginRight: 4 }}></i>อัพโหลด</>}
-                    </button>
+                    <SlipVerifier
+                      slipType="appraisal_fee"
+                      loanRequestId={caseInfo?.loan_request_id || id}
+                      caseId={caseInfo?.case_id}
+                      currentSrc={caseInfo?.case_slip_image || caseInfo?.slip_image}
+                      onConfirm={(file, verifyData) => {
+                        setSlipFiles(file ? [file] : [])
+                        setSlipMsg('')
+                      }}
+                      label="อัพโหลดสลิปค่าประเมิน"
+                      disabled={uploadingSlip}
+                    />
+                    {slipFiles.length > 0 && (
+                      <button onClick={handleUploadSlip} disabled={uploadingSlip}
+                        style={{ marginTop: 8, padding: '6px 14px', background: '#f57f17', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                        {uploadingSlip ? <><i className="fas fa-spinner fa-spin"></i> กำลังอัพโหลด...</> : <><i className="fas fa-upload" style={{ marginRight: 4 }}></i>อัพโหลด</>}
+                      </button>
+                    )}
                     {slipMsg && <p style={{ marginTop: 6, fontSize: 12, color: slipMsg.includes('✅') ? '#2e7d32' : '#c62828', margin: '6px 0 0' }}>{slipMsg}</p>}
 
                     {/* ★ สถานะชำระ — dropdown ให้ฝ่ายขายติ๊กเองได้ */}

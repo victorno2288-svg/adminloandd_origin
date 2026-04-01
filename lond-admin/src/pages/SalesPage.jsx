@@ -832,6 +832,17 @@ export default function SalesPage() {
         >
           <i className="fas fa-chart-line"></i> KPI Dashboard
         </button>
+        <button
+          onClick={() => navigate('/sales/dashboard')}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '7px 14px', borderRadius: 8, border: '1.5px solid #e65100',
+            background: '#fff3e0', color: '#e65100', fontSize: 12, fontWeight: 700,
+            cursor: 'pointer'
+          }}
+        >
+          <i className="fas fa-chart-bar"></i> แดชบอร์ดฝ่ายขาย
+        </button>
       </div>
 
       {/* ===== Filter Row: dropdown + search + OCR + ปุ่มเพิ่ม ===== */}

@@ -112,7 +112,7 @@ function extractCustomerInfo(text) {
 //     หรือ conversation ที่ assign ตรงให้ตัวเอง (assigned_to)
 //   - ฝ่ายอื่น → เห็นเฉพาะที่ assign ตรง
 exports.getConversations = (req, res) => {
-  const { status, platform, search, page, tag_id, show_dead } = req.query;
+  const { status, platform, search, page, tag_id, show_dead, pending_work } = req.query;
   const limit = 30;
   const offset = ((parseInt(page) || 1) - 1) * limit;
   const user = req.user; // { id, username, department } จาก authMiddleware
@@ -145,8 +145,8 @@ exports.getConversations = (req, res) => {
     params.push(platform);
   }
   if (search) {
-    where += ' AND (c.customer_name LIKE ? OR c.customer_phone LIKE ? OR c.last_message_text LIKE ?)';
-    params.push('%' + search + '%', '%' + search + '%', '%' + search + '%');
+    where += ' AND (c.customer_name LIKE ? OR c.customer_line_name LIKE ? OR c.customer_phone LIKE ? OR c.last_message_text LIKE ?)';
+    params.push('%' + search + '%', '%' + search + '%', '%' + search + '%', '%' + search + '%');
   }
   if (tag_id && tag_id !== 'all') {
     if (tag_id === 'none') {
@@ -155,6 +155,12 @@ exports.getConversations = (req, res) => {
       where += ' AND c.tag_id = ?';
       params.push(parseInt(tag_id));
     }
+  }
+
+  // งานค้าง filter — เฉพาะ รอข้อมูล + เข้าเกณฑ์ + ติดภาระ (หรือไม่มีแท็ก)
+  if (pending_work === '1') {
+    extraJoin += ' LEFT JOIN chat_tags ct_pw ON ct_pw.id = c.tag_id';
+    where += " AND (c.tag_id IS NULL OR ct_pw.name IN ('รอข้อมูล', 'เข้าเกณฑ์', 'ติดภาระ'))";
   }
 
   // Dead leads filter
@@ -240,8 +246,21 @@ exports.getConversationDetail = (req, res) => {
   db.query(
     'SELECT c.*, au.username as assigned_username, ' +
     'ct.name as tag_name, ct.bg_color as tag_bg_color, ct.text_color as tag_text_color, ' +
+    'cf.flow_name as active_flow_name, cf.ai_system_prompt as active_flow_prompt, ' +
     'lr.debtor_code, lr.contact_name, lr.status as loan_request_status, ' +
     'lr.marital_status, lr.property_type, lr.province, lr.desired_amount, ' +
+    // ── เอกสารและรูปภาพทั้งหมด (สำหรับ DocSlotsPopup ในหน้าแชท) ──
+    'lr.deed_images, lr.images as lr_images, lr.appraisal_images, lr.appraisal_book_image, ' +
+    // Checklist — สถานะสมรส
+    'lr.house_reg_book, lr.name_change_doc, lr.divorce_doc, ' +
+    'lr.spouse_id_card, lr.spouse_reg_copy, lr.marriage_cert, ' +
+    'lr.borrower_id_card, lr.single_cert, lr.death_cert, lr.will_court_doc, lr.testator_house_reg, ' +
+    // Checklist — เอกสารทรัพย์
+    'lr.deed_copy, lr.building_permit, lr.house_reg_prop, lr.sale_contract, lr.debt_free_cert, ' +
+    'lr.blueprint, lr.property_photos, lr.land_tax_receipt, ' +
+    // Checklist — อื่นๆ (condo / land / shophouse)
+    'lr.condo_title_deed, lr.condo_location_map, lr.common_fee_receipt, lr.floor_plan, ' +
+    'lr.location_sketch_map, lr.land_use_cert, lr.rental_contract, lr.business_reg, ' +
     /* NOTE: columns ต่อไปนี้ถูก comment ออกเพราะรอ migration:
        - lr.pipeline_stage, lr.check_price_*, lr.appraisal_* → FIX_LOAN_REQUESTS_MISSING_COLS.sql
        - lr.broker_contract_*, lr.estimated_value, lr.google_maps_url,
@@ -256,6 +275,7 @@ exports.getConversationDetail = (req, res) => {
     'LEFT JOIN loan_requests lr ON lr.id = c.loan_request_id ' +
     'LEFT JOIN cases cs ON cs.loan_request_id = c.loan_request_id ' +
     'LEFT JOIN admin_users sales_au ON sales_au.id = cs.assigned_sales_id ' +
+    'LEFT JOIN chat_flows cf ON cf.id = c.active_flow_id ' +
     'WHERE c.id = ?',
     [id],
     (err, convRows) => {
@@ -1419,36 +1439,38 @@ exports.syncLoanRequest = (req, res) => {
       return res.status(400).json({ success: false, message: 'ยังไม่ได้สร้างลูกหนี้ — กดสร้างก่อน' });
     }
 
-    // Build update SET ด้วย COALESCE — อัพเดทเฉพาะฟิลด์ที่ยังว่าง
+    // Build update SET — เซฟทับทุกฟิลด์ที่แชทมีข้อมูล (force overwrite)
     const updates = [];
     const params = [];
 
-    if (conv.customer_name) {
-      updates.push('contact_name = COALESCE(contact_name, ?)');
-      params.push(conv.customer_name);
+    // ชื่อ: ใช้ customer_line_name (ต้นฉบับ LINE/FB) ก่อน ถ้าไม่มีค่อยใช้ customer_name
+    const contactName = conv.customer_line_name || conv.customer_name;
+    if (contactName) {
+      updates.push('contact_name = ?');
+      params.push(contactName);
     }
     if (conv.customer_phone) {
-      updates.push('contact_phone = COALESCE(contact_phone, ?)');
+      updates.push('contact_phone = ?');
       params.push(conv.customer_phone);
     }
     if (conv.property_type) {
-      updates.push('property_type = COALESCE(property_type, ?)');
+      updates.push('property_type = ?');
       params.push(conv.property_type);
     }
     if (conv.deed_type) {
-      updates.push('deed_type = COALESCE(deed_type, ?)');
+      updates.push('deed_type = ?');
       params.push(conv.deed_type);
     }
     if (conv.loan_type_detail) {
-      updates.push('loan_type_detail = COALESCE(loan_type_detail, ?)');
+      updates.push('loan_type_detail = ?');
       params.push(conv.loan_type_detail);
     }
     if (conv.estimated_value) {
-      updates.push('estimated_value = COALESCE(estimated_value, ?)');
+      updates.push('estimated_value = ?');
       params.push(conv.estimated_value);
     }
     if (conv.has_obligation) {
-      updates.push('has_obligation = COALESCE(has_obligation, ?)');
+      updates.push('has_obligation = ?');
       params.push(conv.has_obligation);
     }
     if (conv.location_hint) {
@@ -1456,11 +1478,11 @@ exports.syncLoanRequest = (req, res) => {
       if (province === 'กทม' || province === 'กรุงเทพ') province = 'กรุงเทพมหานคร';
       if (province === 'โคราช') province = 'นครราชสีมา';
       if (province === 'อยุธยา') province = 'พระนครศรีอยุธยา';
-      updates.push('province = COALESCE(province, ?)');
+      updates.push('province = ?');
       params.push(province);
     }
     if (conv.platform) {
-      updates.push('preferred_contact = COALESCE(preferred_contact, ?)');
+      updates.push('preferred_contact = ?');
       params.push(conv.platform);
     }
 
@@ -1921,24 +1943,23 @@ exports.searchCustomersForDedup = (req, res) => {
   const { q = '', exclude_conv } = req.query
   if (!q || q.length < 2) return res.json({ success: true, results: [] })
   const like = `%${q}%`
-  const params = [like, like, like]
+  const params = [like, like, like, like]
   let excludeClause = ''
   if (exclude_conv) {
     excludeClause = ' AND c.id != ?'
     params.push(parseInt(exclude_conv))
   }
   db.query(
-    `SELECT c.id, c.customer_name, c.customer_phone, c.platform,
+    `SELECT c.id, c.customer_name, c.customer_line_name, c.customer_phone, c.platform,
             c.profile_id, c.last_message_text,
             DATE_FORMAT(c.last_message_at, '%d/%m/%Y %H:%i') as last_msg_date,
             cp.display_name as profile_name
      FROM chat_conversations c
      LEFT JOIN customer_profiles cp ON cp.id = c.profile_id
-     WHERE (c.customer_name LIKE ? OR c.customer_phone LIKE ? OR c.last_message_text LIKE ?)
+     WHERE (c.customer_name LIKE ? OR c.customer_line_name LIKE ? OR c.customer_phone LIKE ? OR c.last_message_text LIKE ?)
        ${excludeClause}
      ORDER BY c.last_message_at DESC
      LIMIT 20`,
-    params,
     (err, rows) => {
       if (err) return res.status(500).json({ success: false, message: err.message })
       res.json({ success: true, results: rows })
@@ -2837,6 +2858,173 @@ exports.getQualityMonitor = (req, res) => {
           no_response: noResponse
         });
       });
+    });
+  });
+};
+
+// ============================================================
+// setReplyMode — toggle manual/ai per conversation
+// PATCH /api/admin/chat/conversations/:id/reply-mode
+// body: { mode: 'manual' | 'ai' }
+// ============================================================
+exports.setReplyMode = (req, res) => {
+  const convId = req.params.id;
+  const { mode } = req.body;
+  if (!['manual', 'ai'].includes(mode)) {
+    return res.status(400).json({ success: false, message: "mode ต้องเป็น 'manual' หรือ 'ai'" });
+  }
+  db.query(
+    'UPDATE chat_conversations SET reply_mode = ? WHERE id = ?',
+    [mode, convId],
+    (err, result) => {
+      if (err) {
+        console.error('[setReplyMode] DB error:', err.message, '| code:', err.code);
+        if (err.code === 'ER_BAD_FIELD_ERROR') {
+          return res.status(500).json({ success: false, message: 'column reply_mode ยังไม่มีใน DB — รัน ALTER TABLE ใน phpMyAdmin' });
+        }
+        return res.status(500).json({ success: false, message: err.message });
+      }
+      if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'ไม่พบ conversation' });
+      const io = req.app.get('io');
+      if (io) io.emit('reply_mode_changed', { conversationId: Number(convId), mode });
+      res.json({ success: true, mode });
+    }
+  );
+};
+
+// ============================================================
+// setActiveFlow — กำหนด flow ที่ใช้กับ conversation นี้
+// PATCH /conversations/:id/active-flow  body: { flow_id: N | null }
+// ============================================================
+exports.setActiveFlow = (req, res) => {
+  const convId = req.params.id;
+  const flowId = req.body.flow_id ?? null; // null = ถอด flow ออก
+  db.query(
+    'UPDATE chat_conversations SET active_flow_id = ? WHERE id = ?',
+    [flowId, convId],
+    (err, result) => {
+      if (err) {
+        console.error('[setActiveFlow] DB error:', err.message, '| code:', err.code);
+        if (err.code === 'ER_BAD_FIELD_ERROR') {
+          return res.status(500).json({ success: false, message: 'column active_flow_id ยังไม่มีใน DB — รัน ALTER TABLE' });
+        }
+        return res.status(500).json({ success: false, message: err.message });
+      }
+      res.json({ success: true, flow_id: flowId });
+    }
+  );
+};
+
+// ============================================================
+// listActiveFlows — ดึง flows ทั้งหมด (is_active=1) สำหรับ dropdown
+// GET /flows/list-active
+// ============================================================
+exports.listActiveFlows = (req, res) => {
+  db.query(
+    'SELECT id, flow_name, channel, description, ai_system_prompt FROM chat_flows WHERE is_active = 1 ORDER BY sort_order ASC, id ASC',
+    [],
+    (err, rows) => {
+      if (err) return res.status(500).json({ success: false, message: err.message });
+      res.json({ success: true, flows: rows || [] });
+    }
+  );
+};
+
+// ============================================
+// Multer — อัพโหลดเอกสาร checklist เข้า loan_requests field
+// ใช้ req.query.field เพื่อกำหนด folder ก่อน multer จะ parse body
+// ============================================
+const DOC_FOLDER_MAP = {
+  deed_images:        'deeds',
+  appraisal_images:   'appraisal-properties',
+  appraisal_book_image: 'appraisal-books',
+  // รูปทรัพย์ฝ่ายขาย → uploads/properties/ (แยกจาก appraisal-properties)
+  property_photos:    'properties',
+  property_img:       'properties',
+  building_permit:    'permits',
+};
+const docSlotStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const field = req.query.field || 'general';
+    const folder = DOC_FOLDER_MAP[field] || 'auction-docs';
+    const dir = path.join(__dirname, '..', 'uploads', folder);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `doc_${Date.now()}_${Math.round(Math.random() * 1000)}${ext}`);
+  }
+});
+const docSlotMulter = multer({
+  storage: docSlotStorage,
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf') {
+      cb(null, true);
+    } else {
+      cb(new Error('อนุญาตเฉพาะรูปภาพหรือ PDF'), false);
+    }
+  },
+  limits: { fileSize: 50 * 1024 * 1024 }
+});
+exports.docSlotUpload = docSlotMulter;
+
+const ALLOWED_DOC_FIELDS = [
+  'deed_images', 'deed_copy',
+  'property_photos', 'building_permit', 'house_reg_prop', 'land_tax_receipt',
+  'sale_contract', 'debt_free_cert', 'blueprint', 'location_sketch_map',
+  'land_use_cert', 'condo_title_deed', 'floor_plan', 'common_fee_receipt',
+  'rental_contract', 'business_reg',
+  'borrower_id_card', 'house_reg_book', 'name_change_doc',
+  'marriage_cert', 'spouse_id_card', 'spouse_reg_copy',
+  'divorce_doc', 'single_cert', 'death_cert', 'will_court_doc', 'testator_house_reg',
+  'appraisal_images', 'appraisal_book_image'
+];
+const SINGLE_PATH_DOC_FIELDS = ['appraisal_book_image'];
+
+// ============================================
+// POST /conversations/:id/upload-doc?field=xxx
+// อัพโหลดไฟล์เข้าช่อง loan_requests โดยตรงจาก DocSlotsPopup
+// ============================================
+exports.uploadDocToLoanRequest = (req, res) => {
+  const convId = req.params.id;
+  const field = req.query.field;
+
+  if (!field || !ALLOWED_DOC_FIELDS.includes(field)) {
+    return res.status(400).json({ success: false, message: 'ไม่รองรับ field: ' + field });
+  }
+  if (!req.file) {
+    return res.status(400).json({ success: false, message: 'ไม่พบไฟล์' });
+  }
+
+  db.query('SELECT loan_request_id FROM chat_conversations WHERE id = ?', [convId], (err, rows) => {
+    if (err) return res.status(500).json({ success: false, message: err.message });
+    if (!rows.length || !rows[0].loan_request_id) {
+      return res.status(400).json({ success: false, message: 'ยังไม่มีลูกหนี้ในแชทนี้' });
+    }
+
+    const lrId = rows[0].loan_request_id;
+    // Normalize path → relative from project root
+    const absPath = req.file.path.replace(/\\/g, '/');
+    const filePath = 'uploads/' + absPath.split('/uploads/').pop();
+
+    const isSingle = SINGLE_PATH_DOC_FIELDS.includes(field);
+    let sql, params;
+    if (isSingle) {
+      sql = `UPDATE loan_requests SET ${field} = ? WHERE id = ?`;
+      params = [filePath, lrId];
+    } else {
+      // COALESCE + NULLIF ป้องกัน JSON_ARRAY_APPEND กับค่า '' หรือ NULL
+      sql = `UPDATE loan_requests SET ${field} = JSON_ARRAY_APPEND(
+               COALESCE(NULLIF(${field}, 'null'), NULLIF(${field}, ''), '[]'),
+               '$', ?
+             ) WHERE id = ?`;
+      params = [filePath, lrId];
+    }
+
+    db.query(sql, params, (err2) => {
+      if (err2) return res.status(500).json({ success: false, message: err2.message });
+      res.json({ success: true, path: filePath, field, loan_request_id: lrId });
     });
   });
 };

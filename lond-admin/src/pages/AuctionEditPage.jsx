@@ -9,6 +9,7 @@ import ChecklistDocsPanel from '../components/ChecklistDocsPanel'
 import PropertyVideoPanel from '../components/PropertyVideoPanel'
 import LandOfficeInput from '../components/LandOfficeInput'
 import AppraisalStatusCard from '../components/AppraisalStatusCard'
+import SlipVerifier from '../components/SlipVerifier'
 
 const token = () => localStorage.getItem('loandd_admin')
 const API = '/api/admin/auction'
@@ -1281,65 +1282,15 @@ export default function AuctionEditPage() {
                       </span>
                     </div>
 
-                    {bidDepositFile ? (
-                      <div style={{ position: 'relative', borderRadius: 12, overflow: 'hidden', border: '2px solid #fed7aa', background: '#fff7ed' }}>
-                        {bidDepositPreview && !/\.pdf$/i.test(bidDepositFile.name) ? (
-                          <img src={bidDepositPreview} alt="slip preview"
-                            style={{ width: '100%', maxHeight: 180, objectFit: 'contain', background: '#f9fafb', display: 'block' }} />
-                        ) : (
-                          <div style={{ height: 100, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, background: '#fef3c7' }}>
-                            <i className="fas fa-file-pdf" style={{ fontSize: 32, color: '#ef4444' }}></i>
-                            <span style={{ fontSize: 11, color: '#92400e', fontWeight: 600 }}>PDF</span>
-                          </div>
-                        )}
-                        <div style={{ padding: '6px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                          <div style={{ fontSize: 11, color: '#78350f', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                            <i className="fas fa-paperclip" style={{ marginRight: 4, color: '#e67e22' }}></i>
-                            {bidDepositFile.name}
-                          </div>
-                          <button type="button"
-                            onClick={() => { setBidDepositFile(null); setBidDepositPreview(null) }}
-                            style={{ padding: '3px 9px', borderRadius: 6, border: 'none', background: '#fecaca', color: '#b91c1c', fontSize: 11, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
-                            <i className="fas fa-times"></i> เอาออก
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <label style={{
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
-                        height: 100, borderRadius: 12, border: '2px dashed #fdba74', background: '#fff7ed',
-                        cursor: 'pointer', transition: 'all 0.15s',
+                    <SlipVerifier
+                      slipType="deposit"
+                      caseId={caseData?.id}
+                      onConfirm={(file) => {
+                        setBidDepositFile(file || null)
+                        setBidDepositPreview(file && file.type.startsWith('image/') ? URL.createObjectURL(file) : null)
                       }}
-                        onDragOver={e => { e.preventDefault(); e.currentTarget.style.background = '#fed7aa' }}
-                        onDragLeave={e => { e.currentTarget.style.background = '#fff7ed' }}
-                        onDrop={e => {
-                          e.preventDefault(); e.currentTarget.style.background = '#fff7ed'
-                          const file = e.dataTransfer.files[0]
-                          if (!file) return
-                          setBidDepositFile(file)
-                          if (file.type.startsWith('image/')) {
-                            const reader = new FileReader()
-                            reader.onload = ev => setBidDepositPreview(ev.target.result)
-                            reader.readAsDataURL(file)
-                          } else { setBidDepositPreview(null) }
-                        }}
-                      >
-                        <input type="file" accept=".jpg,.jpeg,.png,.pdf,.webp" style={{ display: 'none' }}
-                          onChange={e => {
-                            const file = e.target.files[0]
-                            if (!file) return
-                            setBidDepositFile(file)
-                            if (file.type.startsWith('image/')) {
-                              const reader = new FileReader()
-                              reader.onload = ev => setBidDepositPreview(ev.target.result)
-                              reader.readAsDataURL(file)
-                            } else { setBidDepositPreview(null) }
-                          }} />
-                        <i className="fas fa-cloud-upload-alt" style={{ fontSize: 28, color: '#f97316' }}></i>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: '#92400e' }}>คลิกหรือลากไฟล์มาวาง</div>
-                        <div style={{ fontSize: 10, color: '#fb923c' }}>JPG · PNG · PDF · WEBP (สูงสุด 10MB)</div>
-                      </label>
-                    )}
+                      label="แนบสลิปมัดจำ"
+                    />
                   </div>
 
                   <button type="button" onClick={handleCreateAndBid} disabled={savingBid || !newBidInv.full_name.trim() || !bidForm.bid_amount}

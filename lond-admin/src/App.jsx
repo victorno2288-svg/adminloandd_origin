@@ -53,6 +53,8 @@ import CeoDashboardPage from './pages/CeoDashboardPage'
 import DailyReportPage from './pages/DailyReportPage'
 import SalesUsersPage from './pages/SalesUsersPage'
 import SalesTeamsPage from './pages/SalesTeamsPage'
+import SalesDashboardPage from './pages/SalesDashboardPage'
+import ChatFlowBuilderPage from './pages/ChatFlowBuilderPage'
 
 // เช็คล็อกอินอย่างเดียว (ไม่เช็คสิทธิ์หน้า)
 function RequireLogin({ children }) {
@@ -95,6 +97,7 @@ function App() {
           {/* ฝ่ายขาย */}
           <Route path="sales" element={<ProtectedRoute><SalesPage /></ProtectedRoute>} />
           <Route path="sales/kpi" element={<ProtectedRoute><KpiDashboardPage /></ProtectedRoute>} />
+          <Route path="sales/dashboard" element={<ProtectedRoute><SalesDashboardPage /></ProtectedRoute>} />
           <Route path="sales/followups" element={<ProtectedRoute><FollowUpPage /></ProtectedRoute>} />
           <Route path="sales/loan-table" element={<ProtectedRoute><LoanTablePage /></ProtectedRoute>} />
           <Route path="sales/payment-schedule" element={<ProtectedRoute><PaymentSchedulePage /></ProtectedRoute>} />
@@ -175,6 +178,9 @@ function App() {
 
           {/* จัดการแอคเคาท์ (super_admin เท่านั้น) */}
           <Route path="account-user" element={<ProtectedRoute><AccountUserPage /></ProtectedRoute>} />
+
+          {/* Chat Flow Builder (super_admin เท่านั้น) */}
+          <Route path="chat-flow-builder" element={<ProtectedRoute><ChatFlowBuilderPage /></ProtectedRoute>} />
         </Route>
 
         <Route path="*" element={<Navigate to="/login" />} />

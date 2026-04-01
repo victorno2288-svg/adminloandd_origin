@@ -5,15 +5,33 @@ const { notifyStatusChange } = require('./notificationController')
 exports.getAppraisalStats = (req, res) => {
   const sql = `
     SELECT
+      -- กลุ่ม 1: รอเช็กราคา — check_price ที่ยังไม่มีผล
+      (SELECT COUNT(*) FROM loan_requests
+        WHERE appraisal_type = 'check_price' AND (appraisal_result IS NULL OR appraisal_result = '')
+      ) AS check_price_count,
+
+      -- กลุ่ม 2: รอตรวจเล่ม — outside + inside ที่ยังไม่มีผล (ส่งบริษัทประเมินแล้ว รอเล่มกลับ)
+      (SELECT COUNT(*) FROM loan_requests
+        WHERE appraisal_type IN ('outside','inside') AND (appraisal_result IS NULL OR appraisal_result = '')
+      ) AS pending_review_count,
+
+      -- กลุ่ม 3: รอประเมิน — เคสที่อยู่ใน appraisal_scheduled (จ่ายค่าประเมินแล้ว รอนัดลงพื้นที่)
+      (SELECT COUNT(*) FROM cases WHERE status = 'appraisal_scheduled') AS appraisal_scheduled_count,
+
+      -- ประวัติทั้งหมด
+      (SELECT COUNT(*) FROM loan_requests WHERE appraisal_type IS NOT NULL) AS total_count,
+
+      -- เก็บไว้เพื่อ backward compat
       (SELECT COUNT(*) FROM loan_requests WHERE appraisal_type = 'outside') AS outside_count,
-      (SELECT COUNT(*) FROM loan_requests WHERE appraisal_type = 'inside') AS inside_count,
-      (SELECT COUNT(*) FROM loan_requests WHERE appraisal_type = 'check_price') AS check_price_count,
-      (SELECT COUNT(*) FROM loan_requests) AS total_count
+      (SELECT COUNT(*) FROM loan_requests WHERE appraisal_type = 'inside') AS inside_count
   `
   db.query(sql, (err, results) => {
     if (err) {
       console.error('getAppraisalStats error:', err)
-      return res.json({ success: true, stats: { outside_count: 0, inside_count: 0, check_price_count: 0, total_count: 0 } })
+      return res.json({ success: true, stats: {
+        check_price_count: 0, pending_review_count: 0, appraisal_scheduled_count: 0,
+        total_count: 0, outside_count: 0, inside_count: 0
+      }})
     }
     res.json({ success: true, stats: results[0] })
   })
@@ -42,10 +60,23 @@ exports.getAppraisalCases = (req, res) => {
   `
 
   const params = []
-  if (type) {
+
+  // ★ รองรับ composite filter types จาก stat cards ใหม่
+  if (type === 'check_price') {
+    // กลุ่ม 1: รอเช็กราคา — check_price ที่ยังไม่มีผล
+    sql += " AND lr.appraisal_type = 'check_price' AND (lr.appraisal_result IS NULL OR lr.appraisal_result = '')"
+  } else if (type === 'pending_review') {
+    // กลุ่ม 2: รอตรวจเล่ม — outside/inside ที่ยังไม่มีผล
+    sql += " AND lr.appraisal_type IN ('outside','inside') AND (lr.appraisal_result IS NULL OR lr.appraisal_result = '')"
+  } else if (type === 'appraisal_scheduled') {
+    // กลุ่ม 3: รอประเมิน — เคสที่อยู่ใน status appraisal_scheduled
+    sql += " AND c.status = 'appraisal_scheduled'"
+  } else if (type) {
+    // fallback: filter ตาม appraisal_type ตรงๆ (เช่น outside, inside, check_price)
     sql += ' AND lr.appraisal_type = ?'
     params.push(type)
   }
+
   if (result) {
     sql += ' AND lr.appraisal_result = ?'
     params.push(result)
@@ -448,4 +479,106 @@ exports.updateScreening = (req, res) => {
       res.json({ success: true })
     }
   )
+}
+
+// ============================================================
+// GET /api/admin/appraisal/dashboard
+// แดชบอร์ดฝ่ายประเมิน — สรุปรายสัปดาห์/เดือน/ปี
+// ?period=week|month|year
+// ============================================================
+exports.getAppraisalDashboard = (req, res) => {
+  const period = req.query.period || 'week'
+
+  let dateExpr, groupExpr, labelExpr
+  if (period === 'year') {
+    dateExpr = `DATE(lr.updated_at) >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)`
+    groupExpr = `DATE_FORMAT(lr.updated_at, '%Y-%m')`
+    labelExpr = groupExpr
+  } else if (period === 'month') {
+    dateExpr = `DATE(lr.updated_at) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)`
+    groupExpr = `DATE(lr.updated_at)`
+    labelExpr = groupExpr
+  } else {
+    dateExpr = `DATE(lr.updated_at) >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)`
+    groupExpr = `DATE(lr.updated_at)`
+    labelExpr = groupExpr
+  }
+
+  const queries = []
+
+  // 1. Trend การประเมิน
+  queries.push(new Promise(resolve => {
+    db.query(`
+      SELECT ${labelExpr} AS label, COUNT(*) AS cnt
+      FROM loan_requests lr
+      WHERE lr.appraisal_result IS NOT NULL AND ${dateExpr}
+      GROUP BY ${groupExpr} ORDER BY label ASC
+    `, (err, rows) => resolve({ key: 'appraisal_trend', data: err ? [] : rows }))
+  }))
+
+  // 2. Summary
+  queries.push(new Promise(resolve => {
+    db.query(`
+      SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN lr.appraisal_result = 'passed' THEN 1 ELSE 0 END) AS passed,
+        SUM(CASE WHEN lr.appraisal_result = 'not_passed' THEN 1 ELSE 0 END) AS not_passed,
+        SUM(CASE WHEN lr.appraisal_result IS NULL AND lr.appraisal_date IS NOT NULL THEN 1 ELSE 0 END) AS pending,
+        COALESCE(SUM(lr.appraised_value), 0) AS total_appraised_value,
+        COALESCE(AVG(lr.appraised_value), 0) AS avg_appraised_value,
+        SUM(CASE WHEN lr.payment_status = 'paid' THEN 1 ELSE 0 END) AS fee_paid,
+        COALESCE(SUM(CASE WHEN lr.payment_status = 'paid' THEN lr.appraisal_fee ELSE 0 END), 0) AS total_fee_collected
+      FROM loan_requests lr
+      WHERE lr.appraisal_date IS NOT NULL AND ${dateExpr}
+    `, (err, rows) => resolve({ key: 'summary', data: err ? {} : (rows[0] || {}) }))
+  }))
+
+  // 3. แยกตามประเภทประเมิน
+  queries.push(new Promise(resolve => {
+    db.query(`
+      SELECT COALESCE(lr.appraisal_type, 'unknown') AS appraisal_type, COUNT(*) AS cnt
+      FROM loan_requests lr
+      WHERE lr.appraisal_date IS NOT NULL AND ${dateExpr}
+      GROUP BY lr.appraisal_type ORDER BY cnt DESC
+    `, (err, rows) => resolve({ key: 'by_type', data: err ? [] : rows }))
+  }))
+
+  // 4. แยกตามประเภททรัพย์
+  queries.push(new Promise(resolve => {
+    db.query(`
+      SELECT COALESCE(lr.property_type, 'other') AS property_type, COUNT(*) AS cnt,
+        COALESCE(AVG(lr.appraised_value), 0) AS avg_value
+      FROM loan_requests lr
+      WHERE lr.appraisal_date IS NOT NULL AND ${dateExpr}
+      GROUP BY lr.property_type ORDER BY cnt DESC
+    `, (err, rows) => resolve({ key: 'by_property', data: err ? [] : rows }))
+  }))
+
+  // 5. ผลประเมิน trend (passed vs not_passed)
+  queries.push(new Promise(resolve => {
+    db.query(`
+      SELECT ${labelExpr} AS label,
+        SUM(CASE WHEN lr.appraisal_result = 'passed' THEN 1 ELSE 0 END) AS passed,
+        SUM(CASE WHEN lr.appraisal_result = 'not_passed' THEN 1 ELSE 0 END) AS not_passed
+      FROM loan_requests lr
+      WHERE lr.appraisal_result IS NOT NULL AND ${dateExpr}
+      GROUP BY ${groupExpr} ORDER BY label ASC
+    `, (err, rows) => resolve({ key: 'result_trend', data: err ? [] : rows }))
+  }))
+
+  // 6. Screening status breakdown
+  queries.push(new Promise(resolve => {
+    db.query(`
+      SELECT COALESCE(lr.screening_status, 'none') AS screening_status, COUNT(*) AS cnt
+      FROM loan_requests lr
+      WHERE lr.appraisal_date IS NOT NULL AND ${dateExpr}
+      GROUP BY lr.screening_status ORDER BY cnt DESC
+    `, (err, rows) => resolve({ key: 'screening', data: err ? [] : rows }))
+  }))
+
+  Promise.all(queries).then(results => {
+    const out = {}
+    results.forEach(r => { out[r.key] = r.data })
+    res.json({ success: true, period, dashboard: out })
+  }).catch(e => res.status(500).json({ success: false, message: e.message }))
 }

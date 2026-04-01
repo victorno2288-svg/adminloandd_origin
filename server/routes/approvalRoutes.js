@@ -3,6 +3,7 @@ const router = express.Router()
 const approvalController = require('../controllers/approvalController')
 
 router.get('/stats', approvalController.getStats)
+router.get('/dashboard', approvalController.getApprovalDashboard)
 router.get('/cases', approvalController.getApprovalCases)
 router.get('/cases/:caseId', approvalController.getApprovalDetail)
 router.put('/cases/:caseId', approvalController.updateApproval)

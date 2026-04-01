@@ -8,6 +8,117 @@ const { extractCustomerInfoWithGemini } = require('../utils/textExtract');
 const { notifyStatusChange } = require('./notificationController');
 
 // ============================================================
+// ★ AUTO-CLASSIFY IMAGE → loan_requests field (keyword-based)
+// ============================================================
+
+/**
+ * KEYWORD_FIELD_MAP — จับคู่ keyword กับ column ใน loan_requests
+ * เรียงจาก specific สุด → general สุด (first match wins)
+ */
+const KEYWORD_FIELD_MAP = [
+  // โฉนด / สิทธิ์ที่ดิน — specific ก่อน
+  { rx: /สำเนาโฉนด/i,                                       field: 'deed_copy' },
+  { rx: /โฉนด|ที่ดิน|น\.ส\.?3|น\.ส\.?4|นส\.?3|นส\.?4|ส\.ค\.?1|เอกสารสิทธิ์|chanote/i, field: 'deed_images' },
+  // บัตรประชาชน / ทะเบียนบ้าน ผู้กู้
+  { rx: /บัตรประชาชน|บัตร\s*ปชช|บัตรประจำตัว|id\s*card/i,  field: 'borrower_id_card' },
+  { rx: /ทะเบียนบ้านทรัพย์|ทะเบียนบ้านที่ดิน/i,             field: 'house_reg_prop' },
+  { rx: /ทะเบียนบ้าน|ท\.?ร\.?14/i,                          field: 'house_reg_book' },
+  // เอกสารสถานะสมรส
+  { rx: /ใบสมรส|ทะเบียนสมรส/i,                              field: 'marriage_cert' },
+  { rx: /บัตรประชาชนคู่สมรส|บัตรคู่สมรส|สามีภรรยา/i,        field: 'spouse_id_card' },
+  { rx: /ทะเบียนบ้านคู่สมรส/i,                               field: 'spouse_reg_copy' },
+  { rx: /ใบหย่า|ทะเบียนหย่า/i,                               field: 'divorce_doc' },
+  { rx: /ใบมรณ|มรณบัตร/i,                                   field: 'death_cert' },
+  { rx: /ใบรับรองโสด|รับรองโสด/i,                            field: 'single_cert' },
+  { rx: /เปลี่ยนชื่อ|เปลี่ยนนามสกุล/i,                      field: 'name_change_doc' },
+  // เอกสารทรัพย์
+  { rx: /ใบอนุญาตก่อสร้าง|ใบอนุญาต\s*ก่อสร้าง/i,           field: 'building_permit' },
+  { rx: /ใบปลอดหนี้/i,                                       field: 'debt_free_cert' },
+  { rx: /สัญญาซื้อขาย/i,                                     field: 'sale_contract' },
+  { rx: /แบบแปลน|blueprint/i,                                field: 'blueprint' },
+  { rx: /สัญญาเช่า/i,                                        field: 'rental_contract' },
+  { rx: /ภาษีที่ดิน|ใบเสร็จ\s*ภาษี/i,                       field: 'land_tax_receipt' },
+  { rx: /ทะเบียนพาณิชย์/i,                                   field: 'business_reg' },
+  { rx: /ค่าส่วนกลาง/i,                                      field: 'common_fee_receipt' },
+  { rx: /ผัง\s*ห้อง|floor\s*plan/i,                         field: 'floor_plan' },
+  { rx: /สเก็ตแผนที่|แผนที่ตั้ง/i,                           field: 'location_sketch_map' },
+  { rx: /ใบรับรองการใช้ที่ดิน/i,                             field: 'land_use_cert' },
+  { rx: /โฉนดคอนโด/i,                                        field: 'condo_title_deed' },
+  // สลิปค่าประเมิน (ส่งให้ existing payment_slip flow จัดการ)
+  { rx: /ค่าประเมิน|ค่าสำรวจ|ค่าตีราคา|สลิปประเมิน/i,       field: '_payment_slip' },
+  { rx: /สลิป|โอนเงิน|หลักฐาน\s*โอน/i,                      field: '_payment_slip' },
+];
+
+/**
+ * OCR doc_type → field (fallback เมื่อไม่มี keyword)
+ */
+const DOC_TYPE_FIELD_MAP = {
+  id_card:   'borrower_id_card',
+  house_reg: 'house_reg_book',
+};
+
+/**
+ * autoSaveImageToField — append image path เข้า loan_requests field
+ */
+function autoSaveImageToField(conv, imagePath, targetField, io) {
+  if (!conv || !conv.loan_request_id || !imagePath || !targetField) return;
+  if (targetField.startsWith('_')) return; // special marker — let other flow handle
+
+  const p = imagePath.replace(/\\/g, '/').replace(/^\//, '');
+
+  const isSingle = (targetField === 'appraisal_book_image');
+  const sql = isSingle
+    ? `UPDATE loan_requests SET ${targetField} = ? WHERE id = ?`
+    : `UPDATE loan_requests SET ${targetField} = JSON_ARRAY_APPEND(
+         COALESCE(NULLIF(${targetField},'null'), NULLIF(${targetField},''), '[]'), '$', ?
+       ) WHERE id = ?`;
+
+  db.query(sql, [p, conv.loan_request_id], (err) => {
+    if (err) return console.log(`[AutoSave] ${targetField} error:`, err.message);
+    console.log(`[AutoSave] ✅ ${targetField} ← ${p.split('/').pop()}`);
+    if (io) {
+      io.to('admin_room').emit('image_auto_saved', {
+        conversation_id: conv.id,
+        loan_request_id: conv.loan_request_id,
+        field: targetField,
+        path: p,
+        message: `📎 บันทึกรูปอัตโนมัติ → ${targetField}`
+      });
+    }
+  });
+}
+
+/**
+ * classifyAndSaveImage — ดูข้อความล่าสุดใน conversation (5 นาที)
+ * หา keyword แล้ว save รูปเข้าช่องที่ถูกต้อง
+ */
+function classifyAndSaveImage(conv, imagePath, io) {
+  if (!conv || !imagePath) return;
+
+  const since = new Date(Date.now() - 5 * 60 * 1000); // 5 min window
+  db.query(
+    `SELECT message_text FROM chat_messages
+     WHERE conversation_id = ? AND message_type = 'text' AND created_at >= ?
+     ORDER BY id DESC LIMIT 10`,
+    [conv.id, since],
+    (err, rows) => {
+      if (err || !rows || rows.length === 0) return;
+
+      const txt = rows.map(r => r.message_text || '').join(' ');
+
+      for (const rule of KEYWORD_FIELD_MAP) {
+        if (rule.rx.test(txt)) {
+          console.log(`[Keyword] matched "${rule.rx}" → ${rule.field} | conv #${conv.id}`);
+          autoSaveImageToField(conv, imagePath, rule.field, io);
+          return;
+        }
+      }
+      // ไม่มี keyword match → รูปจะอยู่ใน "ยังไม่ได้เซฟ" ตามเดิม
+    }
+  );
+}
+
+// ============================================================
 // AUTO-TAG HELPERS
 // ============================================================
 
@@ -77,8 +188,17 @@ function mapDeedType(textFromGemini) {
  * แล้ว emit deed_ocr_result (พร้อม updated_fields) กลับ admin
  * ใช้ COALESCE เพื่อไม่ทับข้อมูลที่มีอยู่แล้ว
  */
-function applyDeedDataToLoanRequest(conv, deedData, io, platform, callback) {
+/**
+ * @param {string|null} imageLocalUrl  — local path ของรูปโฉนด เช่น "uploads/chat/xxx.jpg"
+ *                                       (ใส่ null ถ้าไม่มี ฟังก์ชันจะยังทำงานปกติ)
+ */
+function applyDeedDataToLoanRequest(conv, deedData, io, platform, imageLocalUrl, callback) {
+  // รองรับ signature เดิม (5 args: conv, deedData, io, platform, callback)
+  if (typeof imageLocalUrl === 'function') { callback = imageLocalUrl; imageLocalUrl = null; }
+
   const label = platform === 'facebook' ? 'Facebook' : 'LINE';
+  // normalize path: ตัด leading slash ให้ตรงกับ format ใน deed_images
+  const deedImgPath = imageLocalUrl ? imageLocalUrl.replace(/^\//, '') : null;
 
   // --- คำนวณ deedTypeCode ก่อน (ใช้ทั้งกรณีมี/ไม่มี loan_request_id) ---
   const deedTypeCode = mapDeedType(deedData.deed_type);
@@ -122,6 +242,7 @@ function applyDeedDataToLoanRequest(conv, deedData, io, platform, callback) {
       if (deedData.amphoe)       deedExtraData.district     = deedData.amphoe;
       if (deedData.tambon)       deedExtraData.subdistrict  = deedData.tambon;
       if (deedData.land_area)    deedExtraData.land_area    = deedData.land_area;
+      if (deedImgPath)           deedExtraData.deed_image_url = deedImgPath; // ✅ ส่งรูปไปด้วย
       autoCreateLoanRequest(conv.id, io, false, deedExtraData);
     } else {
       console.log(`[OCR] conversation #${conv.id} ยังไม่มี loan_request — บันทึกเฉพาะ conversation`);
@@ -154,6 +275,13 @@ function applyDeedDataToLoanRequest(conv, deedData, io, platform, callback) {
     lrUpdates.push('deed_type = COALESCE(deed_type, ?)');
     lrParams.push(deedTypeCode);
     updatedFields.deed_type = deedTypeCode;
+  }
+
+  // ✅ เพิ่มรูปโฉนดเข้า deed_images JSON array (ไม่ทับรูปเก่า)
+  if (deedImgPath) {
+    lrUpdates.push("deed_images = JSON_ARRAY_APPEND(COALESCE(deed_images, '[]'), '$', ?)");
+    lrParams.push(deedImgPath);
+    updatedFields.deed_images_added = deedImgPath;
   }
 
   // เพิ่ม admin_note เป็น append (ไม่ใช้ COALESCE เพราะต้อง concat)
@@ -378,6 +506,11 @@ function applyDocumentDataToLoanRequest(conv, docData, io, label, slipImagePath)
       if (docData.doc_type === 'payment_slip') {
         autoCreateCaseFromAppraisalSlip(conv, docData, slipImagePath, io);
       }
+
+      // ★ Auto-save image path เข้า field ตาม doc_type (OCR fallback — ถ้า keyword ไม่ match)
+      if (slipImagePath && DOC_TYPE_FIELD_MAP[docData.doc_type]) {
+        autoSaveImageToField(conv, slipImagePath, DOC_TYPE_FIELD_MAP[docData.doc_type], io);
+      }
     }
   );
 }
@@ -540,7 +673,7 @@ function autoCreateLoanRequest(conversationId, io, requirePhone, extraData) {
           `;
           const params = [
             debtor_code, source,
-            merged.customer_name, merged.customer_phone || null, merged.customer_email || null,
+            merged.customer_line_name || merged.customer_name, merged.customer_phone || null, merged.customer_email || null,
             merged.contact_facebook || null, merged.contact_line || null,
             preferred_contact,
             merged.property_type || null, merged.loan_type_detail || null,
@@ -561,6 +694,19 @@ function autoCreateLoanRequest(conversationId, io, requirePhone, extraData) {
 
             // 6) เชื่อม chat_conversations.loan_request_id
             db.query('UPDATE chat_conversations SET loan_request_id = ? WHERE id = ?', [loanRequestId, conversationId], () => {});
+
+            // ✅ 6.1) ถ้ามีรูปโฉนดจาก OCR → บันทึกเข้า deed_images ทันที
+            if (extraData.deed_image_url) {
+              const deedImgPath = extraData.deed_image_url.replace(/^\//, '');
+              db.query(
+                "UPDATE loan_requests SET deed_images = JSON_ARRAY_APPEND(COALESCE(deed_images, '[]'), '$', ?) WHERE id = ?",
+                [deedImgPath, loanRequestId],
+                (errImg) => {
+                  if (errImg) console.warn('[autoCreate] deed_images update error:', errImg.message);
+                  else console.log(`[autoCreate] ✅ deed_images บันทึก: ${deedImgPath}`);
+                }
+              );
+            }
 
             const triggerNote = requirePhone ? '' : ' (trigger จากโฉนด)';
             console.log(`✅ Auto-created loan_request #${loanRequestId} (${debtor_code}) จากแชท conv #${conversationId}${triggerNote}` + (resolvedAgentId ? ` นายหน้า #${resolvedAgentId}` : ''));
@@ -1239,6 +1385,47 @@ function downloadLineContent(messageId, callback) {
 }
 
 // ============================================
+// Helper: ดาวน์โหลดรูปจาก URL (Facebook CDN, หรืออื่นๆ) แล้วเซฟลง /uploads/chat/
+// ใช้เพื่อเก็บรูปถาวรก่อนที่ FB CDN URL จะหมดอายุ
+// callback(localPublicUrl) เช่น "/uploads/chat/fb_1234567890.jpg"
+// ============================================
+function downloadAndSaveImageLocally(imageUrl, prefix, callback) {
+  if (!imageUrl) return callback(null);
+  const dir = path.join(__dirname, '..', 'public', 'uploads', 'chat');
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+  const ext      = '.jpg'; // FB/Line images are always jpeg
+  const filename = `${prefix || 'img'}_${Date.now()}.jpg`;
+  const filepath = path.join(dir, filename);
+  const fileStream = fs.createWriteStream(filepath);
+
+  const request = imageUrl.startsWith('https') ? require('https') : require('http');
+  request.get(imageUrl, (res) => {
+    if (res.statusCode !== 200) {
+      fileStream.close();
+      try { fs.unlinkSync(filepath); } catch (_) {}
+      console.warn(`[downloadAndSaveImage] failed ${res.statusCode}: ${imageUrl.substring(0, 80)}`);
+      return callback(null);
+    }
+    res.pipe(fileStream);
+    fileStream.on('finish', () => {
+      fileStream.close();
+      const publicUrl = `/uploads/chat/${filename}`;
+      console.log(`📥 Image saved locally: ${publicUrl}`);
+      callback(publicUrl);
+    });
+    fileStream.on('error', (e) => {
+      console.warn('[downloadAndSaveImage] write error:', e.message);
+      try { fs.unlinkSync(filepath); } catch (_) {}
+      callback(null);
+    });
+  }).on('error', (e) => {
+    console.warn('[downloadAndSaveImage] request error:', e.message);
+    callback(null);
+  });
+}
+
+// ============================================
 // Helper: หาหรือสร้าง conversation
 // รองรับ avatar ด้วย
 // ============================================
@@ -1251,32 +1438,38 @@ function findOrCreateConversation(platform, platformConvId, customerName, custom
 
       if (rows.length > 0) {
         const conv = rows[0];
-        // อัพเดทชื่อ + avatar ถ้ายังไม่มี
         const updates = [];
         const params = [];
+        // ชื่อ: อัพเดทเฉพาะตอนยังไม่มี (ไม่เขียนทับชื่อที่ admin ตั้งเองแล้ว)
         if (customerName && !conv.customer_name) {
           updates.push('customer_name = ?');
           params.push(customerName);
         }
-        if (customerAvatar && !conv.customer_avatar) {
+        // ★ customer_line_name: อัพเดทเสมอจาก LINE/FB (ชื่อต้นฉบับ — ไม่ถูก admin เขียนทับ)
+        if (customerName && customerName !== conv.customer_line_name) {
+          updates.push('customer_line_name = ?');
+          params.push(customerName);
+        }
+        // รูปโปรไฟล์: อัพเดทเสมอเมื่อ LINE/FB ส่งมาใหม่ (รูปเปลี่ยนได้ตลอด)
+        if (customerAvatar && customerAvatar !== conv.customer_avatar) {
           updates.push('customer_avatar = ?');
           params.push(customerAvatar);
         }
         if (updates.length > 0) {
           params.push(conv.id);
           db.query(`UPDATE chat_conversations SET ${updates.join(', ')} WHERE id = ?`, params, () => {});
-          // อัพเดท object ด้วยเพื่อส่งกลับ
           if (customerName && !conv.customer_name) conv.customer_name = customerName;
-          if (customerAvatar && !conv.customer_avatar) conv.customer_avatar = customerAvatar;
+          if (customerName && customerName !== conv.customer_line_name) conv.customer_line_name = customerName;
+          if (customerAvatar && customerAvatar !== conv.customer_avatar) conv.customer_avatar = customerAvatar;
         }
         return callback(null, conv);
       }
 
-      // สร้างใหม่ — พร้อมชื่อ + avatar ทันที
+      // สร้างใหม่ — พร้อมชื่อ + avatar + customer_line_name ทันที
       db.query(
-        `INSERT INTO chat_conversations (platform, platform_conversation_id, customer_name, customer_platform_id, customer_avatar, status, created_at)
-         VALUES (?, ?, ?, ?, ?, 'unread', NOW())`,
-        [platform, platformConvId, customerName, customerId, customerAvatar],
+        `INSERT INTO chat_conversations (platform, platform_conversation_id, customer_name, customer_line_name, customer_platform_id, customer_avatar, status, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'unread', NOW())`,
+        [platform, platformConvId, customerName, customerName, customerId, customerAvatar],
         (err2, result) => {
           if (err2) return callback(err2);
 
@@ -1289,7 +1482,7 @@ function findOrCreateConversation(platform, platformConvId, customerName, custom
           // หน่วงเล็กน้อยให้ autoAssignSales ทำงานก่อน แล้วค่อยสร้าง loan_request
           setTimeout(() => autoCreateLoanRequest(newConvId, io, false, {}), 500);
 
-          callback(null, { id: newConvId, platform, platform_conversation_id: platformConvId, customer_name: customerName, customer_avatar: customerAvatar });
+          callback(null, { id: newConvId, platform, platform_conversation_id: platformConvId, customer_name: customerName, customer_line_name: customerName, customer_avatar: customerAvatar });
         }
       );
     }
@@ -1769,23 +1962,35 @@ function handleFacebookMessage(pageId, event, io) {
         attachment_url: attachUrl
       }, io, (err3) => {
         if (err3) console.log('FB webhook - save msg error:', err3.message);
+        // 🤖 AI auto-reply — เฉพาะข้อความ text เท่านั้น
+        if (!err3 && msgType === 'text' && msgText) {
+          setImmediate(() => triggerAiReply(conv, msgText, io));
+          setImmediate(() => autoTagConversation(conv, msgText, io));
+        }
       });
 
-      // 🔍 รูปภาพจาก Facebook → สแกนด้วย Gemini (รองรับทุกประเภทเอกสาร)
+      // 🔍 รูปภาพจาก Facebook → บันทึก local ก่อน แล้วสแกนด้วย Gemini
       if (msgType === 'image' && attachUrl) {
-        console.log('[OCR] Facebook image detected, running general document OCR...');
-        downloadAndScanDocument(attachUrl, (err2, docData) => {
-          if (err2 || !docData) return;
-          if (docData.doc_type === 'deed') {
-            // โฉนด → ใช้ deed-specific flow (มี Tesseract fallback + ข้อมูลครบกว่า)
-            downloadAndScanDeed(attachUrl, (err3, deedData) => {
-              if (!err3 && deedData) applyDeedDataToLoanRequest(conv, deedData, io, 'facebook');
-            });
-          } else {
-            // เอกสารอื่น (บัตรประชาชน, สลิป, ทะเบียนบ้าน ฯลฯ)
-            // ส่ง attachUrl เพื่อใช้เป็น slip_image ถ้าเป็นสลิปโอนเงิน
-            applyDocumentDataToLoanRequest(conv, docData, io, 'facebook', attachUrl);
+        console.log('[OCR] Facebook image detected, saving locally + running OCR...');
+        // ✅ save ถาวรก่อน (FB CDN URL หมดอายุ)
+        downloadAndSaveImageLocally(attachUrl, 'fb', (fbLocalUrl) => {
+
+          // ★ Phase 1: Keyword classify (fast)
+          if (fbLocalUrl) {
+            setImmediate(() => classifyAndSaveImage(conv, fbLocalUrl, io));
           }
+
+          // ★ Phase 2: Gemini OCR
+          downloadAndScanDocument(attachUrl, (err2, docData) => {
+            if (err2 || !docData) return;
+            if (docData.doc_type === 'deed') {
+              downloadAndScanDeed(attachUrl, (err3, deedData) => {
+                if (!err3 && deedData) applyDeedDataToLoanRequest(conv, deedData, io, 'facebook', fbLocalUrl);
+              });
+            } else {
+              applyDocumentDataToLoanRequest(conv, docData, io, 'facebook', fbLocalUrl || attachUrl);
+            }
+          });
         });
       }
     });
@@ -1981,6 +2186,11 @@ function handleLineMessage(event, io) {
           attachment_url: finalAttachUrl
         }, io, (err3) => {
           if (err3) console.log('LINE webhook - save msg error:', err3.message);
+          // 🤖 AI auto-reply — เฉพาะข้อความ text เท่านั้น
+          if (!err3 && msgType === 'text' && msgText) {
+            setImmediate(() => triggerAiReply(conv, msgText, io));
+            setImmediate(() => autoTagConversation(conv, msgText, io));
+          }
         });
       });
     };
@@ -1989,26 +2199,33 @@ function handleLineMessage(event, io) {
       downloadLineContent(message.id, (localUrl) => {
         doSave(localUrl);
 
-        // 🔍 รูปภาพจาก LINE → สแกนด้วย Gemini (รองรับทุกประเภทเอกสาร)
+        // 🔍 รูปภาพจาก LINE → keyword classify + Gemini OCR
         if (msgType === 'image' && localUrl) {
           const serverRoot   = path.join(__dirname, '..', 'public');
           const absolutePath = path.join(serverRoot, localUrl);
 
+          // ★ Phase 1: Keyword classify (fast, no AI cost)
+          // ดึง conv ใหม่เพื่อให้ได้ loan_request_id ล่าสุด แล้วค่อย classify
+          findOrCreateConversation('line', userId, null, userId, null, io, (errC, convFresh) => {
+            if (!errC && convFresh) {
+              setImmediate(() => classifyAndSaveImage(convFresh, localUrl, io));
+            }
+          });
+
+          // ★ Phase 2: Gemini OCR (async — ข้อมูลเพิ่มเติม เช่น ชื่อ, เบอร์, รายได้)
           scanDocumentWithGemini(absolutePath, (err, docData) => {
             if (err || !docData) return;
 
-            // ดึง conv ใหม่เพื่อให้ได้ loan_request_id ล่าสุด
             findOrCreateConversation('line', userId, null, userId, null, io, (err2, conv) => {
               if (err2 || !conv) return;
 
               if (docData.doc_type === 'deed') {
-                // โฉนด → ใช้ deed-specific flow (มี Tesseract fallback)
+                // โฉนด → deed-specific flow + save เข้า deed_images
                 scanDeedImage(absolutePath, (err3, deedData) => {
-                  if (!err3 && deedData) applyDeedDataToLoanRequest(conv, deedData, io, 'line');
+                  if (!err3 && deedData) applyDeedDataToLoanRequest(conv, deedData, io, 'line', localUrl);
                 });
               } else {
-                // เอกสารอื่น (บัตรประชาชน, สลิป, ทะเบียนบ้าน ฯลฯ)
-                // ส่ง localUrl เพื่อใช้เป็น slip_image ถ้าเป็นสลิปโอนเงิน
+                // เอกสารอื่น — OCR ดึงข้อมูล + fallback image-save ถ้ายังไม่มี keyword
                 applyDocumentDataToLoanRequest(conv, docData, io, 'line', localUrl);
               }
             });
@@ -2041,6 +2258,242 @@ function handleLineFollow(event, io) {
       }, io, () => {});
     });
   });
+}
+
+// ============================================================
+// 🏷️ AI AUTO-TAG — ติดแท็กอัตโนมัติจาก keyword ในข้อความลูกค้า
+// ลำดับความสำคัญ: ไม่เข้าเกณฑ์ > ติดภาระ > นายหน้า > เข้าเกณฑ์
+// ไม่เขียนทับ: ปิดเคส, ไม่เข้าเกณฑ์ (ถาวร)
+// ============================================================
+function autoTagConversation(conv, msgText, io) {
+  if (!msgText) return;
+  const t = msgText.toLowerCase();
+
+  let tagName = null;
+
+  // ❌ ไม่เข้าเกณฑ์ — ทรัพย์ที่รับไม่ได้ (highest priority)
+  if (/ส\.ป\.ก|สปก|ภ\.บ\.ท|ครุฑเขียว|น\.ส\.3[^4]|นส\.?3[^4]|ที่นา|ที่ไร่|ที่สวน|ปัตตานี|ยะลา|นราธิวาส/.test(t)) {
+    tagName = 'ไม่เข้าเกณฑ์';
+  }
+  // 🟡 ติดภาระ — หนี้เดิมสูง ยังพิจารณาได้
+  else if (/ติดจำนอง|ยอดค้าง|หนี้เยอะ|ภาระหนัก|ค้างชำระ|ยอดหนี้สูง|ติดธนาคาร|ไถ่ถอน/.test(t)) {
+    tagName = 'ติดภาระ';
+  }
+  // 🤝 นายหน้า — ตัวแทน/โบรกเกอร์
+  else if (/นายหน้า|ตัวแทน|คอมมิชชั่น|commission|broker|ค่านำ/.test(t)) {
+    tagName = 'นายหน้า';
+  }
+  // 🟢 เข้าเกณฑ์ — ส่งโฉนดหรือบอกประเภททรัพย์ที่รับได้
+  else if (/โฉนด|น\.ส\.4|นส\.?4|บ้านเดี่ยว|ทาวน์เฮ้าส์|ทาวน์โฮม|คอนโด|อาคารพาณิชย์|ตึกแถว|อพาร์|โรงงาน|โกดัง/.test(t)) {
+    tagName = 'เข้าเกณฑ์';
+  }
+
+  if (!tagName) return;
+
+  // ดึง tag_id ปัจจุบัน + ชื่อ
+  db.query(
+    `SELECT c.tag_id, ct.name AS tag_name
+     FROM chat_conversations c
+     LEFT JOIN chat_tags ct ON ct.id = c.tag_id
+     WHERE c.id = ?`,
+    [conv.id],
+    (err, rows) => {
+      if (err || !rows[0]) return;
+      const currentTagName = rows[0].tag_name;
+
+      // ห้ามเขียนทับ: ปิดเคส, ไม่เข้าเกณฑ์ (ตั้งถาวรแล้ว)
+      if (currentTagName === 'ปิดเคส' || currentTagName === 'ไม่เข้าเกณฑ์') return;
+      // ถ้าแท็กเดิมเหมือนกันอยู่แล้ว → ไม่ต้องทำอะไร
+      if (currentTagName === tagName) return;
+
+      // หา tag id จากชื่อ
+      db.query('SELECT id FROM chat_tags WHERE name = ? LIMIT 1', [tagName], (err2, tagRows) => {
+        if (err2 || !tagRows[0]) return;
+        const newTagId = tagRows[0].id;
+
+        db.query(
+          'UPDATE chat_conversations SET tag_id = ? WHERE id = ?',
+          [newTagId, conv.id],
+          (err3) => {
+            if (err3) return;
+            console.log(`[AutoTag] conv ${conv.id}: "${currentTagName || 'ไม่มี'}" → "${tagName}"`);
+            if (io) io.emit('tag_auto_set', { conv_id: conv.id, tag_id: newTagId, tag_name: tagName });
+          }
+        );
+      });
+    }
+  );
+}
+
+// ============================================================
+// 🤖 AI AUTO-REPLY — ตรวจ reply_mode แล้วให้ Gemini 1.5 Flash ตอบ
+// ============================================================
+function triggerAiReply(conv, customerText, io) {
+  if (!customerText || !customerText.trim()) return; // ไม่ตอบข้อความว่าง/รูป
+
+  // ดึง reply_mode + active_flow_id ล่าสุดจาก DB
+  db.query(
+    `SELECT c.reply_mode, c.customer_name, c.customer_line_name,
+            c.active_flow_id, cf.ai_system_prompt as flow_prompt
+     FROM chat_conversations c
+     LEFT JOIN chat_flows cf ON cf.id = c.active_flow_id
+     WHERE c.id = ?`,
+    [conv.id],
+    (err, rows) => {
+      if (err || !rows || rows.length === 0) return;
+      if (rows[0].reply_mode !== 'ai') return; // ไม่ใช่ AI mode → ออก
+
+      const customerName = rows[0].customer_line_name || rows[0].customer_name || 'ลูกค้า';
+      const flowPrompt   = rows[0].flow_prompt || null; // system prompt จาก flow (อาจเป็น null)
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) return console.warn('[AI Reply] ไม่มี GEMINI_API_KEY');
+
+      // ดึง 10 ข้อความล่าสุดเป็น context
+      db.query(
+        `SELECT sender_type, message_text FROM chat_messages
+         WHERE conversation_id = ? AND message_type = 'text'
+         ORDER BY id DESC LIMIT 10`,
+        [conv.id],
+        (err2, msgRows) => {
+          if (err2) return;
+
+          const history = (msgRows || []).slice().reverse()
+            .filter(m => m.message_text && m.message_text.trim())
+            .map(m => {
+              const role = m.sender_type === 'customer' ? `[ลูกค้า] ${m.message_text}` :
+                           m.sender_type === 'ai'       ? `[AI] ${m.message_text}` :
+                                                          `[เซลล์] ${m.message_text}`;
+              return role;
+            })
+            .join('\n');
+
+          // ── System prompt: ใช้จาก flow ถ้ามี, ไม่งั้น fallback default ────
+          const DEFAULT_SYSTEM = `คุณเป็นผู้ช่วยฝ่ายขายสินเชื่อจำนองและขายฝากของบริษัท LOAN DD
+ตอบภาษาไทย สุภาพ กระชับ เป็นมิตร ไม่เกิน 3-4 ประโยค
+ห้ามสัญญาอนุมัติ ห้ามบอกดอกเบี้ยชัดเจนโดยไม่มีข้อมูลทรัพย์
+ถ้าลูกค้าถามเรื่องที่ดิน/บ้าน ให้ถามพื้นที่, จังหวัด, มูลค่า
+ถ้าลูกค้าต้องการนัด ให้บอกว่าเซลล์จะติดต่อกลับเร็ว ๆ นี้`;
+
+          const systemInstruction = flowPrompt
+            ? flowPrompt.trim()
+            : DEFAULT_SYSTEM;
+
+          const prompt = `${systemInstruction}
+
+== บทสนทนาล่าสุด ==
+${history}
+
+[ลูกค้า] ${customerText}
+[AI]:`;
+
+          const body = JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { maxOutputTokens: 200, temperature: 0.7 }
+          });
+
+          const https = require('https');
+          const options = {
+            hostname: 'generativelanguage.googleapis.com',
+            path: `/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+          };
+
+          const req = https.request(options, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+              try {
+                const json = JSON.parse(data);
+                const aiText = json?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+                if (!aiText) return console.warn('[AI Reply] Gemini ไม่คืน text');
+
+                // บันทึกข้อความ AI ลง DB
+                db.query(
+                  `INSERT INTO chat_messages
+                   (conversation_id, sender_type, sender_name, message_text, message_type, created_at)
+                   VALUES (?, 'ai', 'AI Assistant', ?, 'text', NOW())`,
+                  [conv.id, aiText],
+                  (err3, insertRes) => {
+                    if (err3) return console.error('[AI Reply] DB error:', err3.message);
+
+                    // อัพเดท last_message ของ conversation
+                    db.query(
+                      `UPDATE chat_conversations SET last_message_text = ?, last_message_at = NOW() WHERE id = ?`,
+                      [aiText, conv.id]
+                    );
+
+                    // Emit socket ให้ frontend เห็น AI reply ทันที
+                    if (io) {
+                      io.to('admin_room').emit('new_message', {
+                        id: insertRes.insertId,
+                        conversation_id: conv.id,
+                        sender_type: 'ai',
+                        sender_name: 'AI Assistant',
+                        message_text: aiText,
+                        message_type: 'text',
+                        created_at: new Date().toISOString()
+                      });
+                    }
+
+                    // ส่งข้อความกลับลูกค้าผ่าน LINE หรือ Facebook
+                    getPlatformConfig(conv.platform, (errCfg, config) => {
+                      if (errCfg || !config) return;
+                      const https2 = require('https');
+
+                      if (conv.platform === 'line') {
+                        const lineBody = JSON.stringify({
+                          to: conv.customer_platform_id,
+                          messages: [{ type: 'text', text: aiText }]
+                        });
+                        const lineOpts = {
+                          hostname: 'api.line.me',
+                          path: '/v2/bot/message/push',
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${config.access_token}`,
+                            'Content-Length': Buffer.byteLength(lineBody)
+                          }
+                        };
+                        const lr = https2.request(lineOpts, r => r.resume());
+                        lr.on('error', e => console.error('[AI Reply LINE]', e.message));
+                        lr.write(lineBody); lr.end();
+
+                      } else if (conv.platform === 'facebook') {
+                        const fbBody = JSON.stringify({
+                          recipient: { id: conv.customer_platform_id },
+                          message: { text: aiText }
+                        });
+                        const fbOpts = {
+                          hostname: 'graph.facebook.com',
+                          path: `/v19.0/me/messages?access_token=${config.access_token}`,
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            'Content-Length': Buffer.byteLength(fbBody)
+                          }
+                        };
+                        const fr = https2.request(fbOpts, r => r.resume());
+                        fr.on('error', e => console.error('[AI Reply FB]', e.message));
+                        fr.write(fbBody); fr.end();
+                      }
+
+                      console.log(`🤖 [AI Reply] ส่งให้ ${customerName} (conv#${conv.id}): "${aiText.substring(0, 50)}..."`);
+                    });
+                  }
+                );
+              } catch (e) {
+                console.error('[AI Reply] parse error:', e.message);
+              }
+            });
+          });
+          req.on('error', e => console.error('[AI Reply] request error:', e.message));
+          req.write(body); req.end();
+        }
+      );
+    }
+  );
 }
 
 // Export functions เพื่อให้ chatController เรียกใช้ได้

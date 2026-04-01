@@ -190,7 +190,7 @@ exports.getIssuingDetail = (req, res) => {
         at2.id AS approval_id, at2.approval_type,
         at2.approved_credit, at2.interest_per_year, at2.interest_per_month,
         at2.operation_fee, at2.land_tax_estimate, at2.advance_interest,
-        at2.is_cancelled, at2.approval_status,
+        at2.credit_table_file, at2.is_cancelled, at2.approval_status,
         it.id AS issuing_id,
         it.contract_appointment, it.contract_selling_pledge, it.contract_mortgage,
         it.reminder_selling_pledge, it.reminder_mortgage,
@@ -514,4 +514,67 @@ exports.updateIssuingStatus = (req, res) => {
       }
     });
   });
+};
+
+// ============================================================
+// GET /api/admin/issuing/dashboard
+// แดชบอร์ดฝ่ายออกสัญญา — สรุปรายสัปดาห์/เดือน/ปี
+// ============================================================
+exports.getIssuingDashboard = (req, res) => {
+  const period = req.query.period || 'week'
+  let dateExpr, groupExpr, labelExpr
+  if (period === 'year') {
+    dateExpr = `DATE(iss.created_at) >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)`
+    groupExpr = `DATE_FORMAT(iss.created_at, '%Y-%m')`; labelExpr = groupExpr
+  } else if (period === 'month') {
+    dateExpr = `DATE(iss.created_at) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)`
+    groupExpr = `DATE(iss.created_at)`; labelExpr = groupExpr
+  } else {
+    dateExpr = `DATE(iss.created_at) >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)`
+    groupExpr = `DATE(iss.created_at)`; labelExpr = groupExpr
+  }
+  const queries = []
+  queries.push(new Promise(resolve => {
+    db.query(`SELECT ${labelExpr} AS label, COUNT(*) AS cnt FROM issuing_transactions iss WHERE ${dateExpr} GROUP BY ${groupExpr} ORDER BY label ASC`,
+    (err, rows) => resolve({ key: 'issuing_trend', data: err ? [] : rows }))
+  }))
+  queries.push(new Promise(resolve => {
+    db.query(`SELECT COUNT(*) AS total,
+      SUM(CASE WHEN iss.issuing_status = 'pending' THEN 1 ELSE 0 END) AS pending,
+      SUM(CASE WHEN iss.issuing_status = 'sent' THEN 1 ELSE 0 END) AS sent,
+      SUM(CASE WHEN iss.contract_appointment = 1 THEN 1 ELSE 0 END) AS has_appointment,
+      SUM(CASE WHEN iss.contract_selling_pledge = 1 THEN 1 ELSE 0 END) AS selling_pledge,
+      SUM(CASE WHEN iss.contract_mortgage = 1 THEN 1 ELSE 0 END) AS mortgage,
+      COALESCE(SUM(iss.commission_amount), 0) AS total_commission
+    FROM issuing_transactions iss WHERE ${dateExpr}`,
+    (err, rows) => resolve({ key: 'summary', data: err ? {} : (rows[0] || {}) }))
+  }))
+  queries.push(new Promise(resolve => {
+    db.query(`SELECT COALESCE(iss.issuing_status, 'unknown') AS status, COUNT(*) AS cnt
+    FROM issuing_transactions iss WHERE ${dateExpr}
+    GROUP BY iss.issuing_status ORDER BY cnt DESC`,
+    (err, rows) => resolve({ key: 'status_dist', data: err ? [] : rows }))
+  }))
+  queries.push(new Promise(resolve => {
+    db.query(`SELECT ${labelExpr} AS label,
+      SUM(CASE WHEN iss.issuing_status = 'sent' THEN 1 ELSE 0 END) AS sent,
+      SUM(CASE WHEN iss.issuing_status = 'pending' THEN 1 ELSE 0 END) AS pending
+    FROM issuing_transactions iss WHERE ${dateExpr}
+    GROUP BY ${groupExpr} ORDER BY label ASC`,
+    (err, rows) => resolve({ key: 'status_trend', data: err ? [] : rows }))
+  }))
+  queries.push(new Promise(resolve => {
+    db.query(`SELECT iss.id, c.case_code, lr.contact_name, iss.issuing_status,
+      iss.commission_amount, iss.updated_at
+    FROM issuing_transactions iss
+    LEFT JOIN cases c ON c.id = iss.case_id
+    LEFT JOIN loan_requests lr ON lr.id = c.loan_request_id
+    WHERE iss.issuing_status = 'sent' AND ${dateExpr}
+    ORDER BY iss.updated_at DESC LIMIT 20`,
+    (err, rows) => resolve({ key: 'recent_sent', data: err ? [] : rows }))
+  }))
+  Promise.all(queries).then(results => {
+    const out = {}; results.forEach(r => { out[r.key] = r.data })
+    res.json({ success: true, period, dashboard: out })
+  }).catch(e => res.status(500).json({ success: false, message: e.message }))
 };

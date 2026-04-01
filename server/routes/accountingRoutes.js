@@ -5,6 +5,7 @@ const accountingController = require('../controllers/accountingController')
 
 // ฝ่ายบัญชี routes
 router.get('/stats', accountingController.getAccountingStats)
+router.get('/dashboard', accountingController.getAccountingDashboard)
 router.get('/debtors', accountingController.getAccountingDebtors)
 router.get('/investors', accountingController.getAccountingInvestors)
 router.get('/agents', accountingController.getAccountingAgents)

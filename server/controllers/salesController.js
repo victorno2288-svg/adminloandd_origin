@@ -2445,10 +2445,15 @@ exports.autoCreateCase = (req, res) => {
   const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || ''
 
   // 1. ดึงข้อมูลลูกหนี้ + เช็ค prerequisites
+  // JOIN approval_transactions เพราะ credit_table_file อยู่ในตารางนั้น ไม่ใช่ loan_requests
   db.query(
     `SELECT lr.*,
-       (SELECT COUNT(*) FROM cases WHERE loan_request_id = lr.id) as case_count
-     FROM loan_requests lr WHERE lr.id = ?`,
+       (SELECT COUNT(*) FROM cases WHERE loan_request_id = lr.id) as case_count,
+       at2.credit_table_file
+     FROM loan_requests lr
+     LEFT JOIN approval_transactions at2
+       ON at2.id = (SELECT id FROM approval_transactions WHERE loan_request_id = lr.id ORDER BY id DESC LIMIT 1)
+     WHERE lr.id = ?`,
     [id],
     (err, rows) => {
       if (err || !rows.length) return res.status(404).json({ success: false, message: 'ไม่พบลูกหนี้' })
@@ -2598,6 +2603,184 @@ exports.brokerContractSign = (req, res) => {
       res.json({ success: true, message: 'บันทึกการเซ็นสัญญาแล้ว', signed_at: new Date() })
     }
   )
+}
+
+// ============================================================
+// GET /api/admin/sales/sales-dashboard
+// แดชบอร์ดฝ่ายขาย — สรุปรายสัปดาห์/เดือน/ปี
+// ?period=week|month|year  (default: week)
+// ============================================================
+exports.getSalesDashboard = (req, res) => {
+  const isSales = req.user?.department === 'sales'
+  const userId = req.user?.id
+  const period = req.query.period || 'week' // week | month | year
+
+  // คำนวณ date range
+  let dateExpr, groupExpr, labelExpr, intervalCount
+  if (period === 'year') {
+    dateExpr = `DATE(d.created_at) >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)`
+    groupExpr = `DATE_FORMAT(d.created_at, '%Y-%m')`
+    labelExpr = `DATE_FORMAT(d.created_at, '%Y-%m')`
+    intervalCount = 12
+  } else if (period === 'month') {
+    dateExpr = `DATE(d.created_at) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)`
+    groupExpr = `DATE(d.created_at)`
+    labelExpr = `DATE(d.created_at)`
+    intervalCount = 30
+  } else {
+    // week (default) — 7 วัน
+    dateExpr = `DATE(d.created_at) >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)`
+    groupExpr = `DATE(d.created_at)`
+    labelExpr = `DATE(d.created_at)`
+    intervalCount = 7
+  }
+
+  // date filter for cases
+  let caseDateExpr = dateExpr.replace(/d\.created_at/g, 'c.created_at')
+  let caseDateExprUpdated = dateExpr.replace(/d\.created_at/g, 'c.updated_at')
+
+  // sales user filter
+  let salesWhereLr = ''
+  let salesWhereCase = ''
+  const salesParamsLr = []
+  const salesParamsCase = []
+  if (isSales && userId) {
+    salesWhereLr = ` AND (d.created_by_id = ?)`
+    salesParamsLr.push(userId)
+    salesWhereCase = ` AND (c.assigned_sales_id = ? OR lr.created_by_id = ?)`
+    salesParamsCase.push(userId, userId)
+  }
+
+  const queries = []
+
+  // 1. Lead ใหม่ตาม period (loan_requests)
+  queries.push(new Promise(resolve => {
+    db.query(`
+      SELECT ${labelExpr} AS label, COUNT(*) AS cnt
+      FROM loan_requests d
+      WHERE ${dateExpr}${salesWhereLr}
+      GROUP BY ${groupExpr}
+      ORDER BY label ASC
+    `, [...salesParamsLr], (err, rows) => resolve({ key: 'leads_trend', data: err ? [] : rows }))
+  }))
+
+  // 2. Lead แยกตาม source
+  queries.push(new Promise(resolve => {
+    db.query(`
+      SELECT lead_source, COUNT(*) AS cnt
+      FROM loan_requests d
+      WHERE ${dateExpr}${salesWhereLr}
+      GROUP BY lead_source
+      ORDER BY cnt DESC
+    `, [...salesParamsLr], (err, rows) => resolve({ key: 'leads_by_source', data: err ? [] : rows }))
+  }))
+
+  // 3. เคสใหม่ตาม period
+  queries.push(new Promise(resolve => {
+    db.query(`
+      SELECT ${labelExpr.replace(/d\.created_at/g, 'c.created_at')} AS label, COUNT(*) AS cnt
+      FROM cases c
+      LEFT JOIN loan_requests lr ON lr.id = c.loan_request_id
+      WHERE ${caseDateExpr}${salesWhereCase}
+      GROUP BY label
+      ORDER BY label ASC
+    `, [...salesParamsCase], (err, rows) => resolve({ key: 'cases_trend', data: err ? [] : rows }))
+  }))
+
+  // 4. Summary cards — รวม period นี้
+  queries.push(new Promise(resolve => {
+    db.query(`
+      SELECT
+        COUNT(*) AS total_leads,
+        SUM(CASE WHEN d.status = 'cancelled' THEN 1 ELSE 0 END) AS dead_leads
+      FROM loan_requests d
+      WHERE ${dateExpr}${salesWhereLr}
+    `, [...salesParamsLr], (err, rows) => resolve({ key: 'lead_summary', data: err ? {} : (rows[0] || {}) }))
+  }))
+
+  queries.push(new Promise(resolve => {
+    db.query(`
+      SELECT
+        COUNT(*) AS total_cases,
+        SUM(CASE WHEN c.status IN ('completed','legal_completed','auction_completed') THEN 1 ELSE 0 END) AS closed_cases,
+        SUM(CASE WHEN c.status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled_cases,
+        COALESCE(SUM(c.approved_amount), 0) AS total_approved,
+        SUM(CASE WHEN c.payment_status = 'paid' THEN 1 ELSE 0 END) AS paid_cases,
+        COALESCE(SUM(CASE WHEN c.payment_status = 'paid' THEN c.appraisal_fee ELSE 0 END), 0) AS total_appraisal_fee
+      FROM cases c
+      LEFT JOIN loan_requests lr ON lr.id = c.loan_request_id
+      WHERE ${caseDateExpr}${salesWhereCase}
+    `, [...salesParamsCase], (err, rows) => resolve({ key: 'case_summary', data: err ? {} : (rows[0] || {}) }))
+  }))
+
+  // 5. รายเซลล์ — เฉพาะ period นี้
+  queries.push(new Promise(resolve => {
+    const salesCaseDate = dateExpr.replace(/d\.created_at/g, 'c.created_at')
+    db.query(`
+      SELECT
+        u.id AS sales_id,
+        COALESCE(NULLIF(u.nickname,''), u.full_name) AS sales_name,
+        COUNT(c.id) AS total_cases,
+        SUM(CASE WHEN c.status IN ('completed','legal_completed','auction_completed') THEN 1 ELSE 0 END) AS closed,
+        SUM(CASE WHEN c.status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled,
+        COALESCE(SUM(c.approved_amount), 0) AS total_approved,
+        SUM(CASE WHEN c.payment_status = 'paid' THEN 1 ELSE 0 END) AS paid
+      FROM admin_users u
+      LEFT JOIN cases c ON c.assigned_sales_id = u.id AND ${salesCaseDate}
+      WHERE u.department = 'sales' AND u.status = 'active'
+      GROUP BY u.id
+      ORDER BY total_cases DESC
+    `, [], (err, rows) => resolve({ key: 'per_sales', data: err ? [] : rows }))
+  }))
+
+  // 6. เคสที่ปิดในช่วง period (closed deals) — ตาม updated_at
+  queries.push(new Promise(resolve => {
+    db.query(`
+      SELECT
+        c.id, c.case_code, lr.contact_name, c.approved_amount,
+        c.status AS case_status, c.updated_at,
+        COALESCE(NULLIF(u.nickname,''), u.full_name) AS sales_name
+      FROM cases c
+      LEFT JOIN loan_requests lr ON lr.id = c.loan_request_id
+      LEFT JOIN admin_users u ON u.id = c.assigned_sales_id
+      WHERE c.status IN ('completed','legal_completed','auction_completed')
+        AND ${caseDateExprUpdated}${salesWhereCase}
+      ORDER BY c.updated_at DESC
+      LIMIT 50
+    `, [...salesParamsCase], (err, rows) => resolve({ key: 'closed_deals', data: err ? [] : rows }))
+  }))
+
+  // 7. Dead reasons ช่วง period นี้
+  queries.push(new Promise(resolve => {
+    db.query(`
+      SELECT dead_reason, COUNT(*) AS cnt
+      FROM loan_requests d
+      WHERE dead_reason IS NOT NULL AND dead_reason != ''
+        AND ${dateExpr}${salesWhereLr}
+      GROUP BY dead_reason
+      ORDER BY cnt DESC
+    `, [...salesParamsLr], (err, rows) => resolve({ key: 'dead_reasons', data: err ? [] : rows }))
+  }))
+
+  // 8. Case status distribution — ช่วง period นี้
+  queries.push(new Promise(resolve => {
+    db.query(`
+      SELECT c.status, COUNT(*) AS cnt
+      FROM cases c
+      LEFT JOIN loan_requests lr ON lr.id = c.loan_request_id
+      WHERE ${caseDateExpr}${salesWhereCase}
+      GROUP BY c.status
+      ORDER BY cnt DESC
+    `, [...salesParamsCase], (err, rows) => resolve({ key: 'status_dist', data: err ? [] : rows }))
+  }))
+
+  Promise.all(queries).then(results => {
+    const out = {}
+    results.forEach(r => { out[r.key] = r.data })
+    res.json({ success: true, period, dashboard: out })
+  }).catch(e => {
+    res.status(500).json({ success: false, message: e.message })
+  })
 }
 
 // ============================================================

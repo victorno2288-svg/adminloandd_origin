@@ -452,6 +452,7 @@ export default function ChatPage() {
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterPlatform, setFilterPlatform] = useState('all')
   const [showDead, setShowDead] = useState(false)
+  const [showPendingWork, setShowPendingWork] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
   const [editingNote, setEditingNote] = useState(false)
   const [noteText, setNoteText] = useState('')
@@ -512,6 +513,14 @@ export default function ChatPage() {
   // Mobile adaptive states
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024)
   const [activeMobileView, setActiveMobileView] = useState('list') // 'list', 'chat', 'info'
+  // ★ Doc Slots Popup — แสดงรูปที่บันทึกไปในแต่ละช่องของ loan_request
+  const [showDocSlots, setShowDocSlots] = useState(false)
+  // ★ reply_mode saving state
+  const [savingReplyMode, setSavingReplyMode] = useState(false)
+  const [replyModeErr, setReplyModeErr] = useState('')
+  // ★ AI Flow selector
+  const [aiFlows, setAiFlows] = useState([])        // list of flows สำหรับ dropdown
+  const [savingFlow, setSavingFlow] = useState(false)
 
 
 
@@ -542,7 +551,13 @@ export default function ChatPage() {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-
+  // โหลด AI flows สำหรับ dropdown ใน info panel
+  useEffect(() => {
+    fetch(`${API}/flows/list-active`, { headers: { Authorization: 'Bearer ' + token() } })
+      .then(r => r.json())
+      .then(d => { if (d.success) setAiFlows(d.flows || []) })
+      .catch(() => {})
+  }, [])
 
   // Helper: เล่นเสียงแจ้งเตือน
   function playNotifSound() {
@@ -790,6 +805,27 @@ export default function ChatPage() {
       console.log('🔒 Socket auth error:', err.message)
     })
 
+    // 🤖 AI/Manual mode changed (จาก admin คนอื่น หรือจากตัวเอง)
+    socket.on('reply_mode_changed', (data) => {
+      if (data.conversationId === selectedConv) {
+        setConvDetail(prev => prev ? { ...prev, reply_mode: data.mode } : prev)
+      }
+    })
+
+    // 🏷️ AI Auto-tag — อัพเดทแท็กในลิสต์และหน้าแชทแบบ real-time
+    socket.on('tag_auto_set', (data) => {
+      // อัพ conversation list
+      setConversations(prev => prev.map(c =>
+        c.id === data.conv_id
+          ? { ...c, tag_id: data.tag_id, tag_name: data.tag_name }
+          : c
+      ))
+      // อัพ convDetail ถ้ากำลังเปิด conversation นั้นอยู่
+      if (convDetail && convDetail.id === data.conv_id) {
+        setConvDetail(prev => prev ? { ...prev, tag_id: data.tag_id, tag_name: data.tag_name } : prev)
+      }
+    })
+
     return () => {
       clearInterval(followupInterval)
       if (socketRef.current) {
@@ -802,7 +838,7 @@ export default function ChatPage() {
   // ดึง conversations ใหม่เมื่อ filter เปลี่ยน
   useEffect(() => {
     fetchConversations()
-  }, [filterStatus, filterPlatform, searchText, filterTag, showDead])
+  }, [filterStatus, filterPlatform, searchText, filterTag, showDead, showPendingWork])
 
   // ★ โหลดรายชื่อเซลล์สำหรับ Transfer + Admin list สำหรับ assign + Quick Replies
   useEffect(() => {
@@ -948,8 +984,9 @@ export default function ChatPage() {
     if (filterStatus !== 'all') params.set('status', filterStatus)
     if (filterPlatform !== 'all') params.set('platform', filterPlatform)
     if (searchText) params.set('search', searchText)
-    if (filterTag !== 'all') params.set('tag_id', filterTag)
+    if (filterTag !== 'all' && !showPendingWork) params.set('tag_id', filterTag)
     if (showDead) params.set('show_dead', '1')
+    if (showPendingWork) params.set('pending_work', '1')
 
     fetch(`${API}/conversations?${params}`, {
       headers: { 'Authorization': `Bearer ${token()}` }
@@ -1520,6 +1557,342 @@ export default function ChatPage() {
 
   // ============ RENDER ============
 
+  // ══════════════════════════════════════════════════════════════════
+  // DocSlotsPopup v3 — แสดง + อัพโหลดเอกสารทุก slot ใน loan_request
+  // รวมสถานะสมรส + เอกสารทรัพย์ + ซ่อน appraisal สำหรับ sales
+  // ★ v3: แต่ละ slot มีปุ่มอัพโหลดได้โดยตรง
+  // ══════════════════════════════════════════════════════════════════
+  function DocSlotsPopup({ conv, msgs, onClose }) {
+    const [uploadingSlot, setUploadingSlot] = useState(null)
+    const [localExtra, setLocalExtra] = useState({})
+    const [uploadMsg, setUploadMsg] = useState('')
+
+    const BASE = import.meta.env.VITE_API_URL?.replace('/api/admin', '') || ''
+    const parseJson = (v) => { try { const r = JSON.parse(v); return Array.isArray(r) ? r : (r ? [] : []) } catch { return [] } }
+    const imgUrl = (p) => !p ? null : p.startsWith('http') ? p : `${BASE}/${p.replace(/^\//, '')}`
+
+    // ── role check: sales ดูเอกสารประเมินไม่ได้ ──────────────────────
+    const isSales = currentUser?.department === 'sales'
+    const canSeeAppraisal = !isSales
+
+    // ── parse fields ─────────────────────────────────────────────────
+    const deedImages    = parseJson(conv.deed_images)
+    const lrImages      = parseJson(conv.lr_images)
+    const appraisalImgs = parseJson(conv.appraisal_images)
+    const appraisalBook = conv.appraisal_book_image ? [conv.appraisal_book_image] : []
+
+    const pj = (k) => parseJson(conv[k])
+
+    // ── section groups (dbField = column ใน loan_requests ที่อัพโหลดได้) ──
+    const SECTION_DEED = {
+      key: 'sec_deed', label: 'โฉนด / เอกสารสิทธิ์', icon: 'fas fa-file-alt', color: '#7c3aed', bg: '#f5f3ff',
+      slots: [
+        { key: 'deed_images',  label: 'โฉนด (รูปต้นฉบับ)',     items: deedImages,               dbField: 'deed_images' },
+        { key: 'deed_copy',    label: 'สำเนาโฉนด',             items: pj('deed_copy'),          dbField: 'deed_copy' },
+      ]
+    }
+
+    const SECTION_PROPERTY = {
+      key: 'sec_prop', label: 'รูป / เอกสารทรัพย์', icon: 'fas fa-home', color: '#16a34a', bg: '#f0fdf4',
+      slots: [
+        { key: 'property_img',     label: 'รูปถ่ายทรัพย์ (ภาพรวม)',   items: lrImages.filter(p => p.includes('uploads/properties/') || (p.includes('/properties/') && !p.includes('appraisal'))) },
+        { key: 'property_photos',  label: 'รูปถ่ายทรัพย์ (checklist)', items: pj('property_photos'),    dbField: 'property_photos' },
+        { key: 'building_permit',  label: 'ใบอนุญาตก่อสร้าง',         items: pj('building_permit'),    dbField: 'building_permit' },
+        { key: 'permit_img',       label: 'ใบอนุญาต (ไฟล์เดิม)',       items: lrImages.filter(p => p.includes('permits')) },
+        { key: 'house_reg_prop',   label: 'ทะเบียนบ้านทรัพย์',        items: pj('house_reg_prop'),     dbField: 'house_reg_prop' },
+        { key: 'land_tax_receipt', label: 'ใบเสร็จภาษีที่ดิน',        items: pj('land_tax_receipt'),   dbField: 'land_tax_receipt' },
+        { key: 'sale_contract',    label: 'สัญญาซื้อขาย',              items: pj('sale_contract'),      dbField: 'sale_contract' },
+        { key: 'debt_free_cert',   label: 'ใบปลอดหนี้',               items: pj('debt_free_cert'),     dbField: 'debt_free_cert' },
+        { key: 'blueprint',        label: 'แบบแปลน',                  items: pj('blueprint'),          dbField: 'blueprint' },
+        { key: 'location_sketch',  label: 'ภาพสเก็ตแผนที่',           items: pj('location_sketch_map'),dbField: 'location_sketch_map' },
+        { key: 'land_use_cert',    label: 'ใบรับรองการใช้ที่ดิน',      items: pj('land_use_cert'),      dbField: 'land_use_cert' },
+        { key: 'condo_deed',       label: 'โฉนดคอนโด',                items: pj('condo_title_deed'),   dbField: 'condo_title_deed' },
+        { key: 'floor_plan',       label: 'ผังห้อง / Floor Plan',      items: pj('floor_plan'),         dbField: 'floor_plan' },
+        { key: 'common_fee',       label: 'ใบเสร็จค่าส่วนกลาง',        items: pj('common_fee_receipt'), dbField: 'common_fee_receipt' },
+        { key: 'rental_contract',  label: 'สัญญาเช่า',                items: pj('rental_contract'),    dbField: 'rental_contract' },
+        { key: 'business_reg',     label: 'ทะเบียนพาณิชย์',           items: pj('business_reg'),       dbField: 'business_reg' },
+      ]
+    }
+
+    const SECTION_ID = {
+      key: 'sec_id', label: 'บัตรประชาชน / ทะเบียนบ้าน', icon: 'fas fa-id-card', color: '#b45309', bg: '#fffbeb',
+      slots: [
+        { key: 'id_img',        label: 'บัตรประชาชน (ไฟล์เดิม)',        items: lrImages.filter(p => p.includes('id-cards')) },
+        { key: 'borrower_id',   label: 'บัตรประชาชนผู้กู้',             items: pj('borrower_id_card'),  dbField: 'borrower_id_card' },
+        { key: 'house_reg',     label: 'สำเนาทะเบียนบ้าน',             items: pj('house_reg_book'),    dbField: 'house_reg_book' },
+        { key: 'name_change',   label: 'ใบเปลี่ยนชื่อ/สกุล',           items: pj('name_change_doc'),   dbField: 'name_change_doc' },
+      ]
+    }
+
+    const SECTION_MARITAL = {
+      key: 'sec_marital', label: 'เอกสารสถานะสมรส', icon: 'fas fa-heart', color: '#e11d48', bg: '#fff1f2',
+      slots: [
+        { key: 'marriage_cert',    label: 'ใบสมรส',                      items: pj('marriage_cert'),      dbField: 'marriage_cert' },
+        { key: 'spouse_id',        label: 'บัตรประชาชนคู่สมรส',          items: pj('spouse_id_card'),     dbField: 'spouse_id_card' },
+        { key: 'spouse_reg',       label: 'ทะเบียนบ้านคู่สมรส',          items: pj('spouse_reg_copy'),    dbField: 'spouse_reg_copy' },
+        { key: 'divorce_doc',      label: 'ใบหย่า',                      items: pj('divorce_doc'),        dbField: 'divorce_doc' },
+        { key: 'single_cert',      label: 'ใบรับรองโสด',                 items: pj('single_cert'),        dbField: 'single_cert' },
+        { key: 'death_cert',       label: 'ใบมรณบัตร',                  items: pj('death_cert'),         dbField: 'death_cert' },
+        { key: 'will_court',       label: 'พินัยกรรม / คำสั่งศาล',       items: pj('will_court_doc'),     dbField: 'will_court_doc' },
+        { key: 'testator_house',   label: 'ทะเบียนบ้านผู้ตาย',           items: pj('testator_house_reg'), dbField: 'testator_house_reg' },
+      ]
+    }
+
+    const SECTION_APPRAISAL = canSeeAppraisal ? {
+      key: 'sec_appraisal', label: 'เอกสารประเมิน', icon: 'fas fa-search-dollar', color: '#0369a1', bg: '#f0f9ff',
+      slots: [
+        { key: 'appraisal_imgs', label: 'รูปประเมิน',  items: appraisalImgs,  dbField: 'appraisal_images' },
+        { key: 'appraisal_book', label: 'เล่มประเมิน', items: appraisalBook,  dbField: 'appraisal_book_image' },
+      ]
+    } : null
+
+    const SECTIONS = [SECTION_DEED, SECTION_PROPERTY, SECTION_ID, SECTION_MARITAL, ...(SECTION_APPRAISAL ? [SECTION_APPRAISAL] : [])]
+
+    // ── รูปในแชทที่ยังไม่ได้เซฟ ─────────────────────────────────────
+    const allSavedFilenames = new Set(
+      [...deedImages, ...lrImages, ...appraisalImgs, ...appraisalBook,
+       ...SECTIONS.flatMap(s => s.slots.flatMap(sl => sl.items)),
+       ...Object.values(localExtra).flat()
+      ].map(p => (p || '').split('/').pop())
+    )
+    const chatImgs = msgs.filter(m => m.message_type === 'image' && m.attachment_url)
+    const unsavedImgs = chatImgs.filter(m => !allSavedFilenames.has(m.attachment_url.split('/').pop()))
+
+    const totalSaved = SECTIONS.reduce((s, sec) => s + sec.slots.reduce((ss, sl) => ss + sl.items.length + (localExtra[sl.dbField]||[]).length, 0), 0)
+    const totalSections = SECTIONS.filter(s => s.slots.some(sl => sl.items.length > 0 || (localExtra[sl.dbField]||[]).length > 0)).length
+
+    // ── อัพโหลดไฟล์เข้า slot ────────────────────────────────────────
+    const handleDocUpload = async (dbField, files) => {
+      if (!files || !files.length || !conv.id) return
+      setUploadingSlot(dbField)
+      setUploadMsg('')
+      const results = []
+      try {
+        for (const file of Array.from(files)) {
+          const fd = new FormData()
+          fd.append('doc_file', file)
+          const r = await fetch(`${API}/conversations/${conv.id}/upload-doc?field=${dbField}`, {
+            method: 'POST',
+            headers: { Authorization: 'Bearer ' + token() },
+            body: fd
+          })
+          const d = await r.json()
+          if (d.success) results.push(d.path)
+          else setUploadMsg(d.message || 'อัพโหลดไม่สำเร็จ')
+        }
+        if (results.length > 0) {
+          setLocalExtra(prev => ({ ...prev, [dbField]: [...(prev[dbField] || []), ...results] }))
+          setUploadMsg(`✓ อัพโหลด ${results.length} ไฟล์สำเร็จ`)
+          setTimeout(() => setUploadMsg(''), 3000)
+        }
+      } catch (e) {
+        setUploadMsg('เกิดข้อผิดพลาด: ' + e.message)
+      } finally {
+        setUploadingSlot(null)
+      }
+    }
+
+    // ── Thumb component ──────────────────────────────────────────────
+    const Thumb = ({ p, color, dashed }) => {
+      const url = imgUrl(p)
+      const isPdf = p.toLowerCase().endsWith('.pdf')
+      return (
+        <a href={url} target="_blank" rel="noreferrer" title={p.split('/').pop()}
+          style={{
+            width: 64, height: 64, borderRadius: 8, overflow: 'hidden', flexShrink: 0,
+            border: `2px ${dashed ? 'dashed' : 'solid'} #e2e8f0`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: isPdf ? '#fff1f2' : '#f1f5f9', textDecoration: 'none', cursor: 'pointer',
+            transition: 'border-color .15s, transform .15s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = color; e.currentTarget.style.transform = 'scale(1.05)' }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.transform = 'scale(1)' }}
+        >
+          {isPdf
+            ? <div style={{ textAlign: 'center' }}><i className="fas fa-file-pdf" style={{ color: '#ef4444', fontSize: 22 }}></i><div style={{ fontSize: 8, color: '#ef4444', fontWeight: 700, marginTop: 2 }}>PDF</div></div>
+            : <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                onError={e => { e.target.style.display='none'; e.target.parentElement.innerHTML='<i class="fas fa-image" style="color:#94a3b8;font-size:20px"></i>' }} />
+          }
+        </a>
+      )
+    }
+
+    return (
+      <div onClick={onClose} style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
+        zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12
+      }}>
+        <div onClick={e => e.stopPropagation()} style={{
+          background: '#fff', borderRadius: 16, width: '100%', maxWidth: 580,
+          maxHeight: '90vh', display: 'flex', flexDirection: 'column',
+          boxShadow: '0 25px 60px rgba(0,0,0,0.25)'
+        }}>
+
+          {/* ── Header ──────────────────────────────────────────── */}
+          <div style={{
+            padding: '14px 18px', borderBottom: '1px solid #f1f5f9',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            background: 'linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%)',
+            borderRadius: '16px 16px 0 0'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <i className="fas fa-images" style={{ color: '#fff', fontSize: 20 }}></i>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 14, color: '#fff' }}>เอกสารในระบบ</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)' }}>
+                  {totalSaved} ไฟล์ • {totalSections} หมวด
+                  {conv.debtor_code ? ` • ${conv.debtor_code}` : ''}
+                  {isSales && <span style={{ marginLeft: 6, background: 'rgba(255,255,255,0.2)', borderRadius: 6, padding: '0 6px' }}>ซ่อนเอกสารประเมิน</span>}
+                </div>
+              </div>
+            </div>
+            <button onClick={onClose} style={{
+              background: 'rgba(255,255,255,0.2)', border: 'none', cursor: 'pointer',
+              color: '#fff', fontSize: 18, borderRadius: 8, width: 32, height: 32,
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>×</button>
+          </div>
+
+          {/* ── Upload status msg ────────────────────────────────── */}
+          {uploadMsg && (
+            <div style={{
+              padding: '6px 18px', fontSize: 12, fontWeight: 600,
+              background: uploadMsg.startsWith('✓') ? '#f0fdf4' : '#fff1f2',
+              color: uploadMsg.startsWith('✓') ? '#15803d' : '#dc2626',
+              borderBottom: '1px solid #f1f5f9'
+            }}>
+              {uploadMsg}
+            </div>
+          )}
+
+          {/* ── Body ────────────────────────────────────────────── */}
+          <div style={{ overflowY: 'auto', padding: '10px 14px', flex: 1 }}>
+
+            {SECTIONS.map(sec => {
+              // แสดง slots ที่มีไฟล์แล้ว หรือ slots ที่ upload ได้ (dbField)
+              const visibleSlots = sec.slots.filter(sl => sl.items.length > 0 || (localExtra[sl.dbField]||[]).length > 0 || sl.dbField)
+              if (visibleSlots.length === 0) return null
+              const secTotal = sec.slots.reduce((s, sl) => s + sl.items.length + (localExtra[sl.dbField]||[]).length, 0)
+              return (
+                <div key={sec.key} style={{ marginBottom: 14 }}>
+                  {/* Section title */}
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6,
+                    padding: '5px 10px', background: sec.bg, borderRadius: 8,
+                    border: `1px solid ${sec.color}30`
+                  }}>
+                    <i className={sec.icon} style={{ color: sec.color, fontSize: 12 }}></i>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: sec.color, flex: 1 }}>{sec.label}</span>
+                    <span style={{
+                      background: secTotal > 0 ? sec.color : '#e2e8f0',
+                      color: secTotal > 0 ? '#fff' : '#94a3b8',
+                      fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 10
+                    }}>{secTotal}</span>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    {visibleSlots.map(slot => {
+                      const allItems = [...slot.items, ...(localExtra[slot.dbField] || [])]
+                      const isUploading = uploadingSlot === slot.dbField
+                      return (
+                        <div key={slot.key} style={{
+                          paddingLeft: 8, paddingBottom: 6,
+                          borderBottom: '1px solid #f1f5f9'
+                        }}>
+                          {/* Slot header: label + upload button */}
+                          <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span style={{ width: 4, height: 4, borderRadius: '50%', background: sec.color, display: 'inline-block', flexShrink: 0 }}></span>
+                            <span style={{ flex: 1 }}>{slot.label}</span>
+                            <span style={{ fontSize: 10, color: '#94a3b8', marginRight: 4 }}>({allItems.length})</span>
+                            {slot.dbField && conv.loan_request_id && (
+                              <label style={{
+                                display: 'flex', alignItems: 'center', gap: 3,
+                                padding: '2px 8px', borderRadius: 6, cursor: 'pointer',
+                                background: isUploading ? '#e2e8f0' : sec.bg,
+                                border: `1px solid ${isUploading ? '#cbd5e1' : sec.color}`,
+                                color: isUploading ? '#94a3b8' : sec.color,
+                                fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap',
+                                pointerEvents: isUploading ? 'none' : 'auto'
+                              }}>
+                                {isUploading
+                                  ? <><i className="fas fa-spinner fa-spin" style={{ fontSize: 9 }}></i> กำลังอัพ...</>
+                                  : <><i className="fas fa-upload" style={{ fontSize: 9 }}></i> อัพโหลด</>
+                                }
+                                <input
+                                  type="file"
+                                  accept="image/*,.pdf"
+                                  multiple
+                                  style={{ display: 'none' }}
+                                  disabled={isUploading}
+                                  onChange={e => { handleDocUpload(slot.dbField, e.target.files); e.target.value = '' }}
+                                />
+                              </label>
+                            )}
+                          </div>
+                          {/* Thumbs */}
+                          {allItems.length > 0 ? (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                              {allItems.map((p, idx) => <Thumb key={idx} p={p} color={sec.color} />)}
+                            </div>
+                          ) : (
+                            slot.dbField && conv.loan_request_id ? (
+                              <div style={{
+                                padding: '6px 10px', color: '#cbd5e1', fontSize: 10,
+                                background: '#f8fafc', borderRadius: 6, border: '1.5px dashed #e2e8f0',
+                                display: 'flex', alignItems: 'center', gap: 5
+                              }}>
+                                <i className="fas fa-cloud-upload-alt" style={{ color: '#cbd5e1' }}></i>
+                                ยังไม่มีไฟล์ — กดปุ่มอัพโหลดเพื่อเพิ่ม
+                              </div>
+                            ) : null
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
+
+            {/* รูปในแชทที่ยังไม่ได้เซฟ */}
+            {unsavedImgs.length > 0 && (
+              <div style={{ marginBottom: 10 }}>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6,
+                  padding: '5px 10px', background: '#fff7ed', borderRadius: 8, border: '1px solid #fed7aa'
+                }}>
+                  <i className="fas fa-clock" style={{ color: '#ea580c', fontSize: 12 }}></i>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#ea580c', flex: 1 }}>รูปในแชท (ยังไม่ได้เซฟ)</span>
+                  <span style={{ background: '#ea580c', color: '#fff', fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 10 }}>{unsavedImgs.length}</span>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, paddingLeft: 8 }}>
+                  {unsavedImgs.map((m, idx) => <Thumb key={idx} p={m.attachment_url} color="#ea580c" dashed />)}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── Footer ──────────────────────────────────────────── */}
+          {conv.loan_request_id && (
+            <div style={{
+              padding: '10px 14px', borderTop: '1px solid #f1f5f9',
+              background: '#f8fafc', borderRadius: '0 0 16px 16px', display: 'flex', gap: 8
+            }}>
+              <a href={`/sales/edit/${conv.loan_request_id}`} style={{
+                flex: 1, textAlign: 'center', padding: '8px 0',
+                background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff',
+                borderRadius: 8, fontSize: 12, fontWeight: 600, textDecoration: 'none',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
+              }}>
+                <i className="fas fa-folder-open"></i> เปิดหน้าลูกหนี้
+              </a>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   if (loading) {
     return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
       <i className="fas fa-spinner fa-spin" style={{ fontSize: 32, color: '#3b82f6' }}></i>
@@ -2076,8 +2449,23 @@ export default function ChatPage() {
                 <option value="line">LINE</option>
               </select>
             </div>
-            {/* Filter แท็ก */}
-            {tags.length > 0 && (
+            {/* งานค้าง active banner */}
+            {showPendingWork && (
+              <div style={{
+                marginTop: 6, padding: '5px 10px', borderRadius: 8,
+                background: '#dcfce7', border: '1.5px solid #86efac',
+                display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 600, color: '#15803d'
+              }}>
+                <i className="fas fa-briefcase"></i>
+                งานค้าง: รอข้อมูล + เข้าเกณฑ์ + ติดภาระ
+                <button onClick={() => setShowPendingWork(false)} style={{
+                  marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer',
+                  color: '#16a34a', fontSize: 13, padding: 0
+                }}><i className="fas fa-times"></i></button>
+              </div>
+            )}
+            {/* Filter แท็ก (ซ่อนเมื่อ showPendingWork เปิดอยู่) */}
+            {tags.length > 0 && !showPendingWork && (
               <select value={filterTag} onChange={e => setFilterTag(e.target.value)}
                 style={{ width: '100%', padding: 6, borderRadius: 6, border: '1px solid #e5e7eb', fontSize: 12, marginTop: 6 }}>
                 <option value="all">แท็ก: ทั้งหมด</option>
@@ -2137,7 +2525,7 @@ export default function ChatPage() {
                       style={{ color: isOverdue ? '#ef4444' : '#f59e0b', fontSize: 13, flexShrink: 0 }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 12, fontWeight: 600, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {conv.customer_name || conv.customer_phone || 'ไม่ทราบชื่อ'}
+                        {conv.customer_line_name || conv.customer_name || conv.customer_phone || 'ไม่ทราบชื่อ'}
                       </div>
                       {conv.followup_note && (
                         <div style={{ fontSize: 11, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -2205,7 +2593,7 @@ export default function ChatPage() {
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             color: '#fff', fontSize: 16, fontWeight: 700
                           }}>
-                            {(conv.customer_name || '?')[0].toUpperCase()}
+                            {(conv.customer_line_name || conv.customer_name || '?')[0].toUpperCase()}
                           </div>
                         )}
                         <i className={plt.icon} style={{
@@ -2222,7 +2610,7 @@ export default function ChatPage() {
                             fontSize: 14, color: '#333',
                             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160
                           }}>
-                            {conv.customer_name || 'ไม่ทราบชื่อ'}
+                            {conv.customer_line_name || conv.customer_name || 'ไม่ทราบชื่อ'}
                           </span>
                           <span style={{ fontSize: 11, color: '#999', flexShrink: 0 }}>
                             {formatTime(conv.last_message_at)}
@@ -2306,10 +2694,24 @@ export default function ChatPage() {
             )}
           </div>
 
-          {/* Dead Lead toggle ด้านล่าง list */}
-          <div style={{ padding: '8px 12px', borderTop: '1px solid #f0f0f0', background: '#fff' }}>
+          {/* ปุ่มด้านล่าง list: งานค้าง + Dead Leads */}
+          <div style={{ padding: '8px 12px', borderTop: '1px solid #f0f0f0', background: '#fff', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {/* ★ งานค้าง filter */}
             <button type="button"
-              onClick={() => setShowDead(v => !v)}
+              onClick={() => { setShowPendingWork(v => !v); if (showDead) setShowDead(false) }}
+              style={{
+                width: '100%', padding: '6px 0', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                background: showPendingWork ? '#dcfce7' : '#f9fafb',
+                color: showPendingWork ? '#15803d' : '#888',
+                border: showPendingWork ? '1.5px solid #86efac' : '1.5px solid #e5e7eb',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
+              }}>
+              <i className={`fas ${showPendingWork ? 'fa-layer-group' : 'fa-briefcase'}`}></i>
+              {showPendingWork ? 'งานค้าง (เปิดอยู่) — กดเพื่อดูทั้งหมด' : '📋 งานค้าง'}
+            </button>
+            {/* Dead Lead toggle */}
+            <button type="button"
+              onClick={() => { setShowDead(v => !v); if (showPendingWork) setShowPendingWork(false) }}
               style={{
                 width: '100%', padding: '6px 0', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer',
                 background: showDead ? '#fee2e2' : '#f9fafb',
@@ -2379,7 +2781,7 @@ export default function ChatPage() {
 
                   style={{ fontSize: 18, color: PLATFORM_ICONS[convDetail?.platform]?.color || '#666' }}></i>
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: 15 }}>{convDetail?.customer_name || 'ไม่ทราบชื่อ'}</div>
+                  <div style={{ fontWeight: 600, fontSize: 15 }}>{convDetail?.customer_line_name || convDetail?.customer_name || 'ไม่ทราบชื่อ'}</div>
                   <div style={{ fontSize: 11, color: '#999' }}>
                     {PLATFORM_ICONS[convDetail?.platform]?.label} • {messages.length} ข้อความ
                     {convDetail?.case_code && <span style={{ marginLeft: 6, color: '#7c3aed' }}>• เคส {convDetail.case_code}</span>}
@@ -2401,6 +2803,62 @@ export default function ChatPage() {
                       <i className="fas fa-exchange-alt"></i>
                       {!isMobile && 'โอนลูกหนี้'}
                     </button>
+                  )}
+
+                  {/* 🤖 AI / Manual reply — dropdown */}
+                  {convDetail && (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                      <select
+                        value={convDetail.reply_mode || 'manual'}
+                        disabled={savingReplyMode}
+                        onChange={async (e) => {
+                          const nextMode = e.target.value
+                          // guard: ไม่ทำซ้ำถ้าค่าไม่เปลี่ยน หรือกำลัง save อยู่
+                          if (nextMode === (convDetail.reply_mode || 'manual') || savingReplyMode) return
+                          setSavingReplyMode(true)
+                          setReplyModeErr('')
+                          try {
+                            const r = await fetch(`${API}/conversations/${selectedConv}/reply-mode`, {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token() },
+                              body: JSON.stringify({ mode: nextMode })
+                            })
+                            const d = await r.json()
+                            if (r.ok && d.success) {
+                              setConvDetail(prev => ({ ...prev, reply_mode: nextMode }))
+                            } else {
+                              setReplyModeErr(d.message || `Error ${r.status}`)
+                              setTimeout(() => setReplyModeErr(''), 5000)
+                            }
+                          } catch (err) {
+                            setReplyModeErr('เชื่อมต่อไม่ได้')
+                            setTimeout(() => setReplyModeErr(''), 5000)
+                          } finally {
+                            setSavingReplyMode(false)
+                          }
+                        }}
+                        style={{
+                          padding: '5px 10px', borderRadius: 8,
+                          cursor: savingReplyMode ? 'wait' : 'pointer',
+                          background: savingReplyMode ? '#e2e8f0'
+                            : (convDetail.reply_mode || 'manual') === 'ai' ? '#10b981' : '#f1f5f9',
+                          border: (convDetail.reply_mode || 'manual') === 'ai'
+                            ? '1.5px solid #059669' : '1.5px solid #cbd5e1',
+                          color: savingReplyMode ? '#94a3b8'
+                            : (convDetail.reply_mode || 'manual') === 'ai' ? '#fff' : '#64748b',
+                          fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap',
+                          appearance: 'auto', transition: 'all 0.2s', opacity: savingReplyMode ? 0.7 : 1
+                        }}
+                      >
+                        <option value="manual">✏️ ตอบเอง</option>
+                        <option value="ai">🤖 AI ตอบ</option>
+                      </select>
+                      {replyModeErr && (
+                        <div style={{ fontSize: 9, color: '#dc2626', fontWeight: 600, maxWidth: 120, textAlign: 'right' }}>
+                          ⚠ {replyModeErr}
+                        </div>
+                      )}
+                    </div>
                   )}
 
                   {/* ★ SLA badge */}
@@ -2491,7 +2949,7 @@ export default function ChatPage() {
                   <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, marginRight: 2, whiteSpace: 'nowrap' }}>
                     <i className="fas fa-tag" style={{ marginRight: 4 }}></i>แท็ก:
                   </span>
-                  {tags.map(tag => {
+                  {tags.filter(tag => tag.name !== 'ไม่เข้าเกณฑ์').map(tag => {
                     const isActive = convDetail?.tag_id === tag.id
                     return (
                       <button key={tag.id}
@@ -2650,7 +3108,8 @@ export default function ChatPage() {
                   }
 
                   // ===== Normal message =====
-                  const isAdmin = m.sender_type === 'admin'
+                  const isAi    = m.sender_type === 'ai'
+                  const isAdmin = m.sender_type === 'admin' || isAi
                   return (
                     <div key={m.id || i} style={{
                       display: 'flex', justifyContent: isAdmin ? 'flex-end' : 'flex-start',
@@ -2658,19 +3117,25 @@ export default function ChatPage() {
                     }}>
                       <div style={{
                         maxWidth: '70%', padding: '10px 14px', borderRadius: 16,
-                        background: isAdmin ? '#3b82f6' : '#fff',
+                        background: isAi ? '#10b981' : isAdmin ? '#3b82f6' : '#fff',
                         color: isAdmin ? '#fff' : '#333',
                         boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
                         borderBottomRightRadius: isAdmin ? 4 : 16,
                         borderBottomLeftRadius: isAdmin ? 16 : 4
                       }}>
+                        {/* badge AI */}
+                        {isAi && (
+                          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 2, fontWeight: 700 }}>
+                            🤖 AI Assistant
+                          </div>
+                        )}
                         {!isAdmin && m.sender_name && (
                           <div style={{ fontSize: 11, color: '#999', marginBottom: 2, fontWeight: 600 }}>
                             {m.sender_name}
                           </div>
                         )}
                         {/* super_admin เห็นชื่อแอดมินที่ตอบข้อความ — เพื่อดูพฤติกรรมพนักงาน */}
-                        {isAdmin && isSuperAdmin && m.sender_name && (
+                        {isAdmin && !isAi && isSuperAdmin && m.sender_name && (
                           <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', marginBottom: 2, fontWeight: 600 }}>
                             <i className="fas fa-user-shield" style={{ marginRight: 4, fontSize: 9 }}></i>
                             {m.sender_name}
@@ -2905,76 +3370,6 @@ export default function ChatPage() {
           {convDetail && (
             <div style={{ padding: 16 }}>
 
-              {/* ★ Quick Fill Panel — กรอกด่วน Ctrl+Enter */}
-              <div style={{ marginBottom: 14 }}>
-                <button
-                  onClick={() => setShowQuickFill(v => !v)}
-                  style={{
-                    width: '100%', padding: '8px 0',
-                    background: showQuickFill ? '#7c3aed' : 'linear-gradient(135deg,#7c3aed,#4f46e5)',
-                    color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer',
-                    fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
-                  }}>
-                  <i className="fas fa-bolt"></i> กรอกด่วน
-                  <span style={{ fontSize: 10, opacity: 0.75, fontWeight: 400 }}>Ctrl+Enter</span>
-                </button>
-
-                {showQuickFill && (
-                  <div style={{
-                    marginTop: 8, padding: 12, borderRadius: 10,
-                    background: '#faf5ff', border: '1.5px solid #c4b5fd',
-                    display: 'flex', flexDirection: 'column', gap: 7
-                  }}
-                    onKeyDown={e => { if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); handleQuickSave() } }}
-                  >
-                    <div style={{ fontSize: 11, color: '#7c3aed', fontWeight: 600, marginBottom: 2 }}>
-                      <i className="fas fa-keyboard" style={{ marginRight: 4 }}></i>
-                      กรอกแล้วกด Ctrl+Enter เพื่อบันทึก + สร้างเคสอัตโนมัติ
-                    </div>
-                    {[
-                      { key: 'customer_name',    placeholder: 'ชื่อจริง', icon: 'fas fa-user', type: 'text' },
-                      { key: 'contact_facebook', placeholder: 'ชื่อ Facebook (เฟส)', icon: 'fab fa-facebook', type: 'text' },
-                      { key: 'contact_line',     placeholder: 'LINE ID / ชื่อไลน์', icon: 'fab fa-line', type: 'text' },
-                      { key: 'customer_phone',   placeholder: 'เบอร์โทร', icon: 'fas fa-phone', type: 'tel' },
-                      { key: 'customer_email',   placeholder: 'อีเมล', icon: 'fas fa-envelope', type: 'email' },
-                    ].map(({ key, placeholder, icon, type }) => (
-                      <div key={key} style={{ position: 'relative' }}>
-                        <i className={icon} style={{
-                          position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)',
-                          color: '#9ca3af', fontSize: 12, pointerEvents: 'none'
-                        }}></i>
-                        <input
-                          type={type}
-                          value={customerForm[key] || ''}
-                          onChange={e => setCustomerForm(prev => ({ ...prev, [key]: e.target.value }))}
-                          placeholder={placeholder}
-                          style={{ width: '100%', padding: '7px 8px 7px 28px', borderRadius: 7, border: '1px solid #ddd8fe', fontSize: 12, boxSizing: 'border-box' }}
-                        />
-                      </div>
-                    ))}
-                    <select
-                      value={customerForm.province || ''}
-                      onChange={e => setCustomerForm(prev => ({ ...prev, province: e.target.value }))}
-                      style={{ width: '100%', padding: '7px 8px', borderRadius: 7, border: '1px solid #ddd8fe', fontSize: 12, color: customerForm.province ? '#111' : '#9ca3af' }}
-                    >
-                      <option value="">— จังหวัด —</option>
-                      {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
-                    </select>
-                    <button
-                      onClick={handleQuickSave}
-                      disabled={quickSaving || (!customerForm.customer_name && !customerForm.customer_phone)}
-                      style={{
-                        padding: '8px 0', borderRadius: 8, border: 'none', cursor: 'pointer',
-                        background: quickSaving ? '#e5e7eb' : '#7c3aed', color: quickSaving ? '#9ca3af' : '#fff',
-                        fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
-                      }}>
-                      {quickSaving
-                        ? <><i className="fas fa-spinner fa-spin"></i> กำลังบันทึก...</>
-                        : <><i className="fas fa-check-circle"></i> บันทึก + สร้างเคส</>}
-                    </button>
-                  </div>
-                )}
-              </div>
 
               {/* Customer avatar + name */}
               <div style={{ textAlign: 'center', marginBottom: 20 }}>
@@ -2989,10 +3384,13 @@ export default function ChatPage() {
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     color: '#fff', fontSize: 28, fontWeight: 700
                   }}>
-                    {(convDetail.customer_name || '?')[0].toUpperCase()}
+                    {(convDetail.customer_line_name || convDetail.customer_name || '?')[0].toUpperCase()}
                   </div>
                 )}
-                <div style={{ fontWeight: 700, fontSize: 16 }}>{convDetail.customer_name || 'ไม่ทราบชื่อ'}</div>
+                <div style={{ fontWeight: 700, fontSize: 16 }}>{convDetail.customer_line_name || convDetail.customer_name || 'ไม่ทราบชื่อ'}</div>
+                {convDetail.customer_line_name && convDetail.customer_name && convDetail.customer_line_name !== convDetail.customer_name && (
+                  <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>ชื่อจริง: {convDetail.customer_name}</div>
+                )}
                 <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>
                   <i className={PLATFORM_ICONS[convDetail.platform]?.icon}
                     style={{ color: PLATFORM_ICONS[convDetail.platform]?.color, marginRight: 4 }}></i>
@@ -3045,15 +3443,84 @@ export default function ChatPage() {
                   </div>
                 ) : (
                   <div style={{ fontSize: 13 }}>
-                    <InfoRow icon="fas fa-user" label="ชื่อ" value={convDetail.customer_name} />
+                    {convDetail.customer_line_name && <InfoRow icon={convDetail.platform === 'line' ? 'fab fa-line' : 'fab fa-facebook-messenger'} label="ชื่อ LINE/FB" value={convDetail.customer_line_name} />}
+                    <InfoRow icon="fas fa-user" label="ชื่อจริง (admin)" value={convDetail.customer_name} />
                     {convDetail.contact_facebook && <InfoRow icon="fab fa-facebook" label="Facebook" value={convDetail.contact_facebook} />}
-                    {convDetail.contact_line && <InfoRow icon="fab fa-line" label="LINE" value={convDetail.contact_line} />}
+                    {convDetail.contact_line && <InfoRow icon="fab fa-line" label="LINE ID" value={convDetail.contact_line} />}
                     <InfoRow icon="fas fa-phone" label="เบอร์" value={convDetail.customer_phone} />
                     <InfoRow icon="fas fa-envelope" label="อีเมล" value={convDetail.customer_email} />
                     {convDetail.province && <InfoRow icon="fas fa-map-marker-alt" label="จังหวัด" value={convDetail.province} />}
                     <InfoRow icon="fas fa-id-badge" label="Platform ID" value={convDetail.customer_platform_id} small />
                   </div>
                 )}
+              </div>
+
+              {/* ===== 🤖 AI Flow Selector ===== */}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  marginBottom: 8, borderBottom: '1px solid #f0f0f0', paddingBottom: 6
+                }}>
+                  <span style={{ fontWeight: 600, fontSize: 13, color: '#555' }}>
+                    <i className="fas fa-robot" style={{ marginRight: 6, color: '#6366f1' }}></i>AI Flow
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <select
+                    value={convDetail.active_flow_id || ''}
+                    disabled={savingFlow}
+                    onChange={async (e) => {
+                      const flowId = e.target.value ? parseInt(e.target.value) : null
+                      if (flowId === (convDetail.active_flow_id || null)) return
+                      setSavingFlow(true)
+                      try {
+                        const r = await fetch(`${API}/conversations/${selectedConv}/active-flow`, {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token() },
+                          body: JSON.stringify({ flow_id: flowId })
+                        })
+                        const d = await r.json()
+                        if (d.success) {
+                          const flow = aiFlows.find(f => f.id === flowId)
+                          setConvDetail(prev => ({
+                            ...prev,
+                            active_flow_id: flowId,
+                            active_flow_name: flow?.flow_name || null,
+                            active_flow_prompt: flow?.ai_system_prompt || null
+                          }))
+                        }
+                      } catch(err) { console.error(err) }
+                      finally { setSavingFlow(false) }
+                    }}
+                    style={{
+                      width: '100%', padding: '7px 10px', borderRadius: 8, fontSize: 12,
+                      border: '1.5px solid #a5b4fc', background: convDetail.active_flow_id ? '#eef2ff' : '#f8fafc',
+                      color: convDetail.active_flow_id ? '#3730a3' : '#6b7280',
+                      cursor: savingFlow ? 'wait' : 'pointer', fontWeight: 600
+                    }}
+                  >
+                    <option value="">— ไม่ใช้ AI Flow (ใช้ prompt default) —</option>
+                    {aiFlows.map(f => (
+                      <option key={f.id} value={f.id}>{f.flow_name}</option>
+                    ))}
+                  </select>
+                  {convDetail.active_flow_prompt && (
+                    <div style={{
+                      fontSize: 10, color: '#4338ca', background: '#eef2ff',
+                      border: '1px solid #c7d2fe', borderRadius: 6, padding: '5px 8px',
+                      lineHeight: 1.5, maxHeight: 60, overflow: 'hidden',
+                      position: 'relative'
+                    }}>
+                      <i className="fas fa-info-circle" style={{ marginRight: 4 }}></i>
+                      {convDetail.active_flow_prompt.slice(0, 120)}{convDetail.active_flow_prompt.length > 120 ? '…' : ''}
+                    </div>
+                  )}
+                  {!convDetail.active_flow_id && (
+                    <div style={{ fontSize: 10, color: '#9ca3af' }}>
+                      AI จะใช้ prompt default ของระบบ
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* ===== SOP Warning: ทรัพย์ไม่ผ่านเกณฑ์ ===== */}
@@ -3217,6 +3684,35 @@ export default function ChatPage() {
                       >
                         <i className="fas fa-external-link-alt"></i> ดูข้อมูล
                       </button>
+
+                      {/* ★ ปุ่มรูปในระบบ */}
+                      <button
+                        onClick={() => setShowDocSlots(true)}
+                        title="ดูรูปที่บันทึกไปในแต่ละช่อง"
+                        style={{
+                          padding: '7px 10px', border: 'none', borderRadius: 8,
+                          cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                          background: (() => {
+                            const pj = (v) => { try { const r = JSON.parse(v); return Array.isArray(r) ? r : [] } catch { return [] } }
+                            const n = [...pj(convDetail.deed_images), ...pj(convDetail.lr_images), ...pj(convDetail.appraisal_images)].length
+                            return n > 0 ? '#6366f1' : '#e2e8f0'
+                          })(),
+                          color: (() => {
+                            const pj = (v) => { try { const r = JSON.parse(v); return Array.isArray(r) ? r : [] } catch { return [] } }
+                            const n = [...pj(convDetail.deed_images), ...pj(convDetail.lr_images)].length
+                            return n > 0 ? '#fff' : '#94a3b8'
+                          })(),
+                        }}
+                      >
+                        <i className="fas fa-images"></i>
+                        {(() => {
+                          const pj = (v) => { try { const r = JSON.parse(v); return Array.isArray(r) ? r : [] } catch { return [] } }
+                          const n = [...pj(convDetail.deed_images), ...pj(convDetail.lr_images), ...pj(convDetail.appraisal_images)].length
+                          return n > 0 ? <span style={{ background: 'rgba(255,255,255,0.25)', borderRadius: 8, padding: '0 5px', fontSize: 10 }}>{n}</span> : null
+                        })()}
+                      </button>
+
                       <button
                         onClick={async () => {
                           try {
@@ -3425,38 +3921,9 @@ export default function ChatPage() {
               </div>
               )}
 
-              {/* แท็กสถานะ */}
+              {/* สร้างเมื่อ + Assign */}
               <div style={{ marginBottom: 16 }}>
-                <div style={{
-                  fontWeight: 600, fontSize: 13, color: '#555', marginBottom: 8,
-                  borderBottom: '1px solid #f0f0f0', paddingBottom: 6
-                }}>
-                  <i className="fas fa-tag" style={{ marginRight: 6 }}></i>แท็กสถานะ
-                </div>
-                {/* แสดงแท็กปัจจุบัน */}
-                {convDetail.tag_name && (
-                  <div style={{ marginBottom: 6 }}>
-                    <span style={{
-                      padding: '3px 12px', borderRadius: 12, fontSize: 12, fontWeight: 600,
-                      background: convDetail.tag_bg_color, color: convDetail.tag_text_color
-                    }}>{convDetail.tag_name}</span>
-                  </div>
-                )}
-                {/* Dropdown เลือกแท็ก */}
-                <select
-                  value={convDetail.tag_id || ''}
-                  onChange={e => setConversationTag(convDetail.id, e.target.value ? parseInt(e.target.value) : null)}
-                  style={{ width: '100%', padding: 6, borderRadius: 6, border: '1px solid #ddd', fontSize: 12 }}
-                >
-                  <option value="">— ไม่มีแท็ก —</option>
-                  {tags.map(tag => (
-                    <option key={tag.id} value={tag.id}>{tag.name}</option>
-                  ))}
-                </select>
-                {tags.length === 0 && (
-                  <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>ยังไม่มีแท็ก — สร้างในตั้งค่า</div>
-                )}
-                <div style={{ fontSize: 11, color: '#999', marginTop: 8 }}>
+                <div style={{ fontSize: 11, color: '#999', marginBottom: 8 }}>
                   สร้างเมื่อ: {formatTime(convDetail.created_at)}
                 </div>
                 {/* Assign conversation to admin */}
@@ -3559,46 +4026,6 @@ export default function ChatPage() {
                 </div>
               )}
 
-              {/* Notes */}
-              <div>
-                <div style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  marginBottom: 8, borderBottom: '1px solid #f0f0f0', paddingBottom: 6
-                }}>
-                  <span style={{ fontWeight: 600, fontSize: 13, color: '#555' }}>
-                    <i className="fas fa-sticky-note" style={{ marginRight: 6 }}></i>บันทึก
-                  </span>
-                  <button onClick={() => setEditingNote(!editingNote)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#3b82f6', fontSize: 12 }}>
-                    <i className="fas fa-edit"></i>
-                  </button>
-                </div>
-
-                {editingNote ? (
-                  <div>
-                    <textarea value={noteText} onChange={e => setNoteText(e.target.value)}
-                      rows={4} placeholder="เพิ่มบันทึก..."
-                      style={{
-                        width: '100%', padding: 8, borderRadius: 6, border: '1px solid #ddd',
-                        fontSize: 13, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit'
-                      }} />
-                    <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-                      <button onClick={saveNote}
-                        style={{ flex: 1, padding: 6, background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
-                        บันทึก
-                      </button>
-                      <button onClick={() => setEditingNote(false)}
-                        style={{ flex: 1, padding: 6, background: '#f0f0f0', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
-                        ยกเลิก
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ fontSize: 13, color: noteText ? '#333' : '#999', padding: 4, lineHeight: 1.6 }}>
-                    {noteText || 'ยังไม่มีบันทึก — คลิก แก้ไข เพื่อเพิ่ม'}
-                  </div>
-                )}
-              </div>
 
 
               {/* ===== ★ Follow-up Reminder (ตั้งวันนัดติดตาม) ===== */}
@@ -3665,6 +4092,15 @@ export default function ChatPage() {
           )}
         </div>
       </div>
+
+      {/* ★ DocSlots Popup — รูปที่บันทึกในแต่ละช่อง loan_request */}
+      {showDocSlots && convDetail && (
+        <DocSlotsPopup
+          conv={convDetail}
+          msgs={messages}
+          onClose={() => setShowDocSlots(false)}
+        />
+      )}
 
       {/* ★ Follow-up Schedule Modal */}
       {showFollowupModal && (

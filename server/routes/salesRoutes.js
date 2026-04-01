@@ -48,6 +48,7 @@ const scheduleUpload = upload.fields([
 // สถิติ
 router.get('/stats', salesController.getSalesStats)
 router.get('/kpi', salesController.getKpiStats)
+router.get('/sales-dashboard', salesController.getSalesDashboard)
 router.get('/case-journey', salesController.getCaseJourney)
 
 // Auto-matching (ค้นหาคู่ลูกหนี้-นายหน้า)

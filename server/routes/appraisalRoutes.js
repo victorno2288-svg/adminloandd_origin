@@ -5,6 +5,7 @@ const appraisalController = require('../controllers/appraisalController')
 
 // ฝ่ายประเมิน
 router.get('/stats', appraisalController.getAppraisalStats)
+router.get('/dashboard', appraisalController.getAppraisalDashboard)
 router.get('/cases', appraisalController.getAppraisalCases)
 router.get('/cases/:caseId', appraisalController.getCaseDetail)
 router.put('/result/:caseId', appraisalController.updateAppraisalResult)
